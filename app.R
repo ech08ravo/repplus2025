@@ -3,6 +3,9 @@ library(OpenRepGrid)
 library(DT)
 library(uuid)
 
+# Source the focus analysis functions
+source("R/focus_analysis.R")
+
 ui <- fluidPage(
   tags$head(tags$style(HTML('
     .container-fluid { max-width: 1400px; }
