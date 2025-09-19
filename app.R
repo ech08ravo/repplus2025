@@ -35,6 +35,11 @@ ui <- fluidPage(
       checkboxInput("impute_missing", "Impute missing ratings (use 4)", value = FALSE),
       selectInput("col_elements", "Element color", choices = c("black","blue","red","darkgreen","purple"), selected = "blue"),
       selectInput("col_constructs", "Construct color", choices = c("black","red","orange","darkgreen","brown"), selected = "red"),
+      selectInput(
+        "heat_palette", "Heatmap palette",
+        choices = c("Blue-White-Red", "Greys", "Terrain"),
+        selected = "Blue-White-Red"
+      ),
       actionButton("analyze", "Analyze Grid"),
       tags$hr(),
       downloadButton("download_grid", "Download Grid as CSV"),
@@ -45,27 +50,15 @@ ui <- fluidPage(
       tabsetPanel(
         tabPanel(
           "Summary & Biplot",
-          h4("Elements List"),
-          uiOutput("elements_ui"),
-          h4("Constructs List"),
-          uiOutput("constructs_ui"),
-          tags$hr(),
-          h4("Missing Ratings"),
-          tableOutput("missing_table"),
-          tags$hr(),
-          h4("Analysis Summary"),
-          verbatimTextOutput("analysis_summary"),
-          h4("PCA Biplot (colored)"),
-          plotOutput("pca_biplot")
+          h4("Elements List"), uiOutput("elements_ui"),
+          h4("Constructs List"), uiOutput("constructs_ui"),
+          tags$hr(), h4("Missing Ratings"), tableOutput("missing_table"),
+          tags$hr(), h4("Analysis Summary"), verbatimTextOutput("analysis_summary"),
+          h4("PCA Biplot (colored)"), plotOutput("pca_biplot")
         ),
-        tabPanel(
-          "Element Dendrogram",
-          plotOutput("dend_elements")
-        ),
-        tabPanel(
-          "Construct Dendrogram",
-          plotOutput("dend_constructs")
-        )
+        tabPanel("Heatmap", plotOutput("heatmap_plot", height = 500)),
+        tabPanel("Element Dendrogram", plotOutput("dend_elements")),
+        tabPanel("Construct Dendrogram", plotOutput("dend_constructs"))
       )
     )
   )
@@ -350,6 +343,28 @@ server <- function(input, output, session) {
       text(load[,1], load[,2], labels = paste(rv$constructs$left, "-", rv$constructs$right),
            pos = 4, col = input$col_constructs)
       abline(h = 0, v = 0, lty = 3)
+    })
+
+    output$heatmap_plot <- renderPlot({
+      sm <- rv$scores_mat_last
+      if (is.null(sm)) return()
+      # Build palette
+      pal <- switch(
+        input$heat_palette,
+        "Blue-White-Red" = colorRampPalette(c("#2166AC", "#FFFFFF", "#B2182B"))(100),
+        "Greys" = gray.colors(100, start = 0.95, end = 0.2),
+        "Terrain" = terrain.colors(100)
+      )
+      # Flip rows so first element appears at top
+      z <- t(sm[nrow(sm):1, , drop = FALSE])
+      image(
+        x = 1:ncol(sm), y = 1:nrow(sm), z = z,
+        col = pal, axes = FALSE, xlab = "Elements", ylab = "Constructs"
+      )
+      axis(1, at = 1:ncol(sm), labels = rv$elements, las = 2, cex.axis = 0.8)
+      labs <- paste(rv$constructs$left, "-", rv$constructs$right)
+      axis(2, at = 1:nrow(sm), labels = rev(labs), las = 2, cex.axis = 0.8)
+      box()
     })
 
     output$dend_elements <- renderPlot({
