@@ -32,6 +32,7 @@ ui <- fluidPage(
       DTOutput("ratings_table"),
       actionButton("remove_rating", "Remove selected rating"),
       tags$hr(),
+      checkboxInput("impute_missing", "Impute missing ratings (use 4)", value = FALSE),
       actionButton("analyze", "Analyze Grid"),
       tags$hr(),
       downloadButton("download_grid", "Download Grid as CSV"),
@@ -43,6 +44,9 @@ ui <- fluidPage(
       uiOutput("elements_ui"),
       h4("Constructs List"),
       uiOutput("constructs_ui"),
+      tags$hr(),
+      h4("Missing Ratings"),
+      tableOutput("missing_table"),
       tags$hr(),
       h4("Analysis Summary"),
       verbatimTextOutput("analysis_summary"),
@@ -117,6 +121,19 @@ server <- function(input, output, session) {
     }
     updateSelectInput(session, "rating_construct", choices = construct_labels)
   })
+
+  compute_missing <- reactive({
+    if (length(rv$elements) == 0 || nrow(rv$constructs) == 0) return(NULL)
+    construct_labels <- paste(rv$constructs$left, "-", rv$constructs$right)
+    all_pairs <- expand.grid(element = rv$elements, construct = construct_labels, stringsAsFactors = FALSE)
+    key <- paste(rv$ratings$element, rv$ratings$construct, sep = "||")
+    all_key <- paste(all_pairs$element, all_pairs$construct, sep = "||")
+    missing_idx <- !(all_key %in% key)
+    if (!any(missing_idx)) return(NULL)
+    all_pairs[missing_idx, , drop = FALSE]
+  })
+
+  output$missing_table <- renderTable({ compute_missing() }, rownames = FALSE)
 
   observeEvent(input$add_rating, {
     req(input$rating_element, input$rating_construct, input$rating_score)
@@ -239,23 +256,30 @@ server <- function(input, output, session) {
       }
     }
 
-    # STRICT MODE: require a complete grid
+    # Handle missing values: abort (strict) or impute midpoint
     if (any(is.na(scores_mat))) {
-      output$analysis_summary <- renderPrint({
-        cat(
-          "Analysis aborted: some ratings are missing.\n",
-          "Please provide a rating for every element–construct pair."
-        )
-      })
-      output$construct_plot <- renderPlot({
-        plot.new()
-        text(
-          0.5, 0.5,
-          "Some ratings are missing – please complete the grid",
-          cex = 1.2
-        )
-      })
-      return()
+      if (!isTRUE(input$impute_missing)) {
+        output$analysis_summary <- renderPrint({
+          cat(
+            "Analysis aborted: some ratings are missing.\n",
+            "Tick 'Impute missing ratings (use 4)' or complete all ratings."
+          )
+        })
+        output$construct_plot <- renderPlot({
+          plot.new()
+          text(
+            0.5, 0.5,
+            "Missing ratings detected – complete grid or enable imputation",
+            cex = 1.1
+          )
+        })
+        return()
+      } else {
+        scores_mat[is.na(scores_mat)] <- 4
+        imputed <- TRUE
+      }
+    } else {
+      imputed <- FALSE
     }
 
     scores_vec <- as.vector(t(scores_mat))
@@ -266,7 +290,12 @@ server <- function(input, output, session) {
       scores = scores_vec
     ))
 
-    output$analysis_summary <- renderPrint({ summary(repgrid_obj) })
+    output$analysis_summary <- renderPrint({
+      if (isTRUE(imputed)) {
+        cat("Note: Missing ratings were imputed with 4 (midpoint).\n\n")
+      }
+      print(summary(repgrid_obj))
+    })
     output$construct_plot <- renderPlot({
       if (length(rv$elements) < 3 || nrow(rv$constructs) < 3) {
         plot.new()
