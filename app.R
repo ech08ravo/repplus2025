@@ -211,6 +211,18 @@ server <- function(input, output, session) {
         ][1]
       }
     }
+    # STRICT MODE: require a complete grid
+    if (any(is.na(scores_mat))) {
+      output$analysis_summary <- renderPrint({
+        cat("Analysis aborted: some ratings are missing.\n",
+            "Please provide a rating for every element–construct pair.")
+      })
+      output$construct_plot <- renderPlot({
+        plot.new()
+        text(0.5, 0.5, "Some ratings are missing – please complete the grid", cex = 1.2)
+      })
+      return()
+    }
     scores_vec <- as.vector(t(scores_mat))
     args <- list(name=rv$elements,
                  l.name=rv$constructs$left,
