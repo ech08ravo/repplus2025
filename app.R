@@ -17,6 +17,9 @@ ui <- fluidPage(
   titlePanel("RepGrid Elicitation"),
   sidebarLayout(
     sidebarPanel(
+      fileInput("rgrid_file", "Import .rgrid", accept = ".rgrid"),
+      actionButton("import_rgrid", "Load Grid"),
+      tags$hr(),
       actionButton("load_sample", "Load Sample Data"),
       tags$hr(),
       # Element inputs
@@ -79,6 +82,53 @@ server <- function(input, output, session) {
       element = rep(rv$elements, times = nrow(rv$constructs)),
       construct = rep(paste(rv$constructs$left, "-", rv$constructs$right), each = length(rv$elements)),
       rating = c(4,2,6, 5,3,7, 6,4,2), # example ratings e1-e3 for each construct
+      stringsAsFactors = FALSE
+    )
+  })
+  
+  # Import .rgrid
+  observeEvent(input$import_rgrid, {
+    req(input$rgrid_file)
+    txt <- readLines(input$rgrid_file$datapath, warn = FALSE, encoding = "UTF-8")
+
+    # Parse constructs (lines starting with C)
+    C_lines <- grep("^C\\d+\\t", txt, value = TRUE)
+    if (length(C_lines) == 0) return(NULL)
+    cons_split <- lapply(C_lines, function(l) strsplit(l, "\t")[[1]])
+    left  <- vapply(cons_split, function(p) if (length(p) >= 8) p[8] else NA_character_, character(1))
+    right <- vapply(cons_split, function(p) if (length(p) >= 9) p[9] else NA_character_, character(1))
+    nC <- length(left)
+
+    # Parse elements (lines starting with E) and their scores
+    E_lines <- grep("^E\\d+\\t", txt, value = TRUE)
+    if (length(E_lines) == 0) return(NULL)
+    nE <- length(E_lines)
+    elements <- character(nE)
+    scores_mat <- matrix(NA_real_, nrow = nE, ncol = nC)
+
+    for (i in seq_len(nE)) {
+      parts <- strsplit(E_lines[i], "\t")[[1]]
+      # element name is last field
+      elements[i] <- parts[length(parts)]
+      # scores are the nC fields before the last field
+      if (length(parts) >= (6 + nC + 1)) {
+        start <- length(parts) - nC
+        end   <- length(parts) - 1
+        scores_mat[i, ] <- suppressWarnings(as.numeric(parts[start:end]))
+      } else if (length(parts) >= 6 + nC) {
+        # fallback if no trailing name (unlikely)
+        scores_mat[i, ] <- suppressWarnings(as.numeric(parts[7:(6 + nC)]))
+      }
+    }
+
+    # Update reactive values
+    rv$elements <- elements
+    rv$constructs <- data.frame(left = left, right = right, stringsAsFactors = FALSE)
+    labels <- paste(left, "-", right)
+    rv$ratings <- data.frame(
+      element   = rep(elements, times = nC),
+      construct = rep(labels,   each  = nE),
+      rating    = as.vector(scores_mat),
       stringsAsFactors = FALSE
     )
   })
