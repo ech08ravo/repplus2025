@@ -4,6 +4,16 @@ library(DT)
 
 # Define UI ----
 ui <- fluidPage(
+  tags$head(
+    tags$style(HTML("
+      .container-fluid {
+        max-width: 1400px;
+      }
+      .dataTables_wrapper {
+        overflow-x: auto;
+      }
+    "))
+  ),
   titlePanel("RepGrid Elicitation"),
   sidebarLayout(
     sidebarPanel(
@@ -33,7 +43,7 @@ ui <- fluidPage(
       tags$hr(),
       # Download
       downloadButton("download_grid", "Download Grid as CSV")
-    ),
+    , width = 3),
     mainPanel(
       h4("Elements List"),
       uiOutput("elements_ui"),
@@ -44,7 +54,7 @@ ui <- fluidPage(
       verbatimTextOutput("analysis_summary"),
       h4("Construct Biplot"),
       plotOutput("construct_plot")
-    )
+    , width = 9)
   )
 )
 
@@ -124,7 +134,8 @@ server <- function(input, output, session) {
   
   # Render ratings table with selection
   output$ratings_table <- renderDT({
-    datatable(rv$ratings, selection = 'single', rownames = FALSE)
+    datatable(rv$ratings, selection = 'single', rownames = FALSE,
+              options = list(scrollX = TRUE, autoWidth = TRUE, pageLength = 15))
   })
   
   # Remove selected rating
