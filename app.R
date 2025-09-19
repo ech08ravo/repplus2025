@@ -33,6 +33,8 @@ ui <- fluidPage(
       actionButton("remove_rating", "Remove selected rating"),
       tags$hr(),
       checkboxInput("impute_missing", "Impute missing ratings (use 4)", value = FALSE),
+      selectInput("col_elements", "Element color", choices = c("black","blue","red","darkgreen","purple"), selected = "blue"),
+      selectInput("col_constructs", "Construct color", choices = c("black","red","orange","darkgreen","brown"), selected = "red"),
       actionButton("analyze", "Analyze Grid"),
       tags$hr(),
       downloadButton("download_grid", "Download Grid as CSV"),
@@ -40,18 +42,31 @@ ui <- fluidPage(
     ),
     mainPanel(
       width = 9,
-      h4("Elements List"),
-      uiOutput("elements_ui"),
-      h4("Constructs List"),
-      uiOutput("constructs_ui"),
-      tags$hr(),
-      h4("Missing Ratings"),
-      tableOutput("missing_table"),
-      tags$hr(),
-      h4("Analysis Summary"),
-      verbatimTextOutput("analysis_summary"),
-      h4("Construct Biplot"),
-      plotOutput("construct_plot")
+      tabsetPanel(
+        tabPanel(
+          "Summary & Biplot",
+          h4("Elements List"),
+          uiOutput("elements_ui"),
+          h4("Constructs List"),
+          uiOutput("constructs_ui"),
+          tags$hr(),
+          h4("Missing Ratings"),
+          tableOutput("missing_table"),
+          tags$hr(),
+          h4("Analysis Summary"),
+          verbatimTextOutput("analysis_summary"),
+          h4("PCA Biplot (colored)"),
+          plotOutput("pca_biplot")
+        ),
+        tabPanel(
+          "Element Dendrogram",
+          plotOutput("dend_elements")
+        ),
+        tabPanel(
+          "Construct Dendrogram",
+          plotOutput("dend_constructs")
+        )
+      )
     )
   )
 )
@@ -69,7 +84,9 @@ server <- function(input, output, session) {
       construct = character(),
       rating = numeric(),
       stringsAsFactors = FALSE
-    )
+    ),
+    scores_mat_last = NULL,
+    repgrid_last = NULL
   )
 
   # Load sample data (elements, constructs, ratings)
@@ -265,7 +282,23 @@ server <- function(input, output, session) {
             "Tick 'Impute missing ratings (use 4)' or complete all ratings."
           )
         })
-        output$construct_plot <- renderPlot({
+        output$pca_biplot <- renderPlot({
+          plot.new()
+          text(
+            0.5, 0.5,
+            "Missing ratings detected – complete grid or enable imputation",
+            cex = 1.1
+          )
+        })
+        output$dend_elements <- renderPlot({
+          plot.new()
+          text(
+            0.5, 0.5,
+            "Missing ratings detected – complete grid or enable imputation",
+            cex = 1.1
+          )
+        })
+        output$dend_constructs <- renderPlot({
           plot.new()
           text(
             0.5, 0.5,
@@ -282,6 +315,8 @@ server <- function(input, output, session) {
       imputed <- FALSE
     }
 
+    rv$scores_mat_last <- scores_mat
+
     scores_vec <- as.vector(t(scores_mat))
     repgrid_obj <- makeRepgrid(list(
       name = rv$elements,
@@ -290,19 +325,46 @@ server <- function(input, output, session) {
       scores = scores_vec
     ))
 
+    rv$repgrid_last <- repgrid_obj
+
     output$analysis_summary <- renderPrint({
       if (isTRUE(imputed)) {
         cat("Note: Missing ratings were imputed with 4 (midpoint).\n\n")
       }
       print(summary(repgrid_obj))
     })
-    output$construct_plot <- renderPlot({
-      if (length(rv$elements) < 3 || nrow(rv$constructs) < 3) {
-        plot.new()
-        text(0.5, 0.5, "Need at least 3 elements and 3 constructs for biplot", cex = 1.2)
-      } else {
-        biplot2d(repgrid_obj, cex = 1)
-      }
+
+    output$pca_biplot <- renderPlot({
+      sm <- rv$scores_mat_last
+      if (is.null(sm)) return()
+      # PCA on elements (rows)
+      pc <- prcomp(sm, scale. = TRUE)
+      ex <- pc$x[, 1:2]
+      # construct loadings (approx via correlations)
+      load <- cor(sm, pc$x)[, 1:2]
+      plot(ex, type = "n", xlab = "PC1", ylab = "PC2")
+      points(ex, pch = 19, col = input$col_elements)
+      text(ex, labels = rv$elements, pos = 3, col = input$col_elements)
+      # arrows for constructs
+      arrows(0, 0, load[,1], load[,2], length = 0.1, col = input$col_constructs)
+      text(load[,1], load[,2], labels = paste(rv$constructs$left, "-", rv$constructs$right),
+           pos = 4, col = input$col_constructs)
+      abline(h = 0, v = 0, lty = 3)
+    })
+
+    output$dend_elements <- renderPlot({
+      sm <- rv$scores_mat_last
+      if (is.null(sm) || nrow(sm) < 2) return()
+      hc <- hclust(dist(sm))
+      plot(hc, main = "Elements", xlab = "", sub = "")
+    })
+
+    output$dend_constructs <- renderPlot({
+      sm <- rv$scores_mat_last
+      if (is.null(sm) || ncol(sm) < 2) return()
+      hc <- hclust(dist(t(sm)))
+      labs <- paste(rv$constructs$left, "-", rv$constructs$right)
+      plot(hc, labels = labs, main = "Constructs", xlab = "", sub = "")
     })
   })
 
