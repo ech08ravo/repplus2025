@@ -61,7 +61,15 @@ ui <- fluidPage(
         ),
         tabPanel("Heatmap", plotOutput("heatmap_plot", height = 500)),
         tabPanel("Element Dendrogram", plotOutput("dend_elements")),
-        tabPanel("Construct Dendrogram", plotOutput("dend_constructs"))
+        tabPanel("Construct Dendrogram", plotOutput("dend_constructs")),
+        tabPanel("Statistics",
+                 h4("Descriptive Statistics"),
+                 h5("Element Statistics"),
+                 verbatimTextOutput("stats_elements"),
+                 tags$hr(),
+                 h5("Construct Statistics"),
+                 verbatimTextOutput("stats_constructs")
+        )
       )
     )
   )
@@ -383,6 +391,19 @@ server <- function(input, output, session) {
       hc <- hclust(dist(t(sm)))
       labs <- paste(rv$constructs$left, "-", rv$constructs$right)
       plot(hc, labels = labs, main = "Constructs", xlab = "", sub = "")
+    })
+
+    # Statistics outputs
+    output$stats_elements <- renderPrint({
+      repgrid_obj <- rv$repgrid_last
+      if (is.null(repgrid_obj)) return()
+      statsElements(repgrid_obj, trim = 30)
+    })
+
+    output$stats_constructs <- renderPrint({
+      repgrid_obj <- rv$repgrid_last
+      if (is.null(repgrid_obj)) return()
+      statsConstructs(repgrid_obj, trim = 30)
     })
   })
 
