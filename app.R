@@ -346,13 +346,26 @@ server <- function(input, output, session) {
       ex <- pc$x[, 1:2]
       # construct loadings (approx via correlations)
       load <- cor(sm, pc$x)[, 1:2]
-      plot(ex, type = "n", xlab = "PC1", ylab = "PC2")
+
+      # Calculate expanded plot limits to accommodate labels
+      all_points <- rbind(ex, load)
+      x_range <- range(all_points[, 1])
+      y_range <- range(all_points[, 2])
+      x_expand <- diff(x_range) * 0.25  # 25% padding
+      y_expand <- diff(y_range) * 0.25
+      xlim <- c(x_range[1] - x_expand, x_range[2] + x_expand)
+      ylim <- c(y_range[1] - y_expand, y_range[2] + y_expand)
+
+      # Set margins for better label display
+      par(mar = c(4, 4, 2, 2))
+
+      plot(ex, type = "n", xlab = "PC1", ylab = "PC2", xlim = xlim, ylim = ylim)
       points(ex, pch = 19, col = input$col_elements)
-      text(ex, labels = rv$elements, pos = 3, col = input$col_elements)
+      text(ex, labels = rv$elements, pos = 3, col = input$col_elements, cex = 0.9)
       # arrows for constructs
       arrows(0, 0, load[,1], load[,2], length = 0.1, col = input$col_constructs)
       text(load[,1], load[,2], labels = paste(rv$constructs$left, "-", rv$constructs$right),
-           pos = 4, col = input$col_constructs)
+           pos = 4, col = input$col_constructs, cex = 0.9)
       abline(h = 0, v = 0, lty = 3)
     })
 
@@ -366,23 +379,50 @@ server <- function(input, output, session) {
         "Greys" = gray.colors(100, start = 0.95, end = 0.2),
         "Terrain" = terrain.colors(100)
       )
-      # Flip rows so first element appears at top
-      z <- t(sm[nrow(sm):1, , drop = FALSE])
+      # sm is elements (rows) × constructs (cols)
+      n_elem <- nrow(sm)
+      n_cons <- ncol(sm)
+      # Flip elements so first appears at top
+      z <- sm[n_elem:1, ]
+
+      # Set margins to accommodate labels
+      par(mar = c(8, 12, 2, 2))
+
+      # Draw heatmap
       image(
-        x = 1:ncol(sm), y = 1:nrow(sm), z = z,
-        col = pal, axes = FALSE, xlab = "Elements", ylab = "Constructs"
+        x = 1:n_elem, y = 1:n_cons, z = z,
+        col = pal, axes = FALSE, xlab = "", ylab = ""
       )
-      axis(1, at = 1:ncol(sm), labels = rv$elements, las = 2, cex.axis = 0.8)
+
+      # Add rating values as text in each cell
+      for (i in 1:n_elem) {
+        for (j in 1:n_cons) {
+          val <- z[i, j]
+          if (!is.na(val)) {
+            # Choose text color based on value for readability
+            text_col <- if (val > 2.5) "white" else "black"
+            text(i, j, sprintf("%.0f", val), col = text_col, cex = 1.2)
+          }
+        }
+      }
+
+      # Add axes with labels
+      axis(1, at = 1:n_elem, labels = rev(rv$elements), las = 2, cex.axis = 0.8)
       labs <- paste(rv$constructs$left, "-", rv$constructs$right)
-      axis(2, at = 1:nrow(sm), labels = rev(labs), las = 2, cex.axis = 0.8)
+      axis(2, at = 1:n_cons, labels = labs, las = 1, cex.axis = 0.8)
       box()
+
+      # Add axis titles
+      mtext("Elements", side = 1, line = 6.5)
+      mtext("Constructs", side = 2, line = 10.5)
     })
 
     output$dend_elements <- renderPlot({
       sm <- rv$scores_mat_last
       if (is.null(sm) || nrow(sm) < 2) return()
       hc <- hclust(dist(sm))
-      plot(hc, main = "Elements", xlab = "", sub = "")
+      par(mar = c(2, 8, 2, 2))  # Increase left margin for labels
+      plot(hc, labels = rv$elements, main = "Elements", xlab = "", sub = "", horiz = TRUE)
     })
 
     output$dend_constructs <- renderPlot({
@@ -390,7 +430,8 @@ server <- function(input, output, session) {
       if (is.null(sm) || ncol(sm) < 2) return()
       hc <- hclust(dist(t(sm)))
       labs <- paste(rv$constructs$left, "-", rv$constructs$right)
-      plot(hc, labels = labs, main = "Constructs", xlab = "", sub = "")
+      par(mar = c(2, 12, 2, 2))  # Increase left margin for longer construct labels
+      plot(hc, labels = labs, main = "Constructs", xlab = "", sub = "", horiz = TRUE)
     })
 
     # Statistics outputs
