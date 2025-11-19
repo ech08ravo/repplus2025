@@ -1,0 +1,16 @@
+	Grid	9#	3	9	yurungi	A	3	2019-04-02	03:29:06	220.101.100.150	Rep Plus V1.1	RepGrid
+C0	R	1	0	1	1	5		Social	goal
+C1	R	1	0	1	1	5		LMS	Collaboration
+C2	R	1	128	1	1	5		can be casual use	organisational/work use
+E0	1	0	3	0	4	Canvas
+E1	1	0	2	1	0	Dropbox
+E2	1	0	0	3	0	Facebook
+E3	1	0	4	4	2	GitHub
+E4	1	0	2	4	1	Google Docs/Slides/Draw
+E5	1	0	2	3	0	Google Drive
+E6	1	0	3	4	4	Slack
+E7	1	0	0	3	0	WhatsApp
+E8	1	0	4	4	2	The ideal collaboration environment
+_UID	52540087A7DEED4F03702
+_Date	2019-04-02
+_Time	03:29:06
