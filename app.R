@@ -38,11 +38,7 @@ ui <- fluidPage(
       checkboxInput("impute_missing", "Impute missing ratings (use 4)", value = FALSE),
       selectInput("col_elements", "Element color", choices = c("black","blue","red","darkgreen","purple"), selected = "blue"),
       selectInput("col_constructs", "Construct color", choices = c("black","red","orange","darkgreen","brown"), selected = "red"),
-      selectInput(
-        "heat_palette", "Heatmap palette",
-        choices = c("Blue-White-Red", "Greys", "Terrain"),
-        selected = "Blue-White-Red"
-      ),
+      checkboxInput("heatmap_color", "Use color heatmap", value = FALSE),
       actionButton("analyze", "Analyze Grid"),
       tags$hr(),
       downloadButton("download_grid", "Download Grid as CSV"),
@@ -62,6 +58,50 @@ ui <- fluidPage(
         tabPanel("Heatmap", plotOutput("heatmap_plot", height = 500)),
         tabPanel("Element Dendrogram", plotOutput("dend_elements")),
         tabPanel("Construct Dendrogram", plotOutput("dend_constructs")),
+        tabPanel("Focus Cluster",
+                 fluidRow(
+                   column(12,
+                          h4("Focus Cluster Analysis"),
+                          p("Shaw's (1980) Focus algorithm sorts elements and constructs by similarity, showing hierarchical structure.")
+                   )
+                 ),
+                 fluidRow(
+                   column(3,
+                          sliderInput("focus_power", "Minkowski Power:",
+                                    min = 0.5, max = 3.0, value = 1.0, step = 0.1),
+                          helpText("1.0 = City block metric (default), 2.0 = Euclidean")
+                   ),
+                   column(3,
+                          sliderInput("focus_cutoff", "Match Cutoff (%):",
+                                    min = 0, max = 100, value = 80, step = 5),
+                          helpText("Minimum similarity to display in clusters")
+                   ),
+                   column(3,
+                          checkboxInput("focus_show_values", "Show Rating Values", value = TRUE),
+                          checkboxInput("focus_show_shading", "Show Shading", value = TRUE),
+                          checkboxInput("focus_use_color", "Use color palette", value = FALSE)
+                   ),
+                   column(3,
+                          actionButton("run_focus", "Run Focus Analysis", class = "btn-primary"),
+                          tags$br(), tags$br(),
+                          downloadButton("download_focus", "Download Focus Plot")
+                   )
+                 ),
+                 tags$hr(),
+                 plotOutput("focus_plot", height = 700),
+                 tags$hr(),
+                 h4("Match Data"),
+                 fluidRow(
+                   column(6,
+                          h5("Element Matches"),
+                          verbatimTextOutput("focus_element_matches")
+                   ),
+                   column(6,
+                          h5("Construct Matches"),
+                          verbatimTextOutput("focus_construct_matches")
+                   )
+                 )
+        ),
         tabPanel("Statistics",
                  h4("Descriptive Statistics"),
                  h5("Element Statistics"),
@@ -372,13 +412,12 @@ server <- function(input, output, session) {
     output$heatmap_plot <- renderPlot({
       sm <- rv$scores_mat_last
       if (is.null(sm)) return()
-      # Build palette
-      pal <- switch(
-        input$heat_palette,
-        "Blue-White-Red" = colorRampPalette(c("#2166AC", "#FFFFFF", "#B2182B"))(100),
-        "Greys" = gray.colors(100, start = 0.95, end = 0.2),
-        "Terrain" = terrain.colors(100)
-      )
+      # Build palette - greyscale by default, color if toggled
+      if (input$heatmap_color) {
+        pal <- colorRampPalette(c("#2166AC", "#FFFFFF", "#B2182B"))(100)
+      } else {
+        pal <- gray.colors(100, start = 0.95, end = 0.2)
+      }
       # sm is elements (rows) × constructs (cols)
       n_elem <- nrow(sm)
       n_cons <- ncol(sm)
@@ -447,6 +486,120 @@ server <- function(input, output, session) {
       statsConstructs(repgrid_obj, trim = 30)
     })
   })
+
+  # Focus Cluster Analysis
+  focus_result <- reactiveVal(NULL)
+
+  observeEvent(input$run_focus, {
+    req(rv$scores_mat_last)
+    sm <- rv$scores_mat_last
+
+    construct_labels <- paste(rv$constructs$left, "-", rv$constructs$right)
+
+    result <- focus_cluster(
+      scores_matrix = sm,
+      element_names = rv$elements,
+      construct_names = construct_labels,
+      power = input$focus_power
+    )
+
+    focus_result(result)
+  })
+
+  output$focus_plot <- renderPlot({
+    req(focus_result())
+    result <- focus_result()
+
+    plot_focus_cluster(
+      focus_result = result,
+      title = "Focus Cluster Analysis",
+      show_values = input$focus_show_values,
+      show_shading = input$focus_show_shading,
+      use_color = input$focus_use_color
+    )
+  })
+
+  output$focus_element_matches <- renderPrint({
+    req(focus_result())
+    result <- focus_result()
+    elem_sim <- result$element_similarities
+
+    cat("Element Similarity Matrix (%):\n\n")
+    rownames(elem_sim) <- rv$elements
+    colnames(elem_sim) <- rv$elements
+    print(round(elem_sim, 1))
+
+    cat("\n\nTop Element Matches (excluding self):\n")
+    elem_sim_no_diag <- elem_sim
+    diag(elem_sim_no_diag) <- 0
+
+    matches <- which(elem_sim_no_diag >= input$focus_cutoff, arr.ind = TRUE)
+    if (nrow(matches) > 0) {
+      for (i in seq_len(min(10, nrow(matches)))) {
+        r <- matches[i, 1]
+        c <- matches[i, 2]
+        if (r < c) {
+          cat(sprintf("  %s - %s: %.1f%%\n",
+                     rv$elements[r],
+                     rv$elements[c],
+                     elem_sim[r, c]))
+        }
+      }
+    } else {
+      cat("  No matches above cutoff threshold\n")
+    }
+  })
+
+  output$focus_construct_matches <- renderPrint({
+    req(focus_result())
+    result <- focus_result()
+    const_sim <- result$construct_similarities
+
+    construct_labels <- paste(rv$constructs$left, "-", rv$constructs$right)
+
+    cat("Construct Similarity Matrix (%):\n\n")
+    rownames(const_sim) <- construct_labels
+    colnames(const_sim) <- construct_labels
+    print(round(const_sim, 1))
+
+    cat("\n\nTop Construct Matches (excluding self):\n")
+    const_sim_no_diag <- const_sim
+    diag(const_sim_no_diag) <- 0
+
+    matches <- which(const_sim_no_diag >= input$focus_cutoff, arr.ind = TRUE)
+    if (nrow(matches) > 0) {
+      for (i in seq_len(min(10, nrow(matches)))) {
+        r <- matches[i, 1]
+        c <- matches[i, 2]
+        if (r < c) {
+          cat(sprintf("  %s - %s: %.1f%%\n",
+                     construct_labels[r],
+                     construct_labels[c],
+                     const_sim[r, c]))
+        }
+      }
+    } else {
+      cat("  No matches above cutoff threshold\n")
+    }
+  })
+
+  output$download_focus <- downloadHandler(
+    filename = function() paste0("focus-cluster-", Sys.Date(), ".png"),
+    content = function(file) {
+      req(focus_result())
+      result <- focus_result()
+
+      png(file, width = 1200, height = 900, res = 120)
+      plot_focus_cluster(
+        focus_result = result,
+        title = "Focus Cluster Analysis",
+        show_values = input$focus_show_values,
+        show_shading = input$focus_show_shading,
+        use_color = input$focus_use_color
+      )
+      dev.off()
+    }
+  )
 
   # Downloads
   output$download_grid <- downloadHandler(
