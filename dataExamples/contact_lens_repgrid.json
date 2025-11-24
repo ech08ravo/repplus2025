@@ -1,0 +1,65 @@
+{
+  "metadata": {
+    "name": "Contact Lens Dataset",
+    "source": "UCI Machine Learning Repository",
+    "description": "Classic dataset for contact lens prescription based on patient attributes",
+    "n_elements": 24,
+    "n_constructs": 4
+  },
+  "constructs": [
+    {
+      "id": 1,
+      "name": "age",
+      "left_pole": "young",
+      "right_pole": "presbyopic",
+      "scale": ["young", "pre-presbyopic", "presbyopic"]
+    },
+    {
+      "id": 2,
+      "name": "spectacle_prescription",
+      "left_pole": "myope",
+      "right_pole": "hypermetrope",
+      "scale": ["myope", "hypermetrope"]
+    },
+    {
+      "id": 3,
+      "name": "astigmatism",
+      "left_pole": "no",
+      "right_pole": "yes",
+      "scale": ["no", "yes"]
+    },
+    {
+      "id": 4,
+      "name": "tear_production",
+      "left_pole": "reduced",
+      "right_pole": "normal",
+      "scale": ["reduced", "normal"]
+    }
+  ],
+  "elements": [
+    {"id": 1, "name": "Case 1", "ratings": {"age": "young", "spectacle_prescription": "myope", "astigmatism": "no", "tear_production": "reduced"}, "outcome": "none"},
+    {"id": 2, "name": "Case 2", "ratings": {"age": "young", "spectacle_prescription": "myope", "astigmatism": "no", "tear_production": "normal"}, "outcome": "soft"},
+    {"id": 3, "name": "Case 3", "ratings": {"age": "young", "spectacle_prescription": "myope", "astigmatism": "yes", "tear_production": "reduced"}, "outcome": "none"},
+    {"id": 4, "name": "Case 4", "ratings": {"age": "young", "spectacle_prescription": "myope", "astigmatism": "yes", "tear_production": "normal"}, "outcome": "hard"},
+    {"id": 5, "name": "Case 5", "ratings": {"age": "young", "spectacle_prescription": "hypermetrope", "astigmatism": "no", "tear_production": "reduced"}, "outcome": "none"},
+    {"id": 6, "name": "Case 6", "ratings": {"age": "young", "spectacle_prescription": "hypermetrope", "astigmatism": "no", "tear_production": "normal"}, "outcome": "soft"},
+    {"id": 7, "name": "Case 7", "ratings": {"age": "young", "spectacle_prescription": "hypermetrope", "astigmatism": "yes", "tear_production": "reduced"}, "outcome": "none"},
+    {"id": 8, "name": "Case 8", "ratings": {"age": "young", "spectacle_prescription": "hypermetrope", "astigmatism": "yes", "tear_production": "normal"}, "outcome": "hard"},
+    {"id": 9, "name": "Case 9", "ratings": {"age": "pre-presbyopic", "spectacle_prescription": "myope", "astigmatism": "no", "tear_production": "reduced"}, "outcome": "none"},
+    {"id": 10, "name": "Case 10", "ratings": {"age": "pre-presbyopic", "spectacle_prescription": "myope", "astigmatism": "no", "tear_production": "normal"}, "outcome": "soft"},
+    {"id": 11, "name": "Case 11", "ratings": {"age": "pre-presbyopic", "spectacle_prescription": "myope", "astigmatism": "yes", "tear_production": "reduced"}, "outcome": "none"},
+    {"id": 12, "name": "Case 12", "ratings": {"age": "pre-presbyopic", "spectacle_prescription": "myope", "astigmatism": "yes", "tear_production": "normal"}, "outcome": "hard"},
+    {"id": 13, "name": "Case 13", "ratings": {"age": "pre-presbyopic", "spectacle_prescription": "hypermetrope", "astigmatism": "no", "tear_production": "reduced"}, "outcome": "none"},
+    {"id": 14, "name": "Case 14", "ratings": {"age": "pre-presbyopic", "spectacle_prescription": "hypermetrope", "astigmatism": "no", "tear_production": "normal"}, "outcome": "soft"},
+    {"id": 15, "name": "Case 15", "ratings": {"age": "pre-presbyopic", "spectacle_prescription": "hypermetrope", "astigmatism": "yes", "tear_production": "reduced"}, "outcome": "none"},
+    {"id": 16, "name": "Case 16", "ratings": {"age": "pre-presbyopic", "spectacle_prescription": "hypermetrope", "astigmatism": "yes", "tear_production": "normal"}, "outcome": "none"},
+    {"id": 17, "name": "Case 17", "ratings": {"age": "presbyopic", "spectacle_prescription": "myope", "astigmatism": "no", "tear_production": "reduced"}, "outcome": "none"},
+    {"id": 18, "name": "Case 18", "ratings": {"age": "presbyopic", "spectacle_prescription": "myope", "astigmatism": "no", "tear_production": "normal"}, "outcome": "none"},
+    {"id": 19, "name": "Case 19", "ratings": {"age": "presbyopic", "spectacle_prescription": "myope", "astigmatism": "yes", "tear_production": "reduced"}, "outcome": "none"},
+    {"id": 20, "name": "Case 20", "ratings": {"age": "presbyopic", "spectacle_prescription": "myope", "astigmatism": "yes", "tear_production": "normal"}, "outcome": "hard"},
+    {"id": 21, "name": "Case 21", "ratings": {"age": "presbyopic", "spectacle_prescription": "hypermetrope", "astigmatism": "no", "tear_production": "reduced"}, "outcome": "none"},
+    {"id": 22, "name": "Case 22", "ratings": {"age": "presbyopic", "spectacle_prescription": "hypermetrope", "astigmatism": "no", "tear_production": "normal"}, "outcome": "soft"},
+    {"id": 23, "name": "Case 23", "ratings": {"age": "presbyopic", "spectacle_prescription": "hypermetrope", "astigmatism": "yes", "tear_production": "reduced"}, "outcome": "none"},
+    {"id": 24, "name": "Case 24", "ratings": {"age": "presbyopic", "spectacle_prescription": "hypermetrope", "astigmatism": "yes", "tear_production": "normal"}, "outcome": "none"}
+  ]
+}
