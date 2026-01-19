@@ -4,7 +4,7 @@ library(DT)
 library(uuid)
 
 # Source the focus analysis functions
-source("R/focus_analysis.R")
+source("R/focus_analysis.r")
 
 ui <- fluidPage(
   tags$head(tags$style(HTML('
@@ -38,11 +38,7 @@ ui <- fluidPage(
       checkboxInput("impute_missing", "Impute missing ratings (use 4)", value = FALSE),
       selectInput("col_elements", "Element color", choices = c("black","blue","red","darkgreen","purple"), selected = "blue"),
       selectInput("col_constructs", "Construct color", choices = c("black","red","orange","darkgreen","brown"), selected = "red"),
-      selectInput(
-        "heat_palette", "Heatmap palette",
-        choices = c("Blue-White-Red", "Greys", "Terrain"),
-        selected = "Blue-White-Red"
-      ),
+      checkboxInput("heatmap_color", "Use color heatmap", value = FALSE),
       actionButton("analyze", "Analyze Grid"),
       tags$hr(),
       downloadButton("download_grid", "Download Grid as CSV"),
@@ -59,9 +55,116 @@ ui <- fluidPage(
           tags$hr(), h4("Analysis Summary"), verbatimTextOutput("analysis_summary"),
           h4("PCA Biplot (colored)"), plotOutput("pca_biplot")
         ),
+        tabPanel("Crossplot",
+                 fluidRow(
+                   column(12,
+                          h4("Crossplot Analysis"),
+                          p("Plot elements on two selected constructs as X and Y axes")
+                   )
+                 ),
+                 fluidRow(
+                   column(4,
+                          selectInput("crossplot_x", "X-axis Construct:",
+                                    choices = NULL)
+                   ),
+                   column(4,
+                          selectInput("crossplot_y", "Y-axis Construct:",
+                                    choices = NULL)
+                   ),
+                   column(4,
+                          checkboxInput("crossplot_labels", "Show Element Labels", value = TRUE),
+                          checkboxInput("crossplot_grid", "Show Grid Lines", value = TRUE),
+                          downloadButton("download_crossplot", "Download Crossplot")
+                   )
+                 ),
+                 tags$hr(),
+                 plotOutput("crossplot_plot", height = 600)
+        ),
+        tabPanel("Synopsis",
+                 fluidRow(
+                   column(12,
+                          h4("Synopsis Analysis"),
+                          p("Rating distributions and variance analysis (scree plot)")
+                   )
+                 ),
+                 fluidRow(
+                   column(4,
+                          selectInput("synopsis_type", "Display:",
+                                    choices = c("Overall Distribution" = "overall",
+                                              "Element Distributions" = "elements",
+                                              "Construct Distributions" = "constructs",
+                                              "Scree Plot" = "scree"),
+                                    selected = "overall")
+                   ),
+                   column(4,
+                          numericInput("synopsis_bins", "Number of Bins:",
+                                     value = 7, min = 3, max = 20, step = 1),
+                          helpText("For histograms only")
+                   ),
+                   column(4,
+                          downloadButton("download_synopsis", "Download Synopsis Plot"),
+                          tags$br(), tags$br(),
+                          checkboxInput("synopsis_color", "Use color", value = FALSE)
+                   )
+                 ),
+                 tags$hr(),
+                 plotOutput("synopsis_plot", height = 600)
+        ),
         tabPanel("Heatmap", plotOutput("heatmap_plot", height = 500)),
         tabPanel("Element Dendrogram", plotOutput("dend_elements")),
-        tabPanel("Construct Dendrogram", plotOutput("dend_constructs"))
+        tabPanel("Construct Dendrogram", plotOutput("dend_constructs")),
+        tabPanel("Focus Cluster",
+                 fluidRow(
+                   column(12,
+                          h4("Focus Cluster Analysis"),
+                          p("Shaw's (1980) Focus algorithm sorts elements and constructs by similarity, showing hierarchical structure.")
+                   )
+                 ),
+                 fluidRow(
+                   column(3,
+                          sliderInput("focus_power", "Minkowski Power:",
+                                    min = 0.5, max = 3.0, value = 1.0, step = 0.1),
+                          helpText("1.0 = City block metric (default), 2.0 = Euclidean")
+                   ),
+                   column(3,
+                          sliderInput("focus_cutoff", "Match Cutoff (%):",
+                                    min = 0, max = 100, value = 80, step = 5),
+                          helpText("Minimum similarity to display in clusters")
+                   ),
+                   column(3,
+                          checkboxInput("focus_show_values", "Show Rating Values", value = TRUE),
+                          checkboxInput("focus_show_shading", "Show Shading", value = TRUE),
+                          checkboxInput("focus_use_color", "Use color palette", value = FALSE)
+                   ),
+                   column(3,
+                          actionButton("run_focus", "Run Focus Analysis", class = "btn-primary"),
+                          tags$br(), tags$br(),
+                          downloadButton("download_focus", "Download Focus Plot")
+                   )
+                 ),
+                 tags$hr(),
+                 plotOutput("focus_plot", height = 700),
+                 tags$hr(),
+                 h4("Match Data"),
+                 fluidRow(
+                   column(6,
+                          h5("Element Matches"),
+                          verbatimTextOutput("focus_element_matches")
+                   ),
+                   column(6,
+                          h5("Construct Matches"),
+                          verbatimTextOutput("focus_construct_matches")
+                   )
+                 )
+        ),
+        tabPanel("Statistics",
+                 h4("Descriptive Statistics"),
+                 h5("Element Statistics"),
+                 verbatimTextOutput("stats_elements"),
+                 tags$hr(),
+                 h5("Construct Statistics"),
+                 verbatimTextOutput("stats_constructs")
+        )
       )
     )
   )
@@ -338,43 +441,82 @@ server <- function(input, output, session) {
       ex <- pc$x[, 1:2]
       # construct loadings (approx via correlations)
       load <- cor(sm, pc$x)[, 1:2]
-      plot(ex, type = "n", xlab = "PC1", ylab = "PC2")
+
+      # Calculate expanded plot limits to accommodate labels
+      all_points <- rbind(ex, load)
+      x_range <- range(all_points[, 1])
+      y_range <- range(all_points[, 2])
+      x_expand <- diff(x_range) * 0.25  # 25% padding
+      y_expand <- diff(y_range) * 0.25
+      xlim <- c(x_range[1] - x_expand, x_range[2] + x_expand)
+      ylim <- c(y_range[1] - y_expand, y_range[2] + y_expand)
+
+      # Set margins for better label display
+      par(mar = c(4, 4, 2, 2))
+
+      plot(ex, type = "n", xlab = "PC1", ylab = "PC2", xlim = xlim, ylim = ylim)
       points(ex, pch = 19, col = input$col_elements)
-      text(ex, labels = rv$elements, pos = 3, col = input$col_elements)
+      text(ex, labels = rv$elements, pos = 3, col = input$col_elements, cex = 0.9)
       # arrows for constructs
       arrows(0, 0, load[,1], load[,2], length = 0.1, col = input$col_constructs)
       text(load[,1], load[,2], labels = paste(rv$constructs$left, "-", rv$constructs$right),
-           pos = 4, col = input$col_constructs)
+           pos = 4, col = input$col_constructs, cex = 0.9)
       abline(h = 0, v = 0, lty = 3)
     })
 
     output$heatmap_plot <- renderPlot({
       sm <- rv$scores_mat_last
       if (is.null(sm)) return()
-      # Build palette
-      pal <- switch(
-        input$heat_palette,
-        "Blue-White-Red" = colorRampPalette(c("#2166AC", "#FFFFFF", "#B2182B"))(100),
-        "Greys" = gray.colors(100, start = 0.95, end = 0.2),
-        "Terrain" = terrain.colors(100)
-      )
-      # Flip rows so first element appears at top
-      z <- t(sm[nrow(sm):1, , drop = FALSE])
+      # Build palette - greyscale by default, color if toggled
+      if (input$heatmap_color) {
+        pal <- colorRampPalette(c("#2166AC", "#FFFFFF", "#B2182B"))(100)
+      } else {
+        pal <- gray.colors(100, start = 0.95, end = 0.2)
+      }
+      # sm is elements (rows) × constructs (cols)
+      n_elem <- nrow(sm)
+      n_cons <- ncol(sm)
+      # Flip elements so first appears at top
+      z <- sm[n_elem:1, ]
+
+      # Set margins to accommodate labels
+      par(mar = c(8, 12, 2, 2))
+
+      # Draw heatmap
       image(
-        x = 1:ncol(sm), y = 1:nrow(sm), z = z,
-        col = pal, axes = FALSE, xlab = "Elements", ylab = "Constructs"
+        x = 1:n_elem, y = 1:n_cons, z = z,
+        col = pal, axes = FALSE, xlab = "", ylab = ""
       )
-      axis(1, at = 1:ncol(sm), labels = rv$elements, las = 2, cex.axis = 0.8)
+
+      # Add rating values as text in each cell
+      for (i in 1:n_elem) {
+        for (j in 1:n_cons) {
+          val <- z[i, j]
+          if (!is.na(val)) {
+            # Choose text color based on value for readability
+            text_col <- if (val > 2.5) "white" else "black"
+            text(i, j, sprintf("%.0f", val), col = text_col, cex = 1.2)
+          }
+        }
+      }
+
+      # Add axes with labels
+      axis(1, at = 1:n_elem, labels = rev(rv$elements), las = 2, cex.axis = 0.8)
       labs <- paste(rv$constructs$left, "-", rv$constructs$right)
-      axis(2, at = 1:nrow(sm), labels = rev(labs), las = 2, cex.axis = 0.8)
+      axis(2, at = 1:n_cons, labels = labs, las = 1, cex.axis = 0.8)
       box()
+
+      # Add axis titles
+      mtext("Elements", side = 1, line = 6.5)
+      mtext("Constructs", side = 2, line = 10.5)
     })
 
     output$dend_elements <- renderPlot({
       sm <- rv$scores_mat_last
       if (is.null(sm) || nrow(sm) < 2) return()
       hc <- hclust(dist(sm))
-      plot(hc, main = "Elements", xlab = "", sub = "")
+      par(mar = c(2, 8, 2, 2))  # Increase left margin for labels
+      plot(hc, labels = rv$elements, main = "Elements", xlab = "", sub = "", horiz = TRUE)
     })
 
     output$dend_constructs <- renderPlot({
@@ -382,9 +524,467 @@ server <- function(input, output, session) {
       if (is.null(sm) || ncol(sm) < 2) return()
       hc <- hclust(dist(t(sm)))
       labs <- paste(rv$constructs$left, "-", rv$constructs$right)
-      plot(hc, labels = labs, main = "Constructs", xlab = "", sub = "")
+      par(mar = c(2, 12, 2, 2))  # Increase left margin for longer construct labels
+      plot(hc, labels = labs, main = "Constructs", xlab = "", sub = "", horiz = TRUE)
+    })
+
+    # Statistics outputs
+    output$stats_elements <- renderPrint({
+      repgrid_obj <- rv$repgrid_last
+      if (is.null(repgrid_obj)) return()
+      statsElements(repgrid_obj, trim = 30)
+    })
+
+    output$stats_constructs <- renderPrint({
+      repgrid_obj <- rv$repgrid_last
+      if (is.null(repgrid_obj)) return()
+      statsConstructs(repgrid_obj, trim = 30)
     })
   })
+
+  # Crossplot Analysis
+  # Update construct choices when grid is analyzed
+  observe({
+    req(rv$constructs)
+    construct_labels <- paste(rv$constructs$left, "-", rv$constructs$right)
+
+    updateSelectInput(session, "crossplot_x",
+                     choices = construct_labels,
+                     selected = construct_labels[1])
+
+    updateSelectInput(session, "crossplot_y",
+                     choices = construct_labels,
+                     selected = if(length(construct_labels) > 1) construct_labels[2] else construct_labels[1])
+  })
+
+  output$crossplot_plot <- renderPlot({
+    req(rv$scores_mat_last)
+    req(input$crossplot_x, input$crossplot_y)
+
+    sm <- rv$scores_mat_last
+    construct_labels <- paste(rv$constructs$left, "-", rv$constructs$right)
+
+    # Find indices of selected constructs
+    x_idx <- which(construct_labels == input$crossplot_x)
+    y_idx <- which(construct_labels == input$crossplot_y)
+
+    if(length(x_idx) == 0 || length(y_idx) == 0) return()
+
+    # Extract ratings for selected constructs
+    x_ratings <- sm[, x_idx]
+    y_ratings <- sm[, y_idx]
+
+    # Set up plot
+    par(mar = c(5, 5, 3, 2))
+
+    plot(x_ratings, y_ratings,
+         xlim = c(1, 7), ylim = c(1, 7),
+         xlab = input$crossplot_x,
+         ylab = input$crossplot_y,
+         main = "Crossplot: Element Positions",
+         pch = 19, col = "blue", cex = 1.5,
+         asp = 1)  # 1:1 aspect ratio for equal scaling
+
+    # Add grid lines if requested
+    if (input$crossplot_grid) {
+      abline(h = 1:7, v = 1:7, col = "gray90", lty = 1)
+      abline(h = 4, v = 4, col = "gray60", lty = 2, lwd = 1.5)
+    }
+
+    # Add element labels if requested
+    if (input$crossplot_labels) {
+      text(x_ratings, y_ratings, labels = rv$elements,
+           pos = 3, cex = 0.8, col = "darkblue")
+    }
+
+    # Add box around plot
+    box()
+  })
+
+  output$download_crossplot <- downloadHandler(
+    filename = function() paste0("crossplot-", Sys.Date(), ".png"),
+    content = function(file) {
+      req(rv$scores_mat_last)
+      req(input$crossplot_x, input$crossplot_y)
+
+      sm <- rv$scores_mat_last
+      construct_labels <- paste(rv$constructs$left, "-", rv$constructs$right)
+
+      x_idx <- which(construct_labels == input$crossplot_x)
+      y_idx <- which(construct_labels == input$crossplot_y)
+
+      if(length(x_idx) == 0 || length(y_idx) == 0) return()
+
+      x_ratings <- sm[, x_idx]
+      y_ratings <- sm[, y_idx]
+
+      png(file, width = 1200, height = 1200, res = 120)
+
+      par(mar = c(5, 5, 3, 2))
+
+      plot(x_ratings, y_ratings,
+           xlim = c(1, 7), ylim = c(1, 7),
+           xlab = input$crossplot_x,
+           ylab = input$crossplot_y,
+           main = "Crossplot: Element Positions",
+           pch = 19, col = "blue", cex = 1.5,
+           asp = 1)
+
+      if (input$crossplot_grid) {
+        abline(h = 1:7, v = 1:7, col = "gray90", lty = 1)
+        abline(h = 4, v = 4, col = "gray60", lty = 2, lwd = 1.5)
+      }
+
+      if (input$crossplot_labels) {
+        text(x_ratings, y_ratings, labels = rv$elements,
+             pos = 3, cex = 0.8, col = "darkblue")
+      }
+
+      box()
+
+      dev.off()
+    }
+  )
+
+  # Synopsis Analysis
+  output$synopsis_plot <- renderPlot({
+    req(rv$scores_mat_last)
+    sm <- rv$scores_mat_last
+
+    # Choose color scheme
+    bar_color <- if (input$synopsis_color) "#2166AC" else "gray50"
+
+    if (input$synopsis_type == "overall") {
+      # Overall rating distribution
+      all_ratings <- as.vector(sm)
+      all_ratings <- all_ratings[!is.na(all_ratings)]
+
+      hist(all_ratings,
+           breaks = input$synopsis_bins,
+           main = "Overall Rating Distribution",
+           xlab = "Rating",
+           ylab = "Frequency",
+           col = bar_color,
+           border = "white")
+
+      # Add mean and median lines
+      abline(v = mean(all_ratings), col = "red", lwd = 2, lty = 2)
+      abline(v = median(all_ratings), col = "blue", lwd = 2, lty = 2)
+      legend("topright",
+             legend = c(paste("Mean =", round(mean(all_ratings), 2)),
+                       paste("Median =", round(median(all_ratings), 2))),
+             col = c("red", "blue"), lty = 2, lwd = 2)
+
+    } else if (input$synopsis_type == "elements") {
+      # Element distributions
+      n_elem <- nrow(sm)
+      par(mfrow = c(ceiling(n_elem / 3), 3))
+      par(mar = c(4, 4, 2, 1))
+
+      for (i in 1:n_elem) {
+        elem_ratings <- sm[i, ]
+        elem_ratings <- elem_ratings[!is.na(elem_ratings)]
+
+        hist(elem_ratings,
+             breaks = input$synopsis_bins,
+             main = rv$elements[i],
+             xlab = "Rating",
+             ylab = "Frequency",
+             col = bar_color,
+             border = "white",
+             xlim = c(min(sm, na.rm = TRUE), max(sm, na.rm = TRUE)))
+
+        abline(v = mean(elem_ratings), col = "red", lwd = 2, lty = 2)
+      }
+
+    } else if (input$synopsis_type == "constructs") {
+      # Construct distributions
+      n_const <- ncol(sm)
+      par(mfrow = c(ceiling(n_const / 3), 3))
+      par(mar = c(4, 4, 3, 1))
+
+      construct_labels <- paste(rv$constructs$left, "-", rv$constructs$right)
+
+      for (i in 1:n_const) {
+        const_ratings <- sm[, i]
+        const_ratings <- const_ratings[!is.na(const_ratings)]
+
+        hist(const_ratings,
+             breaks = input$synopsis_bins,
+             main = construct_labels[i],
+             xlab = "Rating",
+             ylab = "Frequency",
+             col = bar_color,
+             border = "white",
+             xlim = c(min(sm, na.rm = TRUE), max(sm, na.rm = TRUE)),
+             cex.main = 0.9)
+
+        abline(v = mean(const_ratings), col = "red", lwd = 2, lty = 2)
+      }
+
+    } else if (input$synopsis_type == "scree") {
+      # Scree plot
+      pca_result <- prcomp(sm, scale. = TRUE)
+      variance_explained <- (pca_result$sdev^2) / sum(pca_result$sdev^2) * 100
+      cumulative_var <- cumsum(variance_explained)
+
+      n_components <- min(10, length(variance_explained))
+
+      par(mar = c(5, 4, 4, 5))
+
+      # Bar plot for variance explained
+      barplot(variance_explained[1:n_components],
+              names.arg = 1:n_components,
+              main = "Scree Plot - Variance Explained by Components",
+              xlab = "Principal Component",
+              ylab = "Variance Explained (%)",
+              col = bar_color,
+              border = "white",
+              ylim = c(0, max(variance_explained[1:n_components]) * 1.2))
+
+      # Add cumulative line on secondary axis
+      par(new = TRUE)
+      plot(1:n_components, cumulative_var[1:n_components],
+           type = "b", pch = 19, col = "red", lwd = 2,
+           axes = FALSE, xlab = "", ylab = "",
+           ylim = c(0, 100))
+
+      axis(4, col = "red", col.axis = "red")
+      mtext("Cumulative Variance (%)", side = 4, line = 3, col = "red")
+
+      legend("right",
+             legend = c("Individual", "Cumulative"),
+             col = c(bar_color, "red"),
+             lty = c(NA, 1), pch = c(15, 19),
+             pt.cex = c(2, 1))
+    }
+  })
+
+  output$download_synopsis <- downloadHandler(
+    filename = function() paste0("synopsis-", Sys.Date(), ".png"),
+    content = function(file) {
+      req(rv$scores_mat_last)
+      sm <- rv$scores_mat_last
+
+      png(file, width = 1200, height = 900, res = 120)
+
+      bar_color <- if (input$synopsis_color) "#2166AC" else "gray50"
+
+      if (input$synopsis_type == "overall") {
+        all_ratings <- as.vector(sm)
+        all_ratings <- all_ratings[!is.na(all_ratings)]
+
+        hist(all_ratings,
+             breaks = input$synopsis_bins,
+             main = "Overall Rating Distribution",
+             xlab = "Rating",
+             ylab = "Frequency",
+             col = bar_color,
+             border = "white")
+
+        abline(v = mean(all_ratings), col = "red", lwd = 2, lty = 2)
+        abline(v = median(all_ratings), col = "blue", lwd = 2, lty = 2)
+        legend("topright",
+               legend = c(paste("Mean =", round(mean(all_ratings), 2)),
+                         paste("Median =", round(median(all_ratings), 2))),
+               col = c("red", "blue"), lty = 2, lwd = 2)
+
+      } else if (input$synopsis_type == "elements") {
+        n_elem <- nrow(sm)
+        par(mfrow = c(ceiling(n_elem / 3), 3))
+        par(mar = c(4, 4, 2, 1))
+
+        for (i in 1:n_elem) {
+          elem_ratings <- sm[i, ]
+          elem_ratings <- elem_ratings[!is.na(elem_ratings)]
+
+          hist(elem_ratings,
+               breaks = input$synopsis_bins,
+               main = rv$elements[i],
+               xlab = "Rating",
+               ylab = "Frequency",
+               col = bar_color,
+               border = "white",
+               xlim = c(min(sm, na.rm = TRUE), max(sm, na.rm = TRUE)))
+
+          abline(v = mean(elem_ratings), col = "red", lwd = 2, lty = 2)
+        }
+
+      } else if (input$synopsis_type == "constructs") {
+        n_const <- ncol(sm)
+        par(mfrow = c(ceiling(n_const / 3), 3))
+        par(mar = c(4, 4, 3, 1))
+
+        construct_labels <- paste(rv$constructs$left, "-", rv$constructs$right)
+
+        for (i in 1:n_const) {
+          const_ratings <- sm[, i]
+          const_ratings <- const_ratings[!is.na(const_ratings)]
+
+          hist(const_ratings,
+               breaks = input$synopsis_bins,
+               main = construct_labels[i],
+               xlab = "Rating",
+               ylab = "Frequency",
+               col = bar_color,
+               border = "white",
+               xlim = c(min(sm, na.rm = TRUE), max(sm, na.rm = TRUE)),
+               cex.main = 0.9)
+
+          abline(v = mean(const_ratings), col = "red", lwd = 2, lty = 2)
+        }
+
+      } else if (input$synopsis_type == "scree") {
+        pca_result <- prcomp(sm, scale. = TRUE)
+        variance_explained <- (pca_result$sdev^2) / sum(pca_result$sdev^2) * 100
+        cumulative_var <- cumsum(variance_explained)
+
+        n_components <- min(10, length(variance_explained))
+
+        par(mar = c(5, 4, 4, 5))
+
+        barplot(variance_explained[1:n_components],
+                names.arg = 1:n_components,
+                main = "Scree Plot - Variance Explained by Components",
+                xlab = "Principal Component",
+                ylab = "Variance Explained (%)",
+                col = bar_color,
+                border = "white",
+                ylim = c(0, max(variance_explained[1:n_components]) * 1.2))
+
+        par(new = TRUE)
+        plot(1:n_components, cumulative_var[1:n_components],
+             type = "b", pch = 19, col = "red", lwd = 2,
+             axes = FALSE, xlab = "", ylab = "",
+             ylim = c(0, 100))
+
+        axis(4, col = "red", col.axis = "red")
+        mtext("Cumulative Variance (%)", side = 4, line = 3, col = "red")
+
+        legend("right",
+               legend = c("Individual", "Cumulative"),
+               col = c(bar_color, "red"),
+               lty = c(NA, 1), pch = c(15, 19),
+               pt.cex = c(2, 1))
+      }
+
+      dev.off()
+    }
+  )
+
+  # Focus Cluster Analysis
+  focus_result <- reactiveVal(NULL)
+
+  observeEvent(input$run_focus, {
+    req(rv$scores_mat_last)
+    sm <- rv$scores_mat_last
+
+    construct_labels <- paste(rv$constructs$left, "-", rv$constructs$right)
+
+    result <- focus_cluster(
+      scores_matrix = sm,
+      element_names = rv$elements,
+      construct_names = construct_labels,
+      power = input$focus_power
+    )
+
+    focus_result(result)
+  })
+
+  output$focus_plot <- renderPlot({
+    req(focus_result())
+    result <- focus_result()
+
+    plot_focus_cluster(
+      focus_result = result,
+      title = "Focus Cluster Analysis",
+      show_values = input$focus_show_values,
+      show_shading = input$focus_show_shading,
+      use_color = input$focus_use_color
+    )
+  })
+
+  output$focus_element_matches <- renderPrint({
+    req(focus_result())
+    result <- focus_result()
+    elem_sim <- result$element_similarities
+
+    cat("Element Similarity Matrix (%):\n\n")
+    rownames(elem_sim) <- rv$elements
+    colnames(elem_sim) <- rv$elements
+    print(round(elem_sim, 1))
+
+    cat("\n\nTop Element Matches (excluding self):\n")
+    elem_sim_no_diag <- elem_sim
+    diag(elem_sim_no_diag) <- 0
+
+    matches <- which(elem_sim_no_diag >= input$focus_cutoff, arr.ind = TRUE)
+    if (nrow(matches) > 0) {
+      for (i in seq_len(min(10, nrow(matches)))) {
+        r <- matches[i, 1]
+        c <- matches[i, 2]
+        if (r < c) {
+          cat(sprintf("  %s - %s: %.1f%%\n",
+                     rv$elements[r],
+                     rv$elements[c],
+                     elem_sim[r, c]))
+        }
+      }
+    } else {
+      cat("  No matches above cutoff threshold\n")
+    }
+  })
+
+  output$focus_construct_matches <- renderPrint({
+    req(focus_result())
+    result <- focus_result()
+    const_sim <- result$construct_similarities
+
+    construct_labels <- paste(rv$constructs$left, "-", rv$constructs$right)
+
+    cat("Construct Similarity Matrix (%):\n\n")
+    rownames(const_sim) <- construct_labels
+    colnames(const_sim) <- construct_labels
+    print(round(const_sim, 1))
+
+    cat("\n\nTop Construct Matches (excluding self):\n")
+    const_sim_no_diag <- const_sim
+    diag(const_sim_no_diag) <- 0
+
+    matches <- which(const_sim_no_diag >= input$focus_cutoff, arr.ind = TRUE)
+    if (nrow(matches) > 0) {
+      for (i in seq_len(min(10, nrow(matches)))) {
+        r <- matches[i, 1]
+        c <- matches[i, 2]
+        if (r < c) {
+          cat(sprintf("  %s - %s: %.1f%%\n",
+                     construct_labels[r],
+                     construct_labels[c],
+                     const_sim[r, c]))
+        }
+      }
+    } else {
+      cat("  No matches above cutoff threshold\n")
+    }
+  })
+
+  output$download_focus <- downloadHandler(
+    filename = function() paste0("focus-cluster-", Sys.Date(), ".png"),
+    content = function(file) {
+      req(focus_result())
+      result <- focus_result()
+
+      png(file, width = 1200, height = 900, res = 120)
+      plot_focus_cluster(
+        focus_result = result,
+        title = "Focus Cluster Analysis",
+        show_values = input$focus_show_values,
+        show_shading = input$focus_show_shading,
+        use_color = input$focus_use_color
+      )
+      dev.off()
+    }
+  )
 
   # Downloads
   output$download_grid <- downloadHandler(

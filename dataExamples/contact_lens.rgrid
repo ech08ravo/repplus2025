@@ -1,0 +1,32 @@
+	Grid	24	4	96	ContactLensDataset		1	24-Nov-2025	16:07	local	Rep IV 2.00	RepGrid
+C0	R	100	0	1	1	5	young	presbyopic	
+C1	R	100	0	1	1	5	myope	hypermetrope	
+C2	R	100	0	1	1	5	no	yes	
+C3	R	100	0	1	1	5	reduced	normal	
+E0	100	0	1	1	4	1	1	1	1	Case 1
+E1	100	0	1	1	4	1	1	1	7	Case 2
+E2	100	0	1	1	4	1	1	7	1	Case 3
+E3	100	0	1	1	4	1	1	7	7	Case 4
+E4	100	0	1	1	4	1	7	1	1	Case 5
+E5	100	0	1	1	4	1	7	1	7	Case 6
+E6	100	0	1	1	4	1	7	7	1	Case 7
+E7	100	0	1	1	4	1	7	7	7	Case 8
+E8	100	0	1	1	4	4	1	1	1	Case 9
+E9	100	0	1	1	4	4	1	1	7	Case 10
+E10	100	0	1	1	4	4	1	7	1	Case 11
+E11	100	0	1	1	4	4	1	7	7	Case 12
+E12	100	0	1	1	4	4	7	1	1	Case 13
+E13	100	0	1	1	4	4	7	1	7	Case 14
+E14	100	0	1	1	4	4	7	7	1	Case 15
+E15	100	0	1	1	4	4	7	7	7	Case 16
+E16	100	0	1	1	4	7	1	1	1	Case 17
+E17	100	0	1	1	4	7	1	1	7	Case 18
+E18	100	0	1	1	4	7	1	7	1	Case 19
+E19	100	0	1	1	4	7	1	7	7	Case 20
+E20	100	0	1	1	4	7	7	1	1	Case 21
+E21	100	0	1	1	4	7	7	1	7	Case 22
+E22	100	0	1	1	4	7	7	7	1	Case 23
+E23	100	0	1	1	4	7	7	7	7	Case 24
+_UID	37ff8ece-e114-4428-8cd5-3eca85f67dc5
+_Date	24-Nov-2025
+_Time	16:07

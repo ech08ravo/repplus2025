@@ -95,8 +95,8 @@ focus_cluster <- function(scores_matrix, element_names, construct_names, power =
 }
 
 #' Plot Focus cluster analysis with dendrograms
-plot_focus_cluster <- function(focus_result, title = "Focus Cluster Analysis", 
-                              show_values = TRUE, show_shading = TRUE) {
+plot_focus_cluster <- function(focus_result, title = "Focus Cluster Analysis",
+                              show_values = TRUE, show_shading = TRUE, use_color = FALSE) {
   
   # Set up plotting layout: dendrograms + main plot
   layout_matrix <- matrix(c(0, 1, 0,
@@ -118,23 +118,35 @@ plot_focus_cluster <- function(focus_result, title = "Focus Cluster Analysis",
   plot(as.dendrogram(focus_result$element_hclust), 
        horiz = TRUE, leaflab = "none", axes = FALSE)
   
-  # Main grid plot
-  par(mar = c(4, 4, 0, 1))
+  # Main grid plot - adjust margins based on label length
   sorted_matrix <- focus_result$sorted_matrix
   n_elem <- nrow(sorted_matrix)
   n_const <- ncol(sorted_matrix)
+
+  # Calculate adaptive margins
+  max_elem_chars <- max(nchar(focus_result$sorted_elements))
+  max_const_chars <- max(nchar(focus_result$sorted_constructs))
+  left_mar <- min(12, max(4, max_elem_chars * 0.5))
+  bottom_mar <- min(12, max(4, max_const_chars * 0.3))
+
+  par(mar = c(bottom_mar, left_mar, 0, 1))
   
-  # Create image plot
+  # Create image plot with 1:1 aspect ratio
   if (show_shading) {
-    # Use color coding for values
-    colors <- colorRampPalette(c("#2166AC", "#FFFFFF", "#B2182B"))(100)
+    # Use greyscale by default, color if requested
+    if (use_color) {
+      colors <- colorRampPalette(c("#2166AC", "#FFFFFF", "#B2182B"))(100)
+    } else {
+      colors <- gray.colors(100, start = 0.95, end = 0.2)
+    }
     image(1:n_const, 1:n_elem, t(sorted_matrix[n_elem:1, , drop = FALSE]),
-          col = colors, axes = FALSE, xlab = "Constructs", ylab = "Elements")
+          col = colors, axes = FALSE, xlab = "Constructs", ylab = "Elements",
+          asp = 1)
   } else {
-    # Just boxes
+    # Just boxes with 1:1 aspect ratio
     plot(1, type = "n", xlim = c(0.5, n_const + 0.5), ylim = c(0.5, n_elem + 0.5),
-         xlab = "Constructs", ylab = "Elements", axes = FALSE)
-    
+         xlab = "Constructs", ylab = "Elements", axes = FALSE, asp = 1)
+
     for (i in 1:n_elem) {
       for (j in 1:n_const) {
         rect(j - 0.4, (n_elem - i + 1) - 0.4, j + 0.4, (n_elem - i + 1) + 0.4)
@@ -144,19 +156,28 @@ plot_focus_cluster <- function(focus_result, title = "Focus Cluster Analysis",
   
   # Add values if requested
   if (show_values) {
+    # Scale text size based on grid size
+    value_cex <- min(0.8, max(0.4, 15 / max(n_elem, n_const)))
+
     for (i in 1:n_elem) {
       for (j in 1:n_const) {
         val <- sorted_matrix[i, j]
         if (!is.na(val)) {
-          text(j, n_elem - i + 1, val, cex = 0.8)
+          text(j, n_elem - i + 1, sprintf("%.0f", val), cex = value_cex)
         }
       }
     }
   }
   
-  # Add axis labels
-  axis(1, at = 1:n_const, labels = focus_result$sorted_constructs, las = 2, cex.axis = 0.7)
-  axis(2, at = 1:n_elem, labels = rev(focus_result$sorted_elements), las = 2, cex.axis = 0.7)
+  # Add axis labels with adaptive sizing
+  # Calculate label size based on number of items
+  const_cex <- min(0.7, max(0.4, 10 / n_const))
+  elem_cex <- min(0.7, max(0.4, 10 / n_elem))
+
+  axis(1, at = 1:n_const, labels = focus_result$sorted_constructs,
+       las = 2, cex.axis = const_cex)
+  axis(2, at = 1:n_elem, labels = rev(focus_result$sorted_elements),
+       las = 2, cex.axis = elem_cex)
   box()
   
   # Right panel - similarity matrices or stats
