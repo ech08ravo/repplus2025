@@ -1249,8 +1249,8 @@ server <- function(input, output, session) {
     }
   })
 
-  # Dynamic slider with construct pole labels
-  output$rating_slider_ui <- renderUI({
+  # Dynamic pole labels that update when construct changes
+  output$pole_labels_ui <- renderUI({
     req(input$rating_construct)
     req(nrow(rv$constructs) > 0)
 
@@ -1266,12 +1266,19 @@ server <- function(input, output, session) {
       right_pole <- rv$constructs$right[idx]
     }
 
+    fluidRow(
+      column(4, tags$div(style = "text-align: left; font-weight: bold; color: #28a745; font-size: 12px;", paste0("1 = ", left_pole))),
+      column(4, tags$div(style = "text-align: center; color: #666; font-size: 11px;", "4 = neutral")),
+      column(4, tags$div(style = "text-align: right; font-weight: bold; color: #dc3545; font-size: 12px;", paste0(right_pole, " = 7")))
+    )
+  })
+
+  # Slider UI (separate so it doesn't reset when labels change)
+  output$rating_slider_ui <- renderUI({
+    req(nrow(rv$constructs) > 0)
+
     div(
-      fluidRow(
-        column(4, tags$div(style = "text-align: left; font-weight: bold; color: #28a745; font-size: 12px;", paste0("1 = ", left_pole))),
-        column(4, tags$div(style = "text-align: center; color: #666; font-size: 11px;", "4 = neutral")),
-        column(4, tags$div(style = "text-align: right; font-weight: bold; color: #dc3545; font-size: 12px;", paste0(right_pole, " = 7")))
-      ),
+      uiOutput("pole_labels_ui"),
       sliderInput("rating_score", NULL, min = 1, max = 7, value = 4, width = "100%", ticks = TRUE)
     )
   })
@@ -1375,6 +1382,9 @@ server <- function(input, output, session) {
   observeEvent(input$add_rating, {
     req(input$rating_element, input$rating_construct, input$rating_score)
 
+    # Store current construct to preserve it
+    current_construct <- input$rating_construct
+
     # Check if this element-construct pair already exists (update instead of add)
     existing_key <- paste(rv$ratings$element, rv$ratings$construct, sep = "||")
     new_key <- paste(input$rating_element, input$rating_construct, sep = "||")
@@ -1396,13 +1406,26 @@ server <- function(input, output, session) {
       )
     }
 
-    # Auto-advance to next element
+    # Auto-advance to next UNRATED element for this construct (stay on same construct)
     current_elem <- input$rating_element
     elem_idx <- match(current_elem, rv$elements)
-    if (!is.na(elem_idx) && elem_idx < length(rv$elements)) {
+
+    # Find elements not yet rated on this construct
+    rated_elements <- rv$ratings$element[rv$ratings$construct == current_construct]
+    unrated_elements <- setdiff(rv$elements, rated_elements)
+
+    if (length(unrated_elements) > 0) {
+      # Move to first unrated element
+      updateSelectInput(session, "rating_element", selected = unrated_elements[1])
+    } else if (!is.na(elem_idx) && elem_idx < length(rv$elements)) {
+      # All rated for this construct - just move to next element in list
       next_elem <- rv$elements[elem_idx + 1]
       updateSelectInput(session, "rating_element", selected = next_elem)
     }
+
+    # Keep the construct dropdown on the same construct
+    updateSelectInput(session, "rating_construct", selected = current_construct)
+
     # Reset slider to middle
     updateSliderInput(session, "rating_score", value = 4)
   })
