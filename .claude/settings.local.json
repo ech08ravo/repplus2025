@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(Rscript:*)"
+      "Bash(Rscript:*)",
+      "Bash(R -e:*)",
+      "Bash(~/.Renviron)"
     ],
     "deny": [],
     "ask": []

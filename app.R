@@ -5,42 +5,91 @@ library(uuid)
 
 # Source the focus analysis functions
 source("R/focus_analysis.r")
+source("R/claude_api.R")
 
 ui <- fluidPage(
-  tags$head(tags$style(HTML('
-    .container-fluid { max-width: 1400px; }
-    .dataTables_wrapper { overflow-x: auto; }
-  '))),
+  tags$head(
+    tags$style(HTML('
+      .container-fluid { max-width: 1400px; }
+      body { font-size: 13px; }
+      .form-group { margin-bottom: 8px; }
+      .form-control { padding: 4px 8px; height: auto; font-size: 13px; }
+      .btn { padding: 4px 10px; font-size: 12px; margin: 2px 0; }
+      .btn-sm { padding: 2px 6px; font-size: 11px; }
+      label { margin-bottom: 2px; font-size: 12px; }
+      h4 { font-size: 16px; margin: 8px 0; }
+      h5 { font-size: 14px; margin: 6px 0; }
+      p { margin-bottom: 6px; font-size: 13px; }
+      hr { margin: 8px 0; }
+      .sidebar { padding: 8px; }
+      .well { padding: 10px; }
+      .dataTables_wrapper { overflow-x: auto; font-size: 12px; }
+      .help-btn { margin: 2px 4px 2px 0; }
+      .help-content { background: #f8f9fa; padding: 10px; border-radius: 4px; margin-top: 6px; border: 1px solid #dee2e6; font-size: 12px; }
+      .help-content h5 { margin-top: 8px; color: #495057; }
+      .help-content ul { margin-bottom: 6px; padding-left: 20px; }
+      .help-content li { margin-bottom: 3px; }
+      .chat-btn { margin: 2px 4px; }
+      .chat-panel { background: #e7f3ff; padding: 10px; border-radius: 4px; margin-top: 6px; border: 1px solid #b3d7ff; }
+      .elicit-panel { background: #fff8e6; padding: 10px; border-radius: 4px; border: 1px solid #ffc107; margin-bottom: 10px; }
+      .elicit-panel h4 { margin-top: 0; }
+      .elicit-panel h5 { color: #856404; margin-top: 0; font-size: 13px; }
+      .elicit-panel p { margin-bottom: 8px; }
+      .elicit-section { background: #fffdf5; padding: 8px; border-radius: 4px; margin-bottom: 6px; }
+      .elicit-section hr { margin: 6px 0; }
+      .elicit-section textarea { font-size: 11px; }
+      .chat-response { background: #fff; padding: 10px; border: 1px solid #ccc; border-radius: 4px; margin-top: 6px; white-space: pre-wrap; max-height: 300px; overflow-y: auto; font-size: 12px; }
+      .chat-error { background: #fee; padding: 8px; border: 1px solid #fcc; border-radius: 4px; color: #c00; margin-top: 6px; font-size: 12px; }
+      .chat-loading { color: #666; font-style: italic; padding: 6px; font-size: 12px; }
+      .copy-success { color: #28a745; font-weight: bold; margin-left: 6px; font-size: 11px; }
+      .btn-group-chat { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
+      .shiny-input-container { margin-bottom: 6px; }
+      .selectize-input { padding: 4px 8px; min-height: 28px; font-size: 12px; }
+      .slider-container { margin-bottom: 6px; }
+      .irs { font-size: 11px; }
+      .tab-content { padding-top: 10px; }
+      .nav-tabs > li > a { padding: 6px 12px; font-size: 12px; }
+      .col-sm-4, .col-sm-3, .col-sm-6 { padding-left: 8px; padding-right: 8px; }
+      .row { margin-left: -8px; margin-right: -8px; }
+    ')),
+    tags$script(HTML('
+      Shiny.addCustomMessageHandler("copyToClipboard", function(text) {
+        navigator.clipboard.writeText(text).then(function() {
+          // Show success message
+          var btn = document.querySelector(".copy-feedback");
+          if (btn) {
+            btn.textContent = "Copied! Now paste into Claude.ai";
+            btn.style.display = "inline";
+            setTimeout(function() { btn.style.display = "none"; }, 3000);
+          }
+        });
+      });
+      Shiny.addCustomMessageHandler("clearTextarea", function(id) {
+        var el = document.getElementById(id);
+        if (el) el.value = "";
+      });
+    '))
+  ),
   titlePanel("RepGrid Elicitation"),
   sidebarLayout(
     sidebarPanel(
       width = 3,
+      h4("File Operations"),
       fileInput("rgrid_file", "Import .rgrid", accept = ".rgrid"),
       actionButton("import_rgrid", "Load Grid"),
       tags$hr(),
       actionButton("load_sample", "Load Sample Data"),
       tags$hr(),
-      textInput("element_name", "Enter element name:"),
-      actionButton("add_element", "Add element"),
-      tags$hr(),
-      textInput("construct_left",  "Enter left pole label:"),
-      textInput("construct_right", "Enter right pole label:"),
-      actionButton("add_construct", "Add construct"),
-      tags$hr(),
-      selectInput("rating_element",   "Select element:",   choices = NULL),
-      selectInput("rating_construct", "Select construct:", choices = NULL),
-      sliderInput("rating_score", "Rating:", min = 1, max = 7, value = 4),
-      actionButton("add_rating", "Add rating"),
-      tags$hr(),
-      DTOutput("ratings_table"),
-      actionButton("remove_rating", "Remove selected rating"),
-      tags$hr(),
+      h4("Analysis"),
+      actionButton("analyze", "Analyze Grid", class = "btn-primary"),
       checkboxInput("impute_missing", "Impute missing ratings (use 4)", value = FALSE),
+      tags$hr(),
+      h4("Display Options"),
       selectInput("col_elements", "Element color", choices = c("black","blue","red","darkgreen","purple"), selected = "blue"),
       selectInput("col_constructs", "Construct color", choices = c("black","red","orange","darkgreen","brown"), selected = "red"),
       checkboxInput("heatmap_color", "Use color heatmap", value = FALSE),
-      actionButton("analyze", "Analyze Grid"),
       tags$hr(),
+      h4("Export"),
       downloadButton("download_grid", "Download Grid as CSV"),
       downloadButton("download_rgrid", "Download Grid as .rgrid")
     ),
@@ -48,12 +97,100 @@ ui <- fluidPage(
       width = 9,
       tabsetPanel(
         tabPanel(
-          "Summary & Biplot",
+          "Build Grid",
+          div(class = "elicit-panel",
+            h4("Build Your Repertory Grid"),
+            fluidRow(
+              column(4,
+                div(class = "elicit-section",
+                  h5("1. Elements"),
+                  textInput("element_name", NULL, placeholder = "Single element"),
+                  actionButton("add_element", "Add", class = "btn-warning btn-sm"),
+                  tags$hr(),
+                  tags$small("Paste list (one per line or comma-separated):"),
+                  tags$textarea(id = "elements_bulk", rows = 3, style = "width: 100%; margin-top: 3px; font-size: 11px;", placeholder = "Mother\nFather\nBest friend"),
+                  actionButton("add_elements_bulk", "Add All", class = "btn-warning btn-sm", style = "margin-top: 3px;")
+                )
+              ),
+              column(4,
+                div(class = "elicit-section",
+                  h5("2. Constructs"),
+                  fluidRow(
+                    column(6, style = "padding-right: 2px;", textInput("construct_left", NULL, placeholder = "Left pole")),
+                    column(6, style = "padding-left: 2px;", textInput("construct_right", NULL, placeholder = "Right pole"))
+                  ),
+                  actionButton("add_construct", "Add", class = "btn-warning btn-sm"),
+                  tags$hr(),
+                  tags$small("Paste list (left - right, one per line):"),
+                  tags$textarea(id = "constructs_bulk", rows = 3, style = "width: 100%; margin-top: 3px; font-size: 11px;", placeholder = "friendly - unfriendly\nwarm - cold"),
+                  actionButton("add_constructs_bulk", "Add All", class = "btn-warning btn-sm", style = "margin-top: 3px;")
+                )
+              ),
+              column(4,
+                div(class = "elicit-section",
+                  h5("3. Ratings"),
+                  fluidRow(
+                    column(6, style = "padding-right: 2px;", selectInput("rating_element", NULL, choices = NULL)),
+                    column(6, style = "padding-left: 2px;", selectInput("rating_construct", NULL, choices = NULL))
+                  ),
+                  sliderInput("rating_score", "1=left, 7=right:", min = 1, max = 7, value = 4, width = "100%"),
+                  actionButton("add_rating", "Add Rating", class = "btn-warning btn-sm")
+                )
+              )
+            )
+          ),
+          h5("Current Ratings"),
+          DTOutput("ratings_table"),
+          actionButton("remove_rating", "Remove Selected", class = "btn-danger btn-sm")
+        ),
+        tabPanel(
+          "Grid Summary",
           h4("Elements List"), uiOutput("elements_ui"),
           h4("Constructs List"), uiOutput("constructs_ui"),
           tags$hr(), h4("Missing Ratings"), tableOutput("missing_table"),
-          tags$hr(), h4("Analysis Summary"), verbatimTextOutput("analysis_summary"),
-          h4("PCA Biplot (colored)"), plotOutput("pca_biplot")
+          tags$hr(), h4("Analysis Summary"), verbatimTextOutput("analysis_summary")
+        ),
+        tabPanel(
+          "Biplot",
+          h4("PCA Biplot"),
+          p("2D visual map showing element and construct relationships using Principal Component Analysis"),
+          plotOutput("pca_biplot", height = 600),
+          tags$hr(),
+          actionButton("help_biplot", "Help me understand this visualisation", class = "btn-info help-btn"),
+          actionButton("chat_biplot", "Chat about this data", class = "btn-success chat-btn"),
+          conditionalPanel(
+            condition = "input.help_biplot % 2 == 1",
+            div(class = "help-content",
+              h5("PCA Biplot"),
+              p("A 2D visual map showing how elements and constructs relate to each other using Principal Component Analysis (PCA)."),
+              tags$ul(
+                tags$li(tags$strong("Elements"), " are plotted as points - elements close together were rated similarly across constructs."),
+                tags$li(tags$strong("Constructs"), " are shown as arrows (vectors) from the origin - arrows pointing in similar directions measure similar things."),
+                tags$li(tags$strong("PC1 and PC2"), " are the two main dimensions that explain the most variance in your ratings.")
+              ),
+              h5("How to interpret"),
+              tags$ul(
+                tags$li("Elements near each other = similar rating patterns"),
+                tags$li("Constructs pointing same direction = correlated (measure similar things)"),
+                tags$li("Constructs pointing opposite directions = negatively correlated"),
+                tags$li("Elements in the direction of a construct arrow = rated high on that construct")
+              )
+            )
+          ),
+          conditionalPanel(
+            condition = "input.chat_biplot % 2 == 1",
+            div(class = "chat-panel",
+              h5("Ask Claude about your PCA Biplot"),
+              textInput("chat_biplot_question", "Your question:", placeholder = "e.g., Why are elements A and B so close together?"),
+              div(class = "btn-group-chat",
+                actionButton("ask_biplot", "Ask Claude (API)", class = "btn-primary"),
+                actionButton("copy_biplot", "Copy to Clipboard", class = "btn-secondary"),
+                tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary", "Open Claude.ai"),
+                span(class = "copy-feedback", style = "display:none;")
+              ),
+              uiOutput("biplot_response")
+            )
+          )
         ),
         tabPanel("Crossplot",
                  fluidRow(
@@ -78,7 +215,45 @@ ui <- fluidPage(
                    )
                  ),
                  tags$hr(),
-                 plotOutput("crossplot_plot", height = 600)
+                 plotOutput("crossplot_plot", height = 600),
+                 tags$hr(),
+                 actionButton("help_crossplot", "Help me understand this visualisation", class = "btn-info help-btn"),
+                 actionButton("chat_crossplot", "Chat about this data", class = "btn-success chat-btn"),
+                 conditionalPanel(
+                   condition = "input.help_crossplot % 2 == 1",
+                   div(class = "help-content",
+                     h5("Crossplot Analysis"),
+                     p("A scatter plot showing where each element falls on two constructs of your choice."),
+                     tags$ul(
+                       tags$li(tags$strong("X-axis"), " = ratings on the first construct (1 = left pole, 7 = right pole)"),
+                       tags$li(tags$strong("Y-axis"), " = ratings on the second construct"),
+                       tags$li(tags$strong("Each point"), " = one element from your grid")
+                     ),
+                     h5("How to interpret"),
+                     tags$ul(
+                       tags$li("Elements in the same quadrant share similar ratings on both constructs"),
+                       tags$li("The midpoint (4) is marked with dashed lines - this divides the plot into four quadrants"),
+                       tags$li("Use this to explore relationships between specific construct pairs"),
+                       tags$li("Try different construct combinations to find meaningful patterns")
+                     ),
+                     h5("Example use"),
+                     p("If your constructs are 'friendly-unfriendly' (X) and 'competent-incompetent' (Y), elements in the top-right are seen as both unfriendly AND incompetent.")
+                   )
+                 ),
+                 conditionalPanel(
+                   condition = "input.chat_crossplot % 2 == 1",
+                   div(class = "chat-panel",
+                     h5("Ask Claude about your Crossplot"),
+                     textInput("chat_crossplot_question", "Your question:", placeholder = "e.g., Why is element X in that quadrant?"),
+                     div(class = "btn-group-chat",
+                       actionButton("ask_crossplot", "Ask Claude (API)", class = "btn-primary"),
+                       actionButton("copy_crossplot", "Copy to Clipboard", class = "btn-secondary"),
+                       tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary", "Open Claude.ai"),
+                       span(class = "copy-feedback", style = "display:none;")
+                     ),
+                     uiOutput("crossplot_response")
+                   )
+                 )
         ),
         tabPanel("Synopsis",
                  fluidRow(
@@ -108,11 +283,155 @@ ui <- fluidPage(
                    )
                  ),
                  tags$hr(),
-                 plotOutput("synopsis_plot", height = 600)
+                 plotOutput("synopsis_plot", height = 600),
+                 tags$hr(),
+                 actionButton("help_synopsis", "Help me understand this visualisation", class = "btn-info help-btn"),
+                 actionButton("chat_synopsis", "Chat about this data", class = "btn-success chat-btn"),
+                 conditionalPanel(
+                   condition = "input.help_synopsis % 2 == 1",
+                   div(class = "help-content",
+                     h5("Synopsis Analysis"),
+                     p("Summarises your rating patterns through histograms and variance analysis."),
+                     h5("Display options"),
+                     tags$ul(
+                       tags$li(tags$strong("Overall Distribution"), " - Histogram of ALL ratings in your grid. Shows if you tend to use certain parts of the scale more than others. Red line = mean, blue line = median."),
+                       tags$li(tags$strong("Element Distributions"), " - Separate histogram for each element. Shows how each element was rated across all constructs."),
+                       tags$li(tags$strong("Construct Distributions"), " - Separate histogram for each construct. Shows how ratings vary across elements for each construct."),
+                       tags$li(tags$strong("Scree Plot"), " - Shows how much variance each principal component explains. Helps determine how many dimensions are meaningful in your data.")
+                     ),
+                     h5("How to interpret"),
+                     tags$ul(
+                       tags$li("Skewed distributions may indicate response bias or genuine patterns"),
+                       tags$li("Flat distributions suggest differentiated ratings"),
+                       tags$li("In the scree plot, look for an 'elbow' where variance drops off - components before the elbow are most meaningful")
+                     )
+                   )
+                 ),
+                 conditionalPanel(
+                   condition = "input.chat_synopsis % 2 == 1",
+                   div(class = "chat-panel",
+                     h5("Ask Claude about your Synopsis"),
+                     textInput("chat_synopsis_question", "Your question:", placeholder = "e.g., Why is my distribution skewed?"),
+                     div(class = "btn-group-chat",
+                       actionButton("ask_synopsis", "Ask Claude (API)", class = "btn-primary"),
+                       actionButton("copy_synopsis", "Copy to Clipboard", class = "btn-secondary"),
+                       tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary", "Open Claude.ai"),
+                       span(class = "copy-feedback", style = "display:none;")
+                     ),
+                     uiOutput("synopsis_response")
+                   )
+                 )
         ),
-        tabPanel("Heatmap", plotOutput("heatmap_plot", height = 500)),
-        tabPanel("Element Dendrogram", plotOutput("dend_elements")),
-        tabPanel("Construct Dendrogram", plotOutput("dend_constructs")),
+        tabPanel("Heatmap",
+                 plotOutput("heatmap_plot", height = 500),
+                 tags$hr(),
+                 actionButton("help_heatmap", "Help me understand this visualisation", class = "btn-info help-btn"),
+                 actionButton("chat_heatmap", "Chat about this data", class = "btn-success chat-btn"),
+                 conditionalPanel(
+                   condition = "input.help_heatmap % 2 == 1",
+                   div(class = "help-content",
+                     h5("Heatmap"),
+                     p("A color-coded grid showing all your ratings at a glance."),
+                     tags$ul(
+                       tags$li(tags$strong("Rows"), " = Elements"),
+                       tags$li(tags$strong("Columns"), " = Constructs"),
+                       tags$li(tags$strong("Colors"), " = Rating values (darker = higher ratings by default, or use color toggle for blue-white-red)")
+                     ),
+                     h5("How to interpret"),
+                     tags$ul(
+                       tags$li("Look for patterns - rows or columns with similar shading"),
+                       tags$li("Dark/red regions indicate high ratings (toward right pole)"),
+                       tags$li("Light/blue regions indicate low ratings (toward left pole)"),
+                       tags$li("Uniform rows = element rated similarly across all constructs"),
+                       tags$li("Uniform columns = construct doesn't differentiate between elements")
+                     )
+                   )
+                 ),
+                 conditionalPanel(
+                   condition = "input.chat_heatmap % 2 == 1",
+                   div(class = "chat-panel",
+                     h5("Ask Claude about your Heatmap"),
+                     textInput("chat_heatmap_question", "Your question:", placeholder = "e.g., Why does this row look different?"),
+                     div(class = "btn-group-chat",
+                       actionButton("ask_heatmap", "Ask Claude (API)", class = "btn-primary"),
+                       actionButton("copy_heatmap", "Copy to Clipboard", class = "btn-secondary"),
+                       tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary", "Open Claude.ai"),
+                       span(class = "copy-feedback", style = "display:none;")
+                     ),
+                     uiOutput("heatmap_response")
+                   )
+                 )
+        ),
+        tabPanel("Element Dendrogram",
+                 plotOutput("dend_elements"),
+                 tags$hr(),
+                 actionButton("help_dend_elem", "Help me understand this visualisation", class = "btn-info help-btn"),
+                 actionButton("chat_dend_elem", "Chat about this data", class = "btn-success chat-btn"),
+                 conditionalPanel(
+                   condition = "input.help_dend_elem % 2 == 1",
+                   div(class = "help-content",
+                     h5("Element Dendrogram"),
+                     p("A tree diagram showing which elements are most similar to each other based on their rating patterns."),
+                     h5("How to read it"),
+                     tags$ul(
+                       tags$li(tags$strong("Elements that join early"), " (close to the left) are very similar - they were rated similarly across most constructs"),
+                       tags$li(tags$strong("Elements that join late"), " (further right) are more different from each other"),
+                       tags$li(tags$strong("Branch length"), " indicates degree of difference")
+                     ),
+                     h5("Example interpretation"),
+                     p("If elements A and B join together before connecting to C, this means A and B have more similar rating profiles than either has with C.")
+                   )
+                 ),
+                 conditionalPanel(
+                   condition = "input.chat_dend_elem % 2 == 1",
+                   div(class = "chat-panel",
+                     h5("Ask Claude about your Element Dendrogram"),
+                     textInput("chat_dend_elem_question", "Your question:", placeholder = "e.g., Why do A and B cluster together?"),
+                     div(class = "btn-group-chat",
+                       actionButton("ask_dend_elem", "Ask Claude (API)", class = "btn-primary"),
+                       actionButton("copy_dend_elem", "Copy to Clipboard", class = "btn-secondary"),
+                       tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary", "Open Claude.ai"),
+                       span(class = "copy-feedback", style = "display:none;")
+                     ),
+                     uiOutput("dend_elem_response")
+                   )
+                 )
+        ),
+        tabPanel("Construct Dendrogram",
+                 plotOutput("dend_constructs"),
+                 tags$hr(),
+                 actionButton("help_dend_const", "Help me understand this visualisation", class = "btn-info help-btn"),
+                 actionButton("chat_dend_const", "Chat about this data", class = "btn-success chat-btn"),
+                 conditionalPanel(
+                   condition = "input.help_dend_const % 2 == 1",
+                   div(class = "help-content",
+                     h5("Construct Dendrogram"),
+                     p("A tree diagram showing which constructs are most similar based on how elements were rated on them."),
+                     h5("How to read it"),
+                     tags$ul(
+                       tags$li(tags$strong("Constructs that join early"), " (close to the left) essentially measure the same thing - elements received similar ratings on both"),
+                       tags$li(tags$strong("Constructs that join late"), " (further right) measure different dimensions"),
+                       tags$li("Very similar constructs may be redundant - consider if you need both")
+                     ),
+                     h5("Example interpretation"),
+                     p("If 'friendly-unfriendly' and 'warm-cold' join early, you may be using these constructs interchangeably. They represent the same underlying dimension in your thinking.")
+                   )
+                 ),
+                 conditionalPanel(
+                   condition = "input.chat_dend_const % 2 == 1",
+                   div(class = "chat-panel",
+                     h5("Ask Claude about your Construct Dendrogram"),
+                     textInput("chat_dend_const_question", "Your question:", placeholder = "e.g., Are these constructs redundant?"),
+                     div(class = "btn-group-chat",
+                       actionButton("ask_dend_const", "Ask Claude (API)", class = "btn-primary"),
+                       actionButton("copy_dend_const", "Copy to Clipboard", class = "btn-secondary"),
+                       tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary", "Open Claude.ai"),
+                       span(class = "copy-feedback", style = "display:none;")
+                     ),
+                     uiOutput("dend_const_response")
+                   )
+                 )
+        ),
         tabPanel("Focus Cluster",
                  fluidRow(
                    column(12,
@@ -155,6 +474,54 @@ ui <- fluidPage(
                           h5("Construct Matches"),
                           verbatimTextOutput("focus_construct_matches")
                    )
+                 ),
+                 tags$hr(),
+                 actionButton("help_focus", "Help me understand this visualisation", class = "btn-info help-btn"),
+                 actionButton("chat_focus", "Chat about this data", class = "btn-success chat-btn"),
+                 conditionalPanel(
+                   condition = "input.help_focus % 2 == 1",
+                   div(class = "help-content",
+                     h5("Focus Cluster Analysis"),
+                     p("Focus automatically sorts your grid to reveal patterns. Similar elements appear together, and similar constructs appear together."),
+                     h5("The display shows 4 parts"),
+                     tags$ul(
+                       tags$li(tags$strong("Top dendrogram"), " - shows how constructs (columns) cluster together"),
+                       tags$li(tags$strong("Left dendrogram"), " - shows how elements (rows) cluster together"),
+                       tags$li(tags$strong("Center grid"), " - your ratings, reordered so similar items are adjacent"),
+                       tags$li(tags$strong("Match statistics"), " - similarity percentages for elements and constructs")
+                     ),
+                     h5("Reading the dendrograms"),
+                     tags$ul(
+                       tags$li("Short connections = very similar items"),
+                       tags$li("Long connections = less similar items"),
+                       tags$li("Items that join low on the tree are more similar than those joining higher up")
+                     ),
+                     h5("Parameters"),
+                     tags$ul(
+                       tags$li(tags$strong("Minkowski Power"), " - 1.0 (city block, default) treats all differences equally; 2.0 (Euclidean) emphasizes larger differences"),
+                       tags$li(tags$strong("Match Cutoff"), " - only shows matches above this similarity threshold")
+                     ),
+                     h5("Common uses"),
+                     tags$ul(
+                       tags$li("Finding element groups that cluster together"),
+                       tags$li("Identifying redundant constructs (matches > 90%)"),
+                       tags$li("Discovering main conceptual dimensions")
+                     )
+                   )
+                 ),
+                 conditionalPanel(
+                   condition = "input.chat_focus % 2 == 1",
+                   div(class = "chat-panel",
+                     h5("Ask Claude about your Focus Cluster Analysis"),
+                     textInput("chat_focus_question", "Your question:", placeholder = "e.g., What does this cluster pattern mean?"),
+                     div(class = "btn-group-chat",
+                       actionButton("ask_focus", "Ask Claude (API)", class = "btn-primary"),
+                       actionButton("copy_focus", "Copy to Clipboard", class = "btn-secondary"),
+                       tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary", "Open Claude.ai"),
+                       span(class = "copy-feedback", style = "display:none;")
+                     ),
+                     uiOutput("focus_response")
+                   )
                  )
         ),
         tabPanel("Statistics",
@@ -163,7 +530,47 @@ ui <- fluidPage(
                  verbatimTextOutput("stats_elements"),
                  tags$hr(),
                  h5("Construct Statistics"),
-                 verbatimTextOutput("stats_constructs")
+                 verbatimTextOutput("stats_constructs"),
+                 tags$hr(),
+                 actionButton("help_stats", "Help me understand this visualisation", class = "btn-info help-btn"),
+                 actionButton("chat_stats", "Chat about this data", class = "btn-success chat-btn"),
+                 conditionalPanel(
+                   condition = "input.help_stats % 2 == 1",
+                   div(class = "help-content",
+                     h5("Descriptive Statistics"),
+                     p("Summary statistics for your grid data, showing patterns in how elements and constructs were rated."),
+                     h5("Element Statistics"),
+                     tags$ul(
+                       tags$li(tags$strong("Mean"), " - average rating for this element across all constructs. High means = element rated toward right poles; low means = toward left poles."),
+                       tags$li(tags$strong("SD (Standard Deviation)"), " - how much ratings varied. Low SD = element rated consistently; high SD = element rated very differently on different constructs.")
+                     ),
+                     h5("Construct Statistics"),
+                     tags$ul(
+                       tags$li(tags$strong("Mean"), " - average rating on this construct across all elements. Near 4 = construct differentiates well; extreme values may indicate bias."),
+                       tags$li(tags$strong("SD"), " - how much this construct differentiates between elements. Low SD = construct doesn't distinguish elements well; high SD = good differentiation.")
+                     ),
+                     h5("What to look for"),
+                     tags$ul(
+                       tags$li("Constructs with very low SD may not be useful - they rate all elements the same"),
+                       tags$li("Elements with extreme means may be outliers worth examining"),
+                       tags$li("Compare means to identify patterns in how you perceive different elements")
+                     )
+                   )
+                 ),
+                 conditionalPanel(
+                   condition = "input.chat_stats % 2 == 1",
+                   div(class = "chat-panel",
+                     h5("Ask Claude about your Statistics"),
+                     textInput("chat_stats_question", "Your question:", placeholder = "e.g., Why is this element's SD so high?"),
+                     div(class = "btn-group-chat",
+                       actionButton("ask_stats", "Ask Claude (API)", class = "btn-primary"),
+                       actionButton("copy_stats", "Copy to Clipboard", class = "btn-secondary"),
+                       tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary", "Open Claude.ai"),
+                       span(class = "copy-feedback", style = "display:none;")
+                     ),
+                     uiOutput("stats_response")
+                   )
+                 )
         )
       )
     )
@@ -226,6 +633,58 @@ server <- function(input, output, session) {
     )
     updateTextInput(session, "construct_left", value = "")
     updateTextInput(session, "construct_right", value = "")
+  })
+
+  # Bulk add elements from pasted list
+  observeEvent(input$add_elements_bulk, {
+    req(input$elements_bulk)
+    # Split by newlines or commas
+    raw_text <- input$elements_bulk
+    # First split by newlines, then by commas if needed
+    elements <- unlist(strsplit(raw_text, "[\n\r]+"))
+    elements <- unlist(strsplit(elements, ","))
+    # Trim whitespace and filter empty strings
+    elements <- trimws(elements)
+    elements <- elements[elements != ""]
+    if (length(elements) > 0) {
+      rv$elements <- c(rv$elements, elements)
+      # Clear the textarea using JavaScript
+      session$sendCustomMessage("clearTextarea", "elements_bulk")
+    }
+  })
+
+  # Bulk add constructs from pasted list (format: "left - right" or "left, right")
+  observeEvent(input$add_constructs_bulk, {
+    req(input$constructs_bulk)
+    raw_text <- input$constructs_bulk
+    # Split by newlines
+    lines <- unlist(strsplit(raw_text, "[\n\r]+"))
+    lines <- trimws(lines)
+    lines <- lines[lines != ""]
+
+    for (line in lines) {
+      # Try splitting by " - " first, then by ","
+      if (grepl(" - ", line)) {
+        parts <- strsplit(line, " - ")[[1]]
+      } else if (grepl(",", line)) {
+        parts <- strsplit(line, ",")[[1]]
+      } else {
+        next  # Skip lines that don't have a separator
+      }
+
+      if (length(parts) >= 2) {
+        left_pole <- trimws(parts[1])
+        right_pole <- trimws(parts[2])
+        if (left_pole != "" && right_pole != "") {
+          rv$constructs <- rbind(
+            rv$constructs,
+            data.frame(left = left_pole, right = right_pole, stringsAsFactors = FALSE)
+          )
+        }
+      }
+    }
+    # Clear the textarea using JavaScript
+    session$sendCustomMessage("clearTextarea", "constructs_bulk")
   })
 
   observe({
@@ -1044,6 +1503,301 @@ server <- function(input, output, session) {
       writeLines(paste("_Time", format(now, "%H:%M"), sep = "\t"), con)
     }
   )
+
+  # Helper function to generate grid data summary for chat prompts
+  generate_grid_summary <- reactive({
+    if (length(rv$elements) == 0 || nrow(rv$constructs) == 0) {
+      return("No grid data available yet. Please load or create a grid first.")
+    }
+
+    construct_labels <- paste(rv$constructs$left, "-", rv$constructs$right)
+
+    # Build ratings matrix text
+    sm <- rv$scores_mat_last
+    if (is.null(sm)) {
+      matrix_text <- "Grid has not been analyzed yet."
+    } else {
+      # Create a readable matrix format
+      col_header <- paste(c("Element", construct_labels), collapse = " | ")
+      rows <- sapply(seq_len(nrow(sm)), function(i) {
+        paste(c(rv$elements[i], sm[i, ]), collapse = " | ")
+      })
+      matrix_text <- paste(c(col_header, rows), collapse = "\n")
+    }
+
+    paste0(
+      "REPERTORY GRID DATA:\n",
+      "Elements: ", paste(rv$elements, collapse = ", "), "\n",
+      "Constructs (left pole - right pole):\n",
+      paste(paste0("  - ", construct_labels), collapse = "\n"), "\n\n",
+      "Rating scale: 1 (left pole) to 7 (right pole)\n\n",
+      "RATINGS MATRIX:\n", matrix_text
+    )
+  })
+
+  # Load RepPlus documentation once at startup
+  repplus_docs <- tryCatch(load_repplus_docs(), error = function(e) list())
+
+  # Reactive values to store chat responses
+  chat_responses <- reactiveValues(
+    biplot = NULL,
+    crossplot = NULL,
+    synopsis = NULL,
+    heatmap = NULL,
+    dend_elem = NULL,
+    dend_const = NULL,
+    focus = NULL,
+    stats = NULL
+  )
+
+  # Helper to render chat response UI
+  render_chat_response <- function(response) {
+    if (is.null(response)) {
+      return(NULL)
+    }
+    if (response$loading) {
+      return(div(class = "chat-loading", "Asking Claude... please wait."))
+    }
+    if (!response$success) {
+      # Check if it's just missing API key - show helpful message
+      if (!is.null(response$error) && response$error == "NO_API_KEY") {
+        return(div(class = "chat-panel",
+          p("No API key configured. You can either:"),
+          tags$ol(
+            tags$li("Set ANTHROPIC_API_KEY in your .Renviron file for direct API access"),
+            tags$li("Click 'Copy to Clipboard' and paste into ", tags$a(href = "https://claude.ai", target = "_blank", "Claude.ai"))
+          ),
+          p(tags$em("Your question and grid data are ready to copy below."))
+        ))
+      }
+      return(div(class = "chat-error", response$error))
+    }
+    return(div(class = "chat-response", response$response))
+  }
+
+  # Biplot chat
+  output$biplot_response <- renderUI({
+    render_chat_response(chat_responses$biplot)
+  })
+
+  observeEvent(input$ask_biplot, {
+    chat_responses$biplot <- list(loading = TRUE, success = FALSE)
+    question <- if (is.null(input$chat_biplot_question) || input$chat_biplot_question == "") {
+      "What patterns do you see in this PCA Biplot?"
+    } else {
+      input$chat_biplot_question
+    }
+    extra <- "The PCA Biplot shows elements as points and constructs as arrows.\n\n"
+    result <- ask_claude_about_grid("PCA Biplot", question, generate_grid_summary(), repplus_docs, extra)
+    chat_responses$biplot <- list(loading = FALSE, success = result$success, response = result$response, error = result$error)
+  })
+
+  observeEvent(input$copy_biplot, {
+    question <- if (is.null(input$chat_biplot_question) || input$chat_biplot_question == "") {
+      "What patterns do you see in this PCA Biplot?"
+    } else {
+      input$chat_biplot_question
+    }
+    extra <- "The PCA Biplot shows elements as points and constructs as arrows.\n\n"
+    context <- generate_claude_context("PCA Biplot", question, generate_grid_summary(), extra)
+    session$sendCustomMessage("copyToClipboard", context)
+  })
+
+  # Crossplot chat
+  output$crossplot_response <- renderUI({
+    render_chat_response(chat_responses$crossplot)
+  })
+
+  observeEvent(input$ask_crossplot, {
+    chat_responses$crossplot <- list(loading = TRUE, success = FALSE)
+    question <- if (is.null(input$chat_crossplot_question) || input$chat_crossplot_question == "") {
+      "What patterns do you see in this Crossplot?"
+    } else {
+      input$chat_crossplot_question
+    }
+    extra <- paste0("Currently viewing crossplot with X-axis: ", input$crossplot_x, " and Y-axis: ", input$crossplot_y, "\n\n")
+    result <- ask_claude_about_grid("Crossplot", question, generate_grid_summary(), repplus_docs, extra)
+    chat_responses$crossplot <- list(loading = FALSE, success = result$success, response = result$response, error = result$error)
+  })
+
+  observeEvent(input$copy_crossplot, {
+    question <- if (is.null(input$chat_crossplot_question) || input$chat_crossplot_question == "") {
+      "What patterns do you see in this Crossplot?"
+    } else {
+      input$chat_crossplot_question
+    }
+    extra <- paste0("Currently viewing crossplot with X-axis: ", input$crossplot_x, " and Y-axis: ", input$crossplot_y, "\n\n")
+    context <- generate_claude_context("Crossplot", question, generate_grid_summary(), extra)
+    session$sendCustomMessage("copyToClipboard", context)
+  })
+
+  # Synopsis chat
+  output$synopsis_response <- renderUI({
+    render_chat_response(chat_responses$synopsis)
+  })
+
+  observeEvent(input$ask_synopsis, {
+    chat_responses$synopsis <- list(loading = TRUE, success = FALSE)
+    question <- if (is.null(input$chat_synopsis_question) || input$chat_synopsis_question == "") {
+      "What patterns do you see in this Synopsis?"
+    } else {
+      input$chat_synopsis_question
+    }
+    extra <- paste0("Currently viewing: ", input$synopsis_type, " display.\n\n")
+    result <- ask_claude_about_grid("Synopsis", question, generate_grid_summary(), repplus_docs, extra)
+    chat_responses$synopsis <- list(loading = FALSE, success = result$success, response = result$response, error = result$error)
+  })
+
+  observeEvent(input$copy_synopsis, {
+    question <- if (is.null(input$chat_synopsis_question) || input$chat_synopsis_question == "") {
+      "What patterns do you see in this Synopsis?"
+    } else {
+      input$chat_synopsis_question
+    }
+    extra <- paste0("Currently viewing: ", input$synopsis_type, " display.\n\n")
+    context <- generate_claude_context("Synopsis", question, generate_grid_summary(), extra)
+    session$sendCustomMessage("copyToClipboard", context)
+  })
+
+  # Heatmap chat
+  output$heatmap_response <- renderUI({
+    render_chat_response(chat_responses$heatmap)
+  })
+
+  observeEvent(input$ask_heatmap, {
+    chat_responses$heatmap <- list(loading = TRUE, success = FALSE)
+    question <- if (is.null(input$chat_heatmap_question) || input$chat_heatmap_question == "") {
+      "What patterns do you see in this Heatmap?"
+    } else {
+      input$chat_heatmap_question
+    }
+    extra <- "The heatmap shows all ratings as a color-coded grid (rows = elements, columns = constructs).\n\n"
+    result <- ask_claude_about_grid("Heatmap", question, generate_grid_summary(), repplus_docs, extra)
+    chat_responses$heatmap <- list(loading = FALSE, success = result$success, response = result$response, error = result$error)
+  })
+
+  observeEvent(input$copy_heatmap, {
+    question <- if (is.null(input$chat_heatmap_question) || input$chat_heatmap_question == "") {
+      "What patterns do you see in this Heatmap?"
+    } else {
+      input$chat_heatmap_question
+    }
+    extra <- "The heatmap shows all ratings as a color-coded grid (rows = elements, columns = constructs).\n\n"
+    context <- generate_claude_context("Heatmap", question, generate_grid_summary(), extra)
+    session$sendCustomMessage("copyToClipboard", context)
+  })
+
+  # Element Dendrogram chat
+  output$dend_elem_response <- renderUI({
+    render_chat_response(chat_responses$dend_elem)
+  })
+
+  observeEvent(input$ask_dend_elem, {
+    chat_responses$dend_elem <- list(loading = TRUE, success = FALSE)
+    question <- if (is.null(input$chat_dend_elem_question) || input$chat_dend_elem_question == "") {
+      "What patterns do you see in this Element Dendrogram?"
+    } else {
+      input$chat_dend_elem_question
+    }
+    extra <- "The element dendrogram shows hierarchical clustering of elements based on rating similarity.\n\n"
+    result <- ask_claude_about_grid("Element Dendrogram", question, generate_grid_summary(), repplus_docs, extra)
+    chat_responses$dend_elem <- list(loading = FALSE, success = result$success, response = result$response, error = result$error)
+  })
+
+  observeEvent(input$copy_dend_elem, {
+    question <- if (is.null(input$chat_dend_elem_question) || input$chat_dend_elem_question == "") {
+      "What patterns do you see in this Element Dendrogram?"
+    } else {
+      input$chat_dend_elem_question
+    }
+    extra <- "The element dendrogram shows hierarchical clustering of elements based on rating similarity.\n\n"
+    context <- generate_claude_context("Element Dendrogram", question, generate_grid_summary(), extra)
+    session$sendCustomMessage("copyToClipboard", context)
+  })
+
+  # Construct Dendrogram chat
+  output$dend_const_response <- renderUI({
+    render_chat_response(chat_responses$dend_const)
+  })
+
+  observeEvent(input$ask_dend_const, {
+    chat_responses$dend_const <- list(loading = TRUE, success = FALSE)
+    question <- if (is.null(input$chat_dend_const_question) || input$chat_dend_const_question == "") {
+      "What patterns do you see in this Construct Dendrogram?"
+    } else {
+      input$chat_dend_const_question
+    }
+    extra <- "The construct dendrogram shows hierarchical clustering of constructs.\n\n"
+    result <- ask_claude_about_grid("Construct Dendrogram", question, generate_grid_summary(), repplus_docs, extra)
+    chat_responses$dend_const <- list(loading = FALSE, success = result$success, response = result$response, error = result$error)
+  })
+
+  observeEvent(input$copy_dend_const, {
+    question <- if (is.null(input$chat_dend_const_question) || input$chat_dend_const_question == "") {
+      "What patterns do you see in this Construct Dendrogram?"
+    } else {
+      input$chat_dend_const_question
+    }
+    extra <- "The construct dendrogram shows hierarchical clustering of constructs.\n\n"
+    context <- generate_claude_context("Construct Dendrogram", question, generate_grid_summary(), extra)
+    session$sendCustomMessage("copyToClipboard", context)
+  })
+
+  # Focus Cluster chat
+  output$focus_response <- renderUI({
+    render_chat_response(chat_responses$focus)
+  })
+
+  observeEvent(input$ask_focus, {
+    chat_responses$focus <- list(loading = TRUE, success = FALSE)
+    question <- if (is.null(input$chat_focus_question) || input$chat_focus_question == "") {
+      "What patterns do you see in this Focus Cluster analysis?"
+    } else {
+      input$chat_focus_question
+    }
+    extra <- paste0("Focus parameters: Minkowski power = ", input$focus_power, ", Match cutoff = ", input$focus_cutoff, "%\n\n")
+    result <- ask_claude_about_grid("Focus Cluster", question, generate_grid_summary(), repplus_docs, extra)
+    chat_responses$focus <- list(loading = FALSE, success = result$success, response = result$response, error = result$error)
+  })
+
+  observeEvent(input$copy_focus, {
+    question <- if (is.null(input$chat_focus_question) || input$chat_focus_question == "") {
+      "What patterns do you see in this Focus Cluster analysis?"
+    } else {
+      input$chat_focus_question
+    }
+    extra <- paste0("Focus parameters: Minkowski power = ", input$focus_power, ", Match cutoff = ", input$focus_cutoff, "%\n\n")
+    context <- generate_claude_context("Focus Cluster", question, generate_grid_summary(), extra)
+    session$sendCustomMessage("copyToClipboard", context)
+  })
+
+  # Statistics chat
+  output$stats_response <- renderUI({
+    render_chat_response(chat_responses$stats)
+  })
+
+  observeEvent(input$ask_stats, {
+    chat_responses$stats <- list(loading = TRUE, success = FALSE)
+    question <- if (is.null(input$chat_stats_question) || input$chat_stats_question == "") {
+      "What patterns do you see in these Statistics?"
+    } else {
+      input$chat_stats_question
+    }
+    extra <- "Viewing element and construct statistics (means, standard deviations, etc.).\n\n"
+    result <- ask_claude_about_grid("Statistics", question, generate_grid_summary(), repplus_docs, extra)
+    chat_responses$stats <- list(loading = FALSE, success = result$success, response = result$response, error = result$error)
+  })
+
+  observeEvent(input$copy_stats, {
+    question <- if (is.null(input$chat_stats_question) || input$chat_stats_question == "") {
+      "What patterns do you see in these Statistics?"
+    } else {
+      input$chat_stats_question
+    }
+    extra <- "Viewing element and construct statistics (means, standard deviations, etc.).\n\n"
+    context <- generate_claude_context("Statistics", question, generate_grid_summary(), extra)
+    session$sendCustomMessage("copyToClipboard", context)
+  })
 }
 
 shinyApp(ui, server)
