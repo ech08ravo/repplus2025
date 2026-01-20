@@ -2,6 +2,7 @@ library(shiny)
 library(OpenRepGrid)
 library(DT)
 library(uuid)
+library(jsonlite)
 
 # Source the focus analysis functions
 source("R/focus_analysis.r")
@@ -87,6 +88,9 @@ ui <- fluidPage(
         var el = document.getElementById(id);
         if (el) el.value = "";
       });
+      Shiny.addCustomMessageHandler("openMailto", function(url) {
+        window.location.href = url;
+      });
     '))
   ),
   titlePanel("RepGrid Elicitation"),
@@ -104,9 +108,20 @@ ui <- fluidPage(
       checkboxInput("impute_missing", "Impute missing ratings (use 4)", value = FALSE),
       tags$hr(),
       h4("Display Options"),
-      selectInput("col_elements", "Element color", choices = c("black","blue","red","darkgreen","purple"), selected = "blue"),
-      selectInput("col_constructs", "Construct color", choices = c("black","red","orange","darkgreen","brown"), selected = "red"),
-      checkboxInput("heatmap_color", "Use color heatmap", value = FALSE),
+      # Color palette selector
+      selectInput("color_palette", "Color Palette",
+                  choices = c(
+                    "Accessible (Wong)" = "wong",
+                    "Classic (Blue/Red)" = "classic",
+                    "Earth Tones" = "earth",
+                    "High Contrast" = "contrast"
+                  ),
+                  selected = "wong"),
+      # Text size control
+      sliderInput("text_size", "Text Size", min = 0.8, max = 1.6, value = 1.2, step = 0.1),
+      # Grid cell size for heatmap/focus
+      sliderInput("grid_cell_size", "Heatmap/Focus Cell Size", min = 0.8, max = 2.0, value = 1.2, step = 0.1),
+      checkboxInput("heatmap_color", "Use color heatmap", value = TRUE),
       tags$hr(),
       h4("Export"),
       downloadButton("download_grid", "Download Grid as CSV"),
@@ -193,6 +208,19 @@ ui <- fluidPage(
                 tags$li("Constructs pointing same direction = correlated (measure similar things)"),
                 tags$li("Constructs pointing opposite directions = negatively correlated"),
                 tags$li("Elements in the direction of a construct arrow = rated high on that construct")
+              ),
+              h5("Understanding construct arrow labels"),
+              div(style = "background: #fff3cd; padding: 8px; border-radius: 4px; border: 1px solid #ffc107; margin-top: 6px;",
+                p(style = "margin: 0;", tags$strong("Arrow labels show the HIGH-SCORING pole (rating = 7).")),
+                p(style = "margin: 6px 0 0 0; font-size: 11px;",
+                  "Each construct has two poles: LEFT (rating 1) and RIGHT (rating 7). ",
+                  "The arrow points toward elements rated HIGH (7) on that construct. ",
+                  "For example, if your construct is 'cheap - expensive' and the arrow label shows 'expensive', ",
+                  "elements near the arrow tip were rated as more expensive (closer to 7)."
+                ),
+                p(style = "margin: 6px 0 0 0; font-size: 11px;",
+                  "Elements in the ", tags$em("opposite"), " direction from the arrow were rated LOW (closer to 1, the left pole)."
+                )
               )
             )
           ),
@@ -460,14 +488,46 @@ ui <- fluidPage(
                  ),
                  fluidRow(
                    column(3,
-                          sliderInput("focus_power", "Minkowski Power:",
+                          div(style = "display: flex; align-items: center;",
+                            tags$label("Minkowski Power:", style = "margin-right: 4px;"),
+                            actionButton("info_minkowski", "?", class = "btn-info info-btn")
+                          ),
+                          sliderInput("focus_power", NULL,
                                     min = 0.5, max = 3.0, value = 1.0, step = 0.1),
-                          helpText("1.0 = City block metric (default), 2.0 = Euclidean")
+                          conditionalPanel(
+                            condition = "input.info_minkowski % 2 == 1",
+                            div(class = "info-popup", style = "font-size: 11px;",
+                              tags$strong("Minkowski Power"), " controls how differences are measured:",
+                              tags$ul(style = "margin: 4px 0; padding-left: 18px;",
+                                tags$li(tags$strong("1.0 (City block/Manhattan):"), " Treats all rating differences equally. A difference of 2 on one construct = two differences of 1. Good default for most grids."),
+                                tags$li(tags$strong("2.0 (Euclidean):"), " Larger differences count more. A difference of 2 counts as 4, not 2. Use when big differences are more meaningful than small ones."),
+                                tags$li(tags$strong("< 1.0:"), " Reduces impact of large differences. Use when you want to emphasise overall patterns over extreme ratings."),
+                                tags$li(tags$strong("> 2.0:"), " Amplifies large differences further. Clusters become dominated by the biggest rating gaps.")
+                              ),
+                              tags$em("Recommendation: Start with 1.0, try 2.0 if clusters seem too loose.")
+                            )
+                          )
                    ),
                    column(3,
-                          sliderInput("focus_cutoff", "Match Cutoff (%):",
+                          div(style = "display: flex; align-items: center;",
+                            tags$label("Match Cutoff (%):", style = "margin-right: 4px;"),
+                            actionButton("info_cutoff", "?", class = "btn-info info-btn")
+                          ),
+                          sliderInput("focus_cutoff", NULL,
                                     min = 0, max = 100, value = 80, step = 5),
-                          helpText("Minimum similarity to display in clusters")
+                          conditionalPanel(
+                            condition = "input.info_cutoff % 2 == 1",
+                            div(class = "info-popup", style = "font-size: 11px;",
+                              tags$strong("Match Cutoff"), " filters which similarity scores are shown:",
+                              tags$ul(style = "margin: 4px 0; padding-left: 18px;",
+                                tags$li(tags$strong("80% (default):"), " Shows only strong matches. Elements/constructs must be 80%+ similar to appear as a match."),
+                                tags$li(tags$strong("90%+:"), " Very strict - only near-identical items shown. Useful for finding redundant constructs."),
+                                tags$li(tags$strong("60-70%:"), " More lenient - shows moderate similarities. Good for exploring broader patterns."),
+                                tags$li(tags$strong("0%:"), " Shows all matches regardless of strength.")
+                              ),
+                              tags$em("Note: This only affects the match statistics below, not the dendrogram structure.")
+                            )
+                          )
                    ),
                    column(3,
                           checkboxInput("focus_show_values", "Show Rating Values", value = TRUE),
@@ -597,6 +657,48 @@ ui <- fluidPage(
 )
 
 server <- function(input, output, session) {
+
+  # Color palette helper function
+  get_colors <- reactive({
+    palette <- input$color_palette
+    if (is.null(palette)) palette <- "wong"
+
+    switch(palette,
+      "wong" = list(
+        element = "#0072B2",      # Dark blue
+        construct = "#D55E00",    # Vermillion
+        highlight = "#009E73",    # Teal
+        accent = "#CC79A7",       # Reddish purple
+        heat_low = "#0072B2",     # Blue
+        heat_high = "#D55E00"     # Orange
+      ),
+      "classic" = list(
+        element = "#2166AC",      # Blue
+        construct = "#B2182B",    # Red
+        highlight = "#4DAF4A",    # Green
+        accent = "#984EA3",       # Purple
+        heat_low = "#2166AC",
+        heat_high = "#B2182B"
+      ),
+      "earth" = list(
+        element = "#8B4513",      # Saddle brown
+        construct = "#228B22",    # Forest green
+        highlight = "#DAA520",    # Goldenrod
+        accent = "#4682B4",       # Steel blue
+        heat_low = "#F5DEB3",     # Wheat
+        heat_high = "#8B4513"     # Brown
+      ),
+      "contrast" = list(
+        element = "#000000",      # Black
+        construct = "#E69F00",    # Orange
+        highlight = "#56B4E9",    # Sky blue
+        accent = "#F0E442",       # Yellow
+        heat_low = "#FFFFFF",
+        heat_high = "#000000"
+      )
+    )
+  })
+
   rv <- reactiveValues(
     elements = character(),
     constructs = data.frame(
@@ -646,15 +748,9 @@ server <- function(input, output, session) {
     updateTextInput(session, "element_name", value = "")
   })
 
-  # Load sample fruit elements
+  # Load sample fruit elements (no emojis to avoid rendering issues in plots)
   observeEvent(input$load_sample_elements, {
-    sample_fruits <- c(
-      "\U0001F34E Apple",
-      "\U0001F34C Banana",
-      "\U0001F347 Grapes",
-      "\U0001F34A Orange",
-      "\U0001F353 Strawberry"
-    )
+    sample_fruits <- c("Apple", "Banana", "Grapes", "Orange", "Strawberry")
     rv$elements <- c(rv$elements, sample_fruits)
   })
 
@@ -734,6 +830,7 @@ server <- function(input, output, session) {
   # Add construct from elicitation
   observeEvent(input$add_elicited_construct, {
     req(input$elicit_left, input$elicit_right)
+    new_construct_label <- paste(input$elicit_left, "-", input$elicit_right)
     rv$constructs <- rbind(
       rv$constructs,
       data.frame(left = input$elicit_left, right = input$elicit_right, stringsAsFactors = FALSE)
@@ -743,6 +840,12 @@ server <- function(input, output, session) {
     # Clear selections for next construct
     rv$similar_elements <- character()
     rv$different_element <- NULL
+    # Select the new construct in the ratings dropdown
+    updateSelectInput(session, "rating_construct", selected = new_construct_label)
+    # Reset to first element
+    if (length(rv$elements) > 0) {
+      updateSelectInput(session, "rating_element", selected = rv$elements[1])
+    }
   })
 
   # Elements display with count
@@ -859,6 +962,21 @@ server <- function(input, output, session) {
   output$ratings_section_ui <- renderUI({
     if (nrow(rv$constructs) == 0) return(NULL)
 
+    construct_choices <- paste(rv$constructs$left, "-", rv$constructs$right)
+
+    # Calculate progress
+    n_elements <- length(rv$elements)
+    n_constructs <- nrow(rv$constructs)
+    total_needed <- n_elements * n_constructs
+    n_rated <- nrow(rv$ratings)
+    pct_complete <- if (total_needed > 0) round(100 * n_rated / total_needed) else 0
+
+    # Check completion per construct
+    construct_completion <- sapply(construct_choices, function(c) {
+      sum(rv$ratings$construct == c)
+    })
+    all_constructs_complete <- all(construct_completion >= n_elements)
+
     div(class = "ratings-section",
       div(class = "step-header",
         h5("Step 3: Rate Each Element on Each Construct"),
@@ -872,20 +990,122 @@ server <- function(input, output, session) {
           "1 = strongly LEFT pole, 4 = neutral, 7 = strongly RIGHT pole"
         )
       ),
+
+      # Progress bar
+      div(style = "margin-bottom: 10px;",
+        tags$div(style = "font-size: 11px; margin-bottom: 4px;",
+          paste0("Progress: ", n_rated, " / ", total_needed, " ratings (", pct_complete, "%)")
+        ),
+        tags$div(style = "background: #e9ecef; border-radius: 4px; height: 8px;",
+          tags$div(style = paste0("background: ", if(pct_complete == 100) "#28a745" else "#007bff", "; width: ", pct_complete, "%; height: 100%; border-radius: 4px;"))
+        )
+      ),
+
+      # Guidance panel when construct is complete
+      uiOutput("rating_guidance_ui"),
+
       fluidRow(
         column(3, selectInput("rating_element", "Element:", choices = rv$elements)),
-        column(4, selectInput("rating_construct", "Construct:", choices = paste(rv$constructs$left, "-", rv$constructs$right))),
-        column(3, sliderInput("rating_score", "Rating:", min = 1, max = 7, value = 4, width = "100%")),
-        column(2, tags$div(style = "margin-top: 25px;", actionButton("add_rating", "Add", class = "btn-warning btn-sm")))
+        column(3, selectInput("rating_construct", "Construct:", choices = construct_choices))
+      ),
+      fluidRow(
+        column(10,
+          uiOutput("rating_slider_ui")
+        ),
+        column(2, tags$div(style = "margin-top: 20px;", actionButton("add_rating", "Add", class = "btn-warning")))
       ),
       h5("Ratings Table"),
       DTOutput("ratings_table"),
-      actionButton("remove_rating", "Remove Selected", class = "btn-danger btn-sm")
+      fluidRow(
+        column(6, actionButton("remove_rating", "Remove Selected", class = "btn-danger btn-sm")),
+        column(6, style = "text-align: right;",
+          downloadButton("save_grid_json", "Save Grid", class = "btn-sm"),
+          actionButton("email_grid", "Email to Self", class = "btn-outline-primary btn-sm", style = "margin-left: 4px;")
+        )
+      )
+    )
+  })
+
+  # Guidance UI based on progress
+  output$rating_guidance_ui <- renderUI({
+    req(input$rating_construct)
+    n_elements <- length(rv$elements)
+    current_construct <- input$rating_construct
+
+    # Count ratings for current construct
+    n_rated_this_construct <- sum(rv$ratings$construct == current_construct)
+
+    if (n_rated_this_construct >= n_elements) {
+      # This construct is complete
+      n_constructs <- nrow(rv$constructs)
+      construct_choices <- paste(rv$constructs$left, "-", rv$constructs$right)
+      construct_completion <- sapply(construct_choices, function(c) sum(rv$ratings$construct == c))
+      all_complete <- all(construct_completion >= n_elements)
+
+      if (all_complete) {
+        # All done!
+        div(class = "info-popup", style = "background: #d4edda; border-color: #28a745;",
+          tags$strong("\u2705 All ratings complete!"),
+          tags$br(),
+          "You can now:",
+          tags$ul(style = "margin: 6px 0;",
+            tags$li(actionLink("goto_analysis", "Run Analysis"), " - See your results in the analysis tabs"),
+            tags$li(actionLink("add_more_constructs", "Add More Constructs"), " - Enrich your grid with additional dimensions"),
+            tags$li("Save or email your grid using the buttons below")
+          )
+        )
+      } else {
+        # Find incomplete constructs
+        incomplete <- construct_choices[construct_completion < n_elements]
+        div(class = "info-popup", style = "background: #fff3cd; border-color: #ffc107;",
+          tags$strong("\u2705 This construct is complete!"),
+          tags$br(),
+          "Choose your next step:",
+          tags$ul(style = "margin: 6px 0;",
+            tags$li(tags$strong("Rate another construct: "), paste(incomplete[1:min(2, length(incomplete))], collapse = ", "),
+                   if(length(incomplete) > 2) paste0(" (+ ", length(incomplete)-2, " more)")),
+            tags$li(actionLink("add_more_constructs2", "Add more constructs"), " to capture additional dimensions"),
+            tags$li(actionLink("goto_analysis2", "Run analysis"), " with current data (you can add more later)")
+          )
+        )
+      }
+    } else {
+      # Show remaining count
+      remaining <- n_elements - n_rated_this_construct
+      NULL
+    }
+  })
+
+  # Dynamic slider with construct pole labels
+  output$rating_slider_ui <- renderUI({
+    req(input$rating_construct)
+    req(nrow(rv$constructs) > 0)
+
+    # Find the selected construct's poles
+    construct_labels <- paste(rv$constructs$left, "-", rv$constructs$right)
+    idx <- match(input$rating_construct, construct_labels)
+
+    if (is.na(idx)) {
+      left_pole <- "Left"
+      right_pole <- "Right"
+    } else {
+      left_pole <- rv$constructs$left[idx]
+      right_pole <- rv$constructs$right[idx]
+    }
+
+    div(
+      fluidRow(
+        column(4, tags$div(style = "text-align: left; font-weight: bold; color: #28a745; font-size: 12px;", paste0("1 = ", left_pole))),
+        column(4, tags$div(style = "text-align: center; color: #666; font-size: 11px;", "4 = neutral")),
+        column(4, tags$div(style = "text-align: right; font-weight: bold; color: #dc3545; font-size: 12px;", paste0(right_pole, " = 7")))
+      ),
+      sliderInput("rating_score", NULL, min = 1, max = 7, value = 4, width = "100%", ticks = TRUE)
     )
   })
 
   observeEvent(input$add_construct, {
     req(input$construct_left, input$construct_right)
+    new_construct_label <- paste(input$construct_left, "-", input$construct_right)
     rv$constructs <- rbind(
       rv$constructs,
       data.frame(
@@ -896,6 +1116,12 @@ server <- function(input, output, session) {
     )
     updateTextInput(session, "construct_left", value = "")
     updateTextInput(session, "construct_right", value = "")
+    # Select the new construct in the ratings dropdown
+    updateSelectInput(session, "rating_construct", selected = new_construct_label)
+    # Reset to first element
+    if (length(rv$elements) > 0) {
+      updateSelectInput(session, "rating_element", selected = rv$elements[1])
+    }
   })
 
   # Bulk add elements from pasted list
@@ -975,15 +1201,118 @@ server <- function(input, output, session) {
 
   observeEvent(input$add_rating, {
     req(input$rating_element, input$rating_construct, input$rating_score)
-    rv$ratings <- rbind(
-      rv$ratings,
-      data.frame(
-        element = input$rating_element,
-        construct = input$rating_construct,
-        rating = input$rating_score,
-        stringsAsFactors = FALSE
+
+    # Check if this element-construct pair already exists (update instead of add)
+    existing_key <- paste(rv$ratings$element, rv$ratings$construct, sep = "||")
+    new_key <- paste(input$rating_element, input$rating_construct, sep = "||")
+    existing_idx <- which(existing_key == new_key)
+
+    if (length(existing_idx) > 0) {
+      # Update existing rating
+      rv$ratings$rating[existing_idx[1]] <- input$rating_score
+    } else {
+      # Add new rating
+      rv$ratings <- rbind(
+        rv$ratings,
+        data.frame(
+          element = input$rating_element,
+          construct = input$rating_construct,
+          rating = input$rating_score,
+          stringsAsFactors = FALSE
+        )
       )
+    }
+
+    # Auto-advance to next element
+    current_elem <- input$rating_element
+    elem_idx <- match(current_elem, rv$elements)
+    if (!is.na(elem_idx) && elem_idx < length(rv$elements)) {
+      next_elem <- rv$elements[elem_idx + 1]
+      updateSelectInput(session, "rating_element", selected = next_elem)
+    }
+    # Reset slider to middle
+    updateSliderInput(session, "rating_score", value = 4)
+  })
+
+  # Action link handlers for guidance panel
+  observeEvent(input$goto_analysis, {
+    # Trigger analysis and switch to Biplot tab
+    click("analyze")
+  })
+
+  observeEvent(input$goto_analysis2, {
+    click("analyze")
+  })
+
+  observeEvent(input$add_more_constructs, {
+    rv$show_constructs <- TRUE
+    rv$elicitation_active <- TRUE
+    rv$manual_mode <- FALSE
+  })
+
+  observeEvent(input$add_more_constructs2, {
+    rv$show_constructs <- TRUE
+    rv$elicitation_active <- TRUE
+    rv$manual_mode <- FALSE
+  })
+
+  # Save grid as JSON
+  output$save_grid_json <- downloadHandler(
+    filename = function() {
+      paste0("repgrid_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".json")
+    },
+    content = function(file) {
+      grid_data <- list(
+        elements = rv$elements,
+        constructs = rv$constructs,
+        ratings = rv$ratings,
+        timestamp = Sys.time(),
+        version = "1.0"
+      )
+      jsonlite::write_json(grid_data, file, pretty = TRUE, auto_unbox = TRUE)
+    }
+  )
+
+  # Email grid to self - show modal with email form
+ observeEvent(input$email_grid, {
+    showModal(modalDialog(
+      title = "Email Grid to Yourself",
+      textInput("email_address", "Your email address:", placeholder = "you@example.com"),
+      tags$hr(),
+      tags$p(style = "font-size: 12px; color: #666;",
+        "This will generate a mailto: link with your grid data. ",
+        "Click the button below to open your email client with the data attached."
+      ),
+      footer = tagList(
+        modalButton("Cancel"),
+        actionButton("send_email", "Open Email Client", class = "btn-primary")
+      )
+    ))
+  })
+
+  observeEvent(input$send_email, {
+    req(input$email_address)
+
+    # Create grid summary for email body
+    grid_summary <- paste0(
+      "RepGrid Data Export\n",
+      "==================\n\n",
+      "Elements (", length(rv$elements), "): ", paste(rv$elements, collapse = ", "), "\n\n",
+      "Constructs (", nrow(rv$constructs), "):\n",
+      paste(paste0("  - ", rv$constructs$left, " - ", rv$constructs$right), collapse = "\n"), "\n\n",
+      "Ratings (", nrow(rv$ratings), "):\n",
+      paste(apply(rv$ratings, 1, function(r) paste0("  ", r["element"], " | ", r["construct"], " | ", r["rating"])), collapse = "\n"),
+      "\n\n---\nGenerated by RepPlus App"
     )
+
+    # URL encode the body
+    email_body <- utils::URLencode(grid_summary, reserved = TRUE)
+    email_subject <- utils::URLencode("My RepGrid Data", reserved = TRUE)
+    mailto_url <- paste0("mailto:", input$email_address, "?subject=", email_subject, "&body=", email_body)
+
+    # Use JavaScript to open mailto link
+    session$sendCustomMessage("openMailto", mailto_url)
+    removeModal()
   })
 
   # UI lists & ratings table
@@ -1021,8 +1350,26 @@ server <- function(input, output, session) {
       rv$ratings,
       selection = "single",
       rownames = FALSE,
-      options = list(scrollX = TRUE, autoWidth = TRUE, pageLength = 15)
+      options = list(
+        scrollX = TRUE,
+        autoWidth = FALSE,
+        pageLength = 15,
+        columnDefs = list(
+          list(className = 'dt-left', targets = '_all')
+        )
+      )
     )
+  })
+
+  # Click on row to edit that rating
+  observeEvent(input$ratings_table_rows_selected, {
+    sel <- input$ratings_table_rows_selected
+    if (length(sel) && sel <= nrow(rv$ratings)) {
+      row <- rv$ratings[sel, ]
+      updateSelectInput(session, "rating_element", selected = row$element)
+      updateSelectInput(session, "rating_construct", selected = row$construct)
+      updateSliderInput(session, "rating_score", value = row$rating)
+    }
   })
 
   observeEvent(input$remove_rating, {
@@ -1181,6 +1528,10 @@ server <- function(input, output, session) {
       # construct loadings (approx via correlations)
       load <- cor(sm, pc$x)[, 1:2]
 
+      # Get colors and text size from settings
+      colors <- get_colors()
+      txt_size <- input$text_size
+
       # Calculate expanded plot limits to accommodate labels
       all_points <- rbind(ex, load)
       x_range <- range(all_points[, 1])
@@ -1191,24 +1542,31 @@ server <- function(input, output, session) {
       ylim <- c(y_range[1] - y_expand, y_range[2] + y_expand)
 
       # Set margins for better label display
-      par(mar = c(4, 4, 2, 2))
+      par(mar = c(4, 4, 2, 2), cex.axis = txt_size, cex.lab = txt_size * 1.1)
 
       plot(ex, type = "n", xlab = "PC1", ylab = "PC2", xlim = xlim, ylim = ylim)
-      points(ex, pch = 19, col = input$col_elements)
-      text(ex, labels = rv$elements, pos = 3, col = input$col_elements, cex = 0.9)
-      # arrows for constructs
-      arrows(0, 0, load[,1], load[,2], length = 0.1, col = input$col_constructs)
-      text(load[,1], load[,2], labels = paste(rv$constructs$left, "-", rv$constructs$right),
-           pos = 4, col = input$col_constructs, cex = 0.9)
-      abline(h = 0, v = 0, lty = 3)
+      points(ex, pch = 19, col = colors$element, cex = txt_size * 1.3)
+      text(ex, labels = rv$elements, pos = 3, col = colors$element, cex = txt_size, font = 2)
+      # arrows for constructs - label with RIGHT pole only (high-scoring direction, rating=7)
+      arrows(0, 0, load[,1], load[,2], length = 0.15, col = colors$construct, lwd = 2)
+      text(load[,1], load[,2], labels = rv$constructs$right,
+           pos = 4, col = colors$construct, cex = txt_size, font = 2)
+      abline(h = 0, v = 0, lty = 3, col = "gray50")
     })
 
     output$heatmap_plot <- renderPlot({
       sm <- rv$scores_mat_last
       if (is.null(sm)) return()
-      # Build palette - greyscale by default, color if toggled
+
+      # Get colors and sizes from settings
+      colors <- get_colors()
+      txt_size <- input$text_size
+      cell_size <- input$grid_cell_size
+
+      # Build palette - use selected color palette
       if (input$heatmap_color) {
-        pal <- colorRampPalette(c("#2166AC", "#FFFFFF", "#B2182B"))(100)
+        # Use palette colors for diverging heatmap
+        pal <- colorRampPalette(c(colors$heat_low, "#FFFFFF", colors$heat_high))(100)
       } else {
         pal <- gray.colors(100, start = 0.95, end = 0.2)
       }
@@ -1218,8 +1576,8 @@ server <- function(input, output, session) {
       # Flip elements so first appears at top
       z <- sm[n_elem:1, ]
 
-      # Set margins to accommodate labels
-      par(mar = c(8, 12, 2, 2))
+      # Set margins to accommodate labels - scale with text size
+      par(mar = c(8 * txt_size, 14 * txt_size, 2, 2))
 
       # Draw heatmap
       image(
@@ -1227,44 +1585,86 @@ server <- function(input, output, session) {
         col = pal, axes = FALSE, xlab = "", ylab = ""
       )
 
-      # Add rating values as text in each cell
+      # Add rating values as text in each cell - scale with cell_size
       for (i in 1:n_elem) {
         for (j in 1:n_cons) {
           val <- z[i, j]
           if (!is.na(val)) {
             # Choose text color based on value for readability
-            text_col <- if (val > 2.5) "white" else "black"
-            text(i, j, sprintf("%.0f", val), col = text_col, cex = 1.2)
+            text_col <- if (val > 4) "white" else "black"
+            text(i, j, sprintf("%.0f", val), col = text_col, cex = cell_size * 1.2, font = 2)
           }
         }
       }
 
-      # Add axes with labels
-      axis(1, at = 1:n_elem, labels = rev(rv$elements), las = 2, cex.axis = 0.8)
+      # Add axes with labels - scale with text_size
+      axis(1, at = 1:n_elem, labels = rev(rv$elements), las = 2, cex.axis = txt_size)
       labs <- paste(rv$constructs$left, "-", rv$constructs$right)
-      axis(2, at = 1:n_cons, labels = labs, las = 1, cex.axis = 0.8)
+      axis(2, at = 1:n_cons, labels = labs, las = 1, cex.axis = txt_size)
       box()
 
-      # Add axis titles
-      mtext("Elements", side = 1, line = 6.5)
-      mtext("Constructs", side = 2, line = 10.5)
+      # Add axis titles - scale with text_size
+      mtext("Elements", side = 1, line = 6 * txt_size, cex = txt_size * 1.1)
+      mtext("Constructs", side = 2, line = 11 * txt_size, cex = txt_size * 1.1)
     })
 
     output$dend_elements <- renderPlot({
       sm <- rv$scores_mat_last
-      if (is.null(sm) || nrow(sm) < 2) return()
-      hc <- hclust(dist(sm))
-      par(mar = c(2, 8, 2, 2))  # Increase left margin for labels
-      plot(hc, labels = rv$elements, main = "Elements", xlab = "", sub = "", horiz = TRUE)
+      if (is.null(sm)) {
+        plot.new()
+        text(0.5, 0.5, "No data available. Run analysis first.", cex = 1.2)
+        return()
+      }
+      if (nrow(sm) < 2) {
+        plot.new()
+        text(0.5, 0.5, "Need at least 2 elements for dendrogram.", cex = 1.2)
+        return()
+      }
+      d <- dist(sm)
+      if (any(is.na(d)) || length(d) == 0) {
+        plot.new()
+        text(0.5, 0.5, "Cannot compute distances. Check your data.", cex = 1.2)
+        return()
+      }
+
+      # Get colors and text size from settings
+      colors <- get_colors()
+      txt_size <- input$text_size
+
+      hc <- hclust(d)
+      par(mar = c(2, 10 * txt_size, 2, 2), cex = txt_size)  # Scale margin with text size
+      plot(hc, labels = rv$elements, main = "Elements", xlab = "", sub = "", horiz = TRUE, cex = txt_size)
     })
 
     output$dend_constructs <- renderPlot({
       sm <- rv$scores_mat_last
-      if (is.null(sm) || ncol(sm) < 2) return()
-      hc <- hclust(dist(t(sm)))
+      if (is.null(sm)) {
+        plot.new()
+        text(0.5, 0.5, "No data available. Run analysis first.", cex = 1.2)
+        return()
+      }
+      if (ncol(sm) < 2) {
+        plot.new()
+        text(0.5, 0.5, "Need at least 2 constructs for dendrogram.", cex = 1.2)
+        return()
+      }
+      # Calculate distance matrix for constructs (columns)
+      d <- dist(t(sm))
+      # Check if distance matrix is valid
+      if (any(is.na(d)) || length(d) == 0) {
+        plot.new()
+        text(0.5, 0.5, "Cannot compute distances. Check your data.", cex = 1.2)
+        return()
+      }
+
+      # Get colors and text size from settings
+      colors <- get_colors()
+      txt_size <- input$text_size
+
+      hc <- hclust(d)
       labs <- paste(rv$constructs$left, "-", rv$constructs$right)
-      par(mar = c(2, 12, 2, 2))  # Increase left margin for longer construct labels
-      plot(hc, labels = labs, main = "Constructs", xlab = "", sub = "", horiz = TRUE)
+      par(mar = c(2, 14 * txt_size, 2, 2), cex = txt_size)  # Scale margin with text size
+      plot(hc, labels = labs, main = "Constructs", xlab = "", sub = "", horiz = TRUE, cex = txt_size)
     })
 
     # Statistics outputs
@@ -1313,15 +1713,22 @@ server <- function(input, output, session) {
     x_ratings <- sm[, x_idx]
     y_ratings <- sm[, y_idx]
 
-    # Set up plot
-    par(mar = c(5, 5, 3, 2))
+    # Get colors and text size from settings
+    colors <- get_colors()
+    txt_size <- input$text_size
+
+    # Set up plot with scalable text
+    par(mar = c(5, 5, 3, 2), cex.axis = txt_size, cex.lab = txt_size * 1.1, cex.main = txt_size * 1.2)
+
+    # Use palette element color
+    point_col <- colors$element
 
     plot(x_ratings, y_ratings,
          xlim = c(1, 7), ylim = c(1, 7),
          xlab = input$crossplot_x,
          ylab = input$crossplot_y,
          main = "Crossplot: Element Positions",
-         pch = 19, col = "blue", cex = 1.5,
+         pch = 19, col = point_col, cex = txt_size * 1.6,
          asp = 1)  # 1:1 aspect ratio for equal scaling
 
     # Add grid lines if requested
@@ -1333,7 +1740,7 @@ server <- function(input, output, session) {
     # Add element labels if requested
     if (input$crossplot_labels) {
       text(x_ratings, y_ratings, labels = rv$elements,
-           pos = 3, cex = 0.8, col = "darkblue")
+           pos = 3, cex = txt_size, col = point_col, font = 2)
     }
 
     # Add box around plot
@@ -1357,16 +1764,22 @@ server <- function(input, output, session) {
       x_ratings <- sm[, x_idx]
       y_ratings <- sm[, y_idx]
 
+      # Get colors and text size from settings
+      colors <- get_colors()
+      txt_size <- input$text_size
+
       png(file, width = 1200, height = 1200, res = 120)
 
-      par(mar = c(5, 5, 3, 2))
+      par(mar = c(5, 5, 3, 2), cex.axis = txt_size, cex.lab = txt_size * 1.1, cex.main = txt_size * 1.2)
+
+      point_col <- colors$element
 
       plot(x_ratings, y_ratings,
            xlim = c(1, 7), ylim = c(1, 7),
            xlab = input$crossplot_x,
            ylab = input$crossplot_y,
            main = "Crossplot: Element Positions",
-           pch = 19, col = "blue", cex = 1.5,
+           pch = 19, col = point_col, cex = txt_size * 1.5,
            asp = 1)
 
       if (input$crossplot_grid) {
@@ -1376,7 +1789,7 @@ server <- function(input, output, session) {
 
       if (input$crossplot_labels) {
         text(x_ratings, y_ratings, labels = rv$elements,
-             pos = 3, cex = 0.8, col = "darkblue")
+             pos = 3, cex = txt_size * 0.8, col = point_col, font = 2)
       }
 
       box()
@@ -1390,14 +1803,21 @@ server <- function(input, output, session) {
     req(rv$scores_mat_last)
     sm <- rv$scores_mat_last
 
-    # Choose color scheme
-    bar_color <- if (input$synopsis_color) "#2166AC" else "gray50"
+    # Get colors and text size from settings
+    colors <- get_colors()
+    txt_size <- input$text_size
+
+    # Choose color scheme based on palette
+    bar_color <- if (input$synopsis_color) colors$element else "gray50"
+    mean_color <- colors$construct  # Vermillion-like
+    median_color <- colors$highlight  # Teal-like
 
     if (input$synopsis_type == "overall") {
       # Overall rating distribution
       all_ratings <- as.vector(sm)
       all_ratings <- all_ratings[!is.na(all_ratings)]
 
+      par(cex.axis = txt_size, cex.lab = txt_size * 1.1, cex.main = txt_size * 1.2)
       hist(all_ratings,
            breaks = input$synopsis_bins,
            main = "Overall Rating Distribution",
@@ -1406,19 +1826,19 @@ server <- function(input, output, session) {
            col = bar_color,
            border = "white")
 
-      # Add mean and median lines
-      abline(v = mean(all_ratings), col = "red", lwd = 2, lty = 2)
-      abline(v = median(all_ratings), col = "blue", lwd = 2, lty = 2)
+      # Add mean and median lines with palette colors
+      abline(v = mean(all_ratings), col = mean_color, lwd = 3, lty = 2)
+      abline(v = median(all_ratings), col = median_color, lwd = 3, lty = 2)
       legend("topright",
              legend = c(paste("Mean =", round(mean(all_ratings), 2)),
                        paste("Median =", round(median(all_ratings), 2))),
-             col = c("red", "blue"), lty = 2, lwd = 2)
+             col = c(mean_color, median_color), lty = 2, lwd = 3, cex = txt_size)
 
     } else if (input$synopsis_type == "elements") {
       # Element distributions
       n_elem <- nrow(sm)
       par(mfrow = c(ceiling(n_elem / 3), 3))
-      par(mar = c(4, 4, 2, 1))
+      par(mar = c(4, 4, 2, 1), cex.axis = txt_size * 0.9, cex.lab = txt_size, cex.main = txt_size * 1.1)
 
       for (i in 1:n_elem) {
         elem_ratings <- sm[i, ]
@@ -1433,14 +1853,14 @@ server <- function(input, output, session) {
              border = "white",
              xlim = c(min(sm, na.rm = TRUE), max(sm, na.rm = TRUE)))
 
-        abline(v = mean(elem_ratings), col = "red", lwd = 2, lty = 2)
+        abline(v = mean(elem_ratings), col = mean_color, lwd = 2, lty = 2)
       }
 
     } else if (input$synopsis_type == "constructs") {
       # Construct distributions
       n_const <- ncol(sm)
       par(mfrow = c(ceiling(n_const / 3), 3))
-      par(mar = c(4, 4, 3, 1))
+      par(mar = c(4, 4, 3, 1), cex.axis = txt_size * 0.9, cex.lab = txt_size, cex.main = txt_size)
 
       construct_labels <- paste(rv$constructs$left, "-", rv$constructs$right)
 
@@ -1456,9 +1876,9 @@ server <- function(input, output, session) {
              col = bar_color,
              border = "white",
              xlim = c(min(sm, na.rm = TRUE), max(sm, na.rm = TRUE)),
-             cex.main = 0.9)
+             cex.main = txt_size * 0.75)
 
-        abline(v = mean(const_ratings), col = "red", lwd = 2, lty = 2)
+        abline(v = mean(const_ratings), col = mean_color, lwd = 2, lty = 2)
       }
 
     } else if (input$synopsis_type == "scree") {
@@ -1469,7 +1889,7 @@ server <- function(input, output, session) {
 
       n_components <- min(10, length(variance_explained))
 
-      par(mar = c(5, 4, 4, 5))
+      par(mar = c(5, 4, 4, 5), cex.axis = txt_size, cex.lab = txt_size * 1.1, cex.main = txt_size * 1.2)
 
       # Bar plot for variance explained
       barplot(variance_explained[1:n_components],
@@ -1484,18 +1904,18 @@ server <- function(input, output, session) {
       # Add cumulative line on secondary axis
       par(new = TRUE)
       plot(1:n_components, cumulative_var[1:n_components],
-           type = "b", pch = 19, col = "red", lwd = 2,
+           type = "b", pch = 19, col = mean_color, lwd = 2,
            axes = FALSE, xlab = "", ylab = "",
            ylim = c(0, 100))
 
-      axis(4, col = "red", col.axis = "red")
-      mtext("Cumulative Variance (%)", side = 4, line = 3, col = "red")
+      axis(4, col = mean_color, col.axis = mean_color, cex.axis = txt_size)
+      mtext("Cumulative Variance (%)", side = 4, line = 3, col = mean_color, cex = txt_size)
 
       legend("right",
              legend = c("Individual", "Cumulative"),
-             col = c(bar_color, "red"),
+             col = c(bar_color, mean_color),
              lty = c(NA, 1), pch = c(15, 19),
-             pt.cex = c(2, 1))
+             pt.cex = c(2, 1), cex = txt_size * 0.9)
     }
   })
 
@@ -1634,12 +2054,21 @@ server <- function(input, output, session) {
     req(focus_result())
     result <- focus_result()
 
+    # Get colors and sizes from settings
+    colors <- get_colors()
+    txt_size <- input$text_size
+    cell_size <- input$grid_cell_size
+
     plot_focus_cluster(
       focus_result = result,
       title = "Focus Cluster Analysis",
       show_values = input$focus_show_values,
       show_shading = input$focus_show_shading,
-      use_color = input$focus_use_color
+      use_color = input$focus_use_color,
+      text_size = txt_size,
+      cell_size = cell_size,
+      heat_low = colors$heat_low,
+      heat_high = colors$heat_high
     )
   })
 
@@ -1713,13 +2142,22 @@ server <- function(input, output, session) {
       req(focus_result())
       result <- focus_result()
 
+      # Get colors and sizes from settings
+      colors <- get_colors()
+      txt_size <- input$text_size
+      cell_size <- input$grid_cell_size
+
       png(file, width = 1200, height = 900, res = 120)
       plot_focus_cluster(
         focus_result = result,
         title = "Focus Cluster Analysis",
         show_values = input$focus_show_values,
         show_shading = input$focus_show_shading,
-        use_color = input$focus_use_color
+        use_color = input$focus_use_color,
+        text_size = txt_size,
+        cell_size = cell_size,
+        heat_low = colors$heat_low,
+        heat_high = colors$heat_high
       )
       dev.off()
     }
