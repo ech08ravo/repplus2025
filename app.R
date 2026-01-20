@@ -102,10 +102,11 @@ ui <- fluidPage(
     sidebarPanel(
       width = 3,
       h4("File Operations"),
-      fileInput("rgrid_file", "Import .rgrid", accept = ".rgrid"),
-      actionButton("import_rgrid", "Load Grid"),
+      fileInput("import_file", "Import Grid", accept = c(".rgrid", ".json")),
+      actionButton("import_grid", "Load Grid", class = "btn-sm"),
+      tags$small(class = "text-muted", "Accepts .rgrid or .json files"),
       tags$hr(),
-      actionButton("load_sample", "Load Sample Data"),
+      actionButton("load_sample", "Load Sample Data", class = "btn-outline-secondary btn-sm"),
       tags$hr(),
       h4("Analysis"),
       actionButton("analyze", "Analyze Grid", class = "btn-primary"),
@@ -1595,84 +1596,164 @@ server <- function(input, output, session) {
     }
   })
 
-  # Import .rgrid (robust parser for multiple formats)
-  observeEvent(input$import_rgrid, {
-    req(input$rgrid_file)
-    txt <- readLines(
-      input$rgrid_file$datapath,
-      warn = FALSE,
-      encoding = "UTF-8"
-    )
+  # Import grid (supports .rgrid and .json formats)
+  observeEvent(input$import_grid, {
+    req(input$import_file)
 
-    # Parse constructs (lines starting with C) – take last two non-empty fields
-    c_lines <- grep("^C\\d+\\t", txt, value = TRUE)
-    if (length(c_lines) == 0) return(NULL)
-    cons_split <- lapply(c_lines, function(l) {
-      toks <- strsplit(l, "\t")[[1]]
-      toks[nzchar(toks)]
-    })
-    left <- vapply(
-      cons_split,
-      function(p) if (length(p) >= 2) p[length(p) - 1] else NA_character_,
-      character(1)
-    )
-    right <- vapply(
-      cons_split,
-      function(p) if (length(p) >= 1) p[length(p)] else NA_character_,
-      character(1)
-    )
-    n_c <- length(left)
+    file_path <- input$import_file$datapath
+    file_name <- input$import_file$name
+    file_ext <- tolower(tools::file_ext(file_name))
 
-    # Parse elements (lines starting with E) – name last; scores are last n_c before name
-    e_lines <- grep("^E\\d+\\t", txt, value = TRUE)
-    if (length(e_lines) == 0) return(NULL)
-    n_e <- length(e_lines)
-    elements <- character(n_e)
-    scores_mat <- matrix(NA_real_, nrow = n_e, ncol = n_c)
+    tryCatch({
+      if (file_ext == "json") {
+        # Import JSON format (exported from this app)
+        grid_data <- jsonlite::read_json(file_path)
 
-    for (i in seq_len(n_e)) {
-      toks <- strsplit(e_lines[i], "\t")[[1]]
-      toks <- toks[nzchar(toks)]
-      if (length(toks) < (n_c + 1)) next
-      elements[i] <- toks[length(toks)]
-      start <- (length(toks) - 1) - n_c + 1
-      end   <- length(toks) - 1
-      if (start >= 1 && end >= start) {
-        sc <- suppressWarnings(as.numeric(toks[start:end]))
-        scores_mat[i, ] <- sc
+        # Validate required fields
+        if (is.null(grid_data$elements) || is.null(grid_data$constructs)) {
+          showNotification("Invalid JSON file: missing elements or constructs", type = "error")
+          return()
+        }
+
+        rv$elements <- as.character(grid_data$elements)
+
+        # Handle constructs - could be list or data frame
+        if (is.data.frame(grid_data$constructs)) {
+          rv$constructs <- grid_data$constructs
+        } else {
+          rv$constructs <- data.frame(
+            left = sapply(grid_data$constructs, function(x) x$left),
+            right = sapply(grid_data$constructs, function(x) x$right),
+            stringsAsFactors = FALSE
+          )
+        }
+
+        # Handle ratings
+        if (!is.null(grid_data$ratings) && length(grid_data$ratings) > 0) {
+          if (is.data.frame(grid_data$ratings)) {
+            rv$ratings <- grid_data$ratings
+          } else {
+            rv$ratings <- data.frame(
+              element = sapply(grid_data$ratings, function(x) x$element),
+              construct = sapply(grid_data$ratings, function(x) x$construct),
+              rating = sapply(grid_data$ratings, function(x) x$rating),
+              stringsAsFactors = FALSE
+            )
+          }
+        } else {
+          rv$ratings <- data.frame(
+            element = character(),
+            construct = character(),
+            rating = numeric(),
+            stringsAsFactors = FALSE
+          )
+        }
+
+        showNotification(
+          paste0("Loaded ", length(rv$elements), " elements, ",
+                 nrow(rv$constructs), " constructs, ",
+                 nrow(rv$ratings), " ratings from JSON"),
+          type = "message"
+        )
+
+      } else if (file_ext == "rgrid") {
+        # Import .rgrid format
+        txt <- readLines(file_path, warn = FALSE, encoding = "UTF-8")
+
+        # Parse constructs (lines starting with C) – take last two non-empty fields
+        c_lines <- grep("^C\\d+\\t", txt, value = TRUE)
+        if (length(c_lines) == 0) {
+          showNotification("Invalid .rgrid file: no constructs found", type = "error")
+          return()
+        }
+        cons_split <- lapply(c_lines, function(l) {
+          toks <- strsplit(l, "\t")[[1]]
+          toks[nzchar(toks)]
+        })
+        left <- vapply(
+          cons_split,
+          function(p) if (length(p) >= 2) p[length(p) - 1] else NA_character_,
+          character(1)
+        )
+        right <- vapply(
+          cons_split,
+          function(p) if (length(p) >= 1) p[length(p)] else NA_character_,
+          character(1)
+        )
+        n_c <- length(left)
+
+        # Parse elements (lines starting with E) – name last; scores are last n_c before name
+        e_lines <- grep("^E\\d+\\t", txt, value = TRUE)
+        if (length(e_lines) == 0) {
+          showNotification("Invalid .rgrid file: no elements found", type = "error")
+          return()
+        }
+        n_e <- length(e_lines)
+        elements <- character(n_e)
+        scores_mat <- matrix(NA_real_, nrow = n_e, ncol = n_c)
+
+        for (i in seq_len(n_e)) {
+          toks <- strsplit(e_lines[i], "\t")[[1]]
+          toks <- toks[nzchar(toks)]
+          if (length(toks) < (n_c + 1)) next
+          elements[i] <- toks[length(toks)]
+          start <- (length(toks) - 1) - n_c + 1
+          end   <- length(toks) - 1
+          if (start >= 1 && end >= start) {
+            sc <- suppressWarnings(as.numeric(toks[start:end]))
+            scores_mat[i, ] <- sc
+          }
+        }
+
+        rv$elements <- elements
+        rv$constructs <- data.frame(
+          left = left,
+          right = right,
+          stringsAsFactors = FALSE
+        )
+        labels <- paste(left, "-", right)
+        rv$ratings <- data.frame(
+          element   = rep(elements, times = n_c),
+          construct = rep(labels,   each  = n_e),
+          rating    = as.vector(scores_mat),
+          stringsAsFactors = FALSE
+        )
+
+        showNotification(
+          paste0("Loaded ", n_e, " elements, ", n_c, " constructs from .rgrid"),
+          type = "message"
+        )
+
+      } else {
+        showNotification("Unsupported file format. Please use .json or .rgrid", type = "error")
       }
-    }
-
-    rv$elements <- elements
-    rv$constructs <- data.frame(
-      left = left,
-      right = right,
-      stringsAsFactors = FALSE
-    )
-    labels <- paste(left, "-", right)
-    rv$ratings <- data.frame(
-      element   = rep(elements, times = n_c),
-      construct = rep(labels,   each  = n_e),
-      rating    = as.vector(scores_mat),
-      stringsAsFactors = FALSE
-    )
+    }, error = function(e) {
+      showNotification(paste("Error importing file:", e$message), type = "error")
+    })
   })
 
   # Analyze
   observeEvent(input$analyze, {
-    # Validation: need at least some data
-    if (length(rv$elements) < 2) {
-      showNotification("Need at least 2 elements to run analysis.", type = "error")
-      return()
-    }
-    if (nrow(rv$constructs) < 2) {
-      showNotification("Need at least 2 constructs to run analysis.", type = "error")
-      return()
-    }
-    if (nrow(rv$ratings) == 0) {
-      showNotification("No ratings found. Please rate elements on constructs first.", type = "error")
-      return()
-    }
+    showNotification("Starting analysis...", type = "message", duration = 2)
+
+    tryCatch({
+      # Validation: need at least some data
+      n_elem <- length(rv$elements)
+      n_const <- if (is.null(rv$constructs) || !is.data.frame(rv$constructs)) 0 else nrow(rv$constructs)
+      n_ratings <- if (is.null(rv$ratings) || !is.data.frame(rv$ratings)) 0 else nrow(rv$ratings)
+
+      if (n_elem < 2) {
+        showNotification("Need at least 2 elements to run analysis.", type = "error")
+        return()
+      }
+      if (n_const < 2) {
+        showNotification("Need at least 2 constructs to run analysis.", type = "error")
+        return()
+      }
+      if (n_ratings == 0) {
+        showNotification("No ratings found. Please rate elements on constructs first.", type = "error")
+        return()
+      }
 
     construct_labels <- paste(rv$constructs$left, "-", rv$constructs$right)
     n_e <- length(rv$elements)
@@ -1907,6 +1988,9 @@ server <- function(input, output, session) {
       repgrid_obj <- rv$repgrid_last
       if (is.null(repgrid_obj)) return()
       statsConstructs(repgrid_obj, trim = 30)
+    })
+    }, error = function(e) {
+      showNotification(paste("Analysis error:", e$message), type = "error")
     })
   })
 
