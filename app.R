@@ -113,20 +113,11 @@ ui <- fluidPage(
       checkboxInput("impute_missing", "Impute missing ratings (use 4)", value = FALSE),
       tags$hr(),
       h4("Display Options"),
-      # Color palette selector
-      selectInput("color_palette", "Color Palette",
-                  choices = c(
-                    "Accessible (Wong)" = "wong",
-                    "Classic (Blue/Red)" = "classic",
-                    "Earth Tones" = "earth",
-                    "High Contrast" = "contrast"
-                  ),
-                  selected = "wong"),
+      p("Each visualization has its own color palette selector.", style = "font-size: 11px; color: #666;"),
       # Text size control
       sliderInput("text_size", "Text Size", min = 0.8, max = 1.6, value = 1.2, step = 0.1),
       # Grid cell size for heatmap/focus
       sliderInput("grid_cell_size", "Heatmap/Focus Cell Size", min = 0.8, max = 2.0, value = 1.2, step = 0.1),
-      checkboxInput("heatmap_color", "Use color heatmap", value = TRUE),
       tags$hr(),
       h4("Export"),
       downloadButton("download_grid", "Download Grid as CSV"),
@@ -193,6 +184,18 @@ ui <- fluidPage(
           "Biplot",
           h4("PCA Biplot"),
           p("2D visual map showing element and construct relationships using Principal Component Analysis"),
+          fluidRow(
+            column(4,
+              selectInput("biplot_palette", "Color Palette",
+                          choices = c(
+                            "Accessible (Wong)" = "wong",
+                            "Classic (Blue/Red)" = "classic",
+                            "Earth Tones" = "earth",
+                            "High Contrast" = "contrast"
+                          ),
+                          selected = "wong")
+            )
+          ),
           plotOutput("pca_biplot", height = 600),
           tags$hr(),
           actionButton("help_biplot", "Help me understand this visualisation", class = "btn-info help-btn"),
@@ -260,9 +263,19 @@ ui <- fluidPage(
                           selectInput("crossplot_y", "Y-axis Construct:",
                                     choices = NULL)
                    ),
-                   column(4,
+                   column(2,
                           checkboxInput("crossplot_labels", "Show Element Labels", value = TRUE),
-                          checkboxInput("crossplot_grid", "Show Grid Lines", value = TRUE),
+                          checkboxInput("crossplot_grid", "Show Grid Lines", value = TRUE)
+                   ),
+                   column(2,
+                          selectInput("crossplot_palette", "Color Palette",
+                                      choices = c(
+                                        "Accessible (Wong)" = "wong",
+                                        "Classic (Blue/Red)" = "classic",
+                                        "Earth Tones" = "earth",
+                                        "High Contrast" = "contrast"
+                                      ),
+                                      selected = "wong"),
                           downloadButton("download_crossplot", "Download Crossplot")
                    )
                  ),
@@ -375,6 +388,21 @@ ui <- fluidPage(
                  )
         ),
         tabPanel("Heatmap",
+                 fluidRow(
+                   column(4,
+                     checkboxInput("heatmap_use_color", "Use color shading", value = TRUE)
+                   ),
+                   column(4,
+                     selectInput("heatmap_palette", "Color Palette",
+                                 choices = c(
+                                   "Accessible (Wong)" = "wong",
+                                   "Classic (Blue/Red)" = "classic",
+                                   "Earth Tones" = "earth",
+                                   "High Contrast" = "contrast"
+                                 ),
+                                 selected = "wong")
+                   )
+                 ),
                  plotOutput("heatmap_plot", height = 500),
                  tags$hr(),
                  actionButton("help_heatmap", "Help me understand this visualisation", class = "btn-info help-btn"),
@@ -537,7 +565,15 @@ ui <- fluidPage(
                    column(3,
                           checkboxInput("focus_show_values", "Show Rating Values", value = TRUE),
                           checkboxInput("focus_show_shading", "Show Shading", value = TRUE),
-                          checkboxInput("focus_use_color", "Use color palette", value = FALSE)
+                          checkboxInput("focus_use_color", "Use color shading", value = TRUE),
+                          selectInput("focus_palette", "Color Palette",
+                                      choices = c(
+                                        "Accessible (Wong)" = "wong",
+                                        "Classic (Blue/Red)" = "classic",
+                                        "Earth Tones" = "earth",
+                                        "High Contrast" = "contrast"
+                                      ),
+                                      selected = "wong")
                    ),
                    column(3,
                           actionButton("run_focus", "Run Focus Analysis", class = "btn-primary"),
@@ -663,11 +699,9 @@ ui <- fluidPage(
 
 server <- function(input, output, session) {
 
-  # Color palette helper function
-  get_colors <- reactive({
-    palette <- input$color_palette
+  # Non-reactive palette function for use with specific palette names
+  get_palette_colors <- function(palette) {
     if (is.null(palette)) palette <- "wong"
-
     switch(palette,
       "wong" = list(
         element = "#0072B2",      # Dark blue
@@ -702,6 +736,12 @@ server <- function(input, output, session) {
         heat_high = "#000000"
       )
     )
+  }
+
+  # Reactive wrapper using global palette (kept for backward compatibility)
+  get_colors <- reactive({
+    palette <- input$color_palette
+    get_palette_colors(palette)
   })
 
   rv <- reactiveValues(
@@ -719,6 +759,7 @@ server <- function(input, output, session) {
     ),
     scores_mat_last = NULL,
     repgrid_last = NULL,
+    imputed_last = FALSE,
     elicitation_active = FALSE,
     show_constructs = FALSE,
     manual_mode = FALSE,
@@ -1771,36 +1812,10 @@ server <- function(input, output, session) {
     # Handle missing values: abort (strict) or impute midpoint
     if (any(is.na(scores_mat))) {
       if (!isTRUE(input$impute_missing)) {
-        output$analysis_summary <- renderPrint({
-          cat(
-            "Analysis aborted: some ratings are missing.\n",
-            "Tick 'Impute missing ratings (use 4)' or complete all ratings."
-          )
-        })
-        output$pca_biplot <- renderPlot({
-          plot.new()
-          text(
-            0.5, 0.5,
-            "Missing ratings detected – complete grid or enable imputation",
-            cex = 1.1
-          )
-        })
-        output$dend_elements <- renderPlot({
-          plot.new()
-          text(
-            0.5, 0.5,
-            "Missing ratings detected – complete grid or enable imputation",
-            cex = 1.1
-          )
-        })
-        output$dend_constructs <- renderPlot({
-          plot.new()
-          text(
-            0.5, 0.5,
-            "Missing ratings detected – complete grid or enable imputation",
-            cex = 1.1
-          )
-        })
+        showNotification(
+          "Analysis aborted: some ratings are missing. Tick 'Impute missing ratings' or complete all ratings.",
+          type = "error"
+        )
         return()
       } else {
         scores_mat[is.na(scores_mat)] <- 4
@@ -1821,177 +1836,185 @@ server <- function(input, output, session) {
     ))
 
     rv$repgrid_last <- repgrid_obj
+    rv$imputed_last <- imputed
 
-    output$analysis_summary <- renderPrint({
-      if (isTRUE(imputed)) {
-        cat("Note: Missing ratings were imputed with 4 (midpoint).\n\n")
-      }
-      print(summary(repgrid_obj))
-    })
-
-    output$pca_biplot <- renderPlot({
-      sm <- rv$scores_mat_last
-      if (is.null(sm)) return()
-      # PCA on elements (rows)
-      pc <- prcomp(sm, scale. = TRUE)
-      ex <- pc$x[, 1:2]
-      # construct loadings (approx via correlations)
-      load <- cor(sm, pc$x)[, 1:2]
-
-      # Get colors and text size from settings
-      colors <- get_colors()
-      txt_size <- input$text_size
-
-      # Calculate expanded plot limits to accommodate labels
-      all_points <- rbind(ex, load)
-      x_range <- range(all_points[, 1])
-      y_range <- range(all_points[, 2])
-      x_expand <- diff(x_range) * 0.25  # 25% padding
-      y_expand <- diff(y_range) * 0.25
-      xlim <- c(x_range[1] - x_expand, x_range[2] + x_expand)
-      ylim <- c(y_range[1] - y_expand, y_range[2] + y_expand)
-
-      # Set margins for better label display
-      par(mar = c(4, 4, 2, 2), cex.axis = txt_size, cex.lab = txt_size * 1.1)
-
-      plot(ex, type = "n", xlab = "PC1", ylab = "PC2", xlim = xlim, ylim = ylim)
-      points(ex, pch = 19, col = colors$element, cex = txt_size * 1.3)
-      text(ex, labels = rv$elements, pos = 3, col = colors$element, cex = txt_size, font = 2)
-      # arrows for constructs - label with RIGHT pole only (high-scoring direction, rating=7)
-      arrows(0, 0, load[,1], load[,2], length = 0.15, col = colors$construct, lwd = 2)
-      text(load[,1], load[,2], labels = rv$constructs$right,
-           pos = 4, col = colors$construct, cex = txt_size, font = 2)
-      abline(h = 0, v = 0, lty = 3, col = "gray50")
-    })
-
-    output$heatmap_plot <- renderPlot({
-      sm <- rv$scores_mat_last
-      if (is.null(sm)) return()
-
-      # Get colors and sizes from settings
-      colors <- get_colors()
-      txt_size <- input$text_size
-      cell_size <- input$grid_cell_size
-
-      # Build palette - use selected color palette
-      if (input$heatmap_color) {
-        # Use palette colors for diverging heatmap
-        pal <- colorRampPalette(c(colors$heat_low, "#FFFFFF", colors$heat_high))(100)
-      } else {
-        pal <- gray.colors(100, start = 0.95, end = 0.2)
-      }
-      # sm is elements (rows) × constructs (cols)
-      n_elem <- nrow(sm)
-      n_cons <- ncol(sm)
-      # Flip elements so first appears at top
-      z <- sm[n_elem:1, ]
-
-      # Set margins to accommodate labels - scale with text size
-      par(mar = c(8 * txt_size, 14 * txt_size, 2, 2))
-
-      # Draw heatmap
-      image(
-        x = 1:n_elem, y = 1:n_cons, z = z,
-        col = pal, axes = FALSE, xlab = "", ylab = ""
-      )
-
-      # Add rating values as text in each cell - scale with cell_size
-      for (i in 1:n_elem) {
-        for (j in 1:n_cons) {
-          val <- z[i, j]
-          if (!is.na(val)) {
-            # Choose text color based on value for readability
-            text_col <- if (val > 4) "white" else "black"
-            text(i, j, sprintf("%.0f", val), col = text_col, cex = cell_size * 1.2, font = 2)
-          }
-        }
-      }
-
-      # Add axes with labels - scale with text_size
-      axis(1, at = 1:n_elem, labels = rev(rv$elements), las = 2, cex.axis = txt_size)
-      labs <- paste(rv$constructs$left, "-", rv$constructs$right)
-      axis(2, at = 1:n_cons, labels = labs, las = 1, cex.axis = txt_size)
-      box()
-
-      # Add axis titles - scale with text_size
-      mtext("Elements", side = 1, line = 6 * txt_size, cex = txt_size * 1.1)
-      mtext("Constructs", side = 2, line = 11 * txt_size, cex = txt_size * 1.1)
-    })
-
-    output$dend_elements <- renderPlot({
-      sm <- rv$scores_mat_last
-      if (is.null(sm)) {
-        plot.new()
-        text(0.5, 0.5, "No data available. Run analysis first.", cex = 1.2)
-        return()
-      }
-      if (nrow(sm) < 2) {
-        plot.new()
-        text(0.5, 0.5, "Need at least 2 elements for dendrogram.", cex = 1.2)
-        return()
-      }
-      d <- dist(sm)
-      if (any(is.na(d)) || length(d) == 0) {
-        plot.new()
-        text(0.5, 0.5, "Cannot compute distances. Check your data.", cex = 1.2)
-        return()
-      }
-
-      # Get colors and text size from settings
-      colors <- get_colors()
-      txt_size <- input$text_size
-
-      hc <- hclust(d)
-      par(mar = c(2, 10 * txt_size, 2, 2), cex = txt_size)  # Scale margin with text size
-      plot(hc, labels = rv$elements, main = "Elements", xlab = "", sub = "", horiz = TRUE, cex = txt_size)
-    })
-
-    output$dend_constructs <- renderPlot({
-      sm <- rv$scores_mat_last
-      if (is.null(sm)) {
-        plot.new()
-        text(0.5, 0.5, "No data available. Run analysis first.", cex = 1.2)
-        return()
-      }
-      if (ncol(sm) < 2) {
-        plot.new()
-        text(0.5, 0.5, "Need at least 2 constructs for dendrogram.", cex = 1.2)
-        return()
-      }
-      # Calculate distance matrix for constructs (columns)
-      d <- dist(t(sm))
-      # Check if distance matrix is valid
-      if (any(is.na(d)) || length(d) == 0) {
-        plot.new()
-        text(0.5, 0.5, "Cannot compute distances. Check your data.", cex = 1.2)
-        return()
-      }
-
-      # Get colors and text size from settings
-      colors <- get_colors()
-      txt_size <- input$text_size
-
-      hc <- hclust(d)
-      labs <- paste(rv$constructs$left, "-", rv$constructs$right)
-      par(mar = c(2, 14 * txt_size, 2, 2), cex = txt_size)  # Scale margin with text size
-      plot(hc, labels = labs, main = "Constructs", xlab = "", sub = "", horiz = TRUE, cex = txt_size)
-    })
-
-    # Statistics outputs
-    output$stats_elements <- renderPrint({
-      repgrid_obj <- rv$repgrid_last
-      if (is.null(repgrid_obj)) return()
-      statsElements(repgrid_obj, trim = 30)
-    })
-
-    output$stats_constructs <- renderPrint({
-      repgrid_obj <- rv$repgrid_last
-      if (is.null(repgrid_obj)) return()
-      statsConstructs(repgrid_obj, trim = 30)
-    })
+    showNotification("Analysis complete!", type = "message", duration = 2)
     }, error = function(e) {
       showNotification(paste("Analysis error:", e$message), type = "error")
     })
+  })
+
+  # ---- Analysis Output Plots (outside observeEvent so they react to color changes) ----
+
+  output$analysis_summary <- renderPrint({
+    req(rv$repgrid_last)
+    if (isTRUE(rv$imputed_last)) {
+      cat("Note: Missing ratings were imputed with 4 (midpoint).\n\n")
+    }
+    print(summary(rv$repgrid_last))
+  })
+
+  output$pca_biplot <- renderPlot({
+    sm <- rv$scores_mat_last
+    if (is.null(sm)) return()
+    # PCA on elements (rows)
+    pc <- prcomp(sm, scale. = TRUE)
+    ex <- pc$x[, 1:2]
+    # construct loadings (approx via correlations)
+    load <- cor(sm, pc$x)[, 1:2]
+
+    # Get colors from biplot-specific palette
+    colors <- get_palette_colors(input$biplot_palette)
+    txt_size <- input$text_size
+
+    # Calculate expanded plot limits to accommodate labels
+    all_points <- rbind(ex, load)
+    x_range <- range(all_points[, 1])
+    y_range <- range(all_points[, 2])
+    x_expand <- diff(x_range) * 0.25  # 25% padding
+    y_expand <- diff(y_range) * 0.25
+    xlim <- c(x_range[1] - x_expand, x_range[2] + x_expand)
+    ylim <- c(y_range[1] - y_expand, y_range[2] + y_expand)
+
+    # Set margins for better label display
+    par(mar = c(4, 4, 2, 2), cex.axis = txt_size, cex.lab = txt_size * 1.1)
+
+    plot(ex, type = "n", xlab = "PC1", ylab = "PC2", xlim = xlim, ylim = ylim)
+    points(ex, pch = 19, col = colors$element, cex = txt_size * 1.3)
+    text(ex, labels = rv$elements, pos = 3, col = colors$element, cex = txt_size, font = 2)
+    # arrows for constructs - label with RIGHT pole only (high-scoring direction, rating=7)
+    arrows(0, 0, load[,1], load[,2], length = 0.15, col = colors$construct, lwd = 2)
+    text(load[,1], load[,2], labels = rv$constructs$right,
+         pos = 4, col = colors$construct, cex = txt_size, font = 2)
+    abline(h = 0, v = 0, lty = 3, col = "gray50")
+  })
+
+  output$heatmap_plot <- renderPlot({
+    sm <- rv$scores_mat_last
+    if (is.null(sm)) return()
+
+    # Get colors from heatmap-specific palette
+    colors <- get_palette_colors(input$heatmap_palette)
+    txt_size <- input$text_size
+    cell_size <- input$grid_cell_size
+
+    # Build palette - use selected color palette
+    if (isTRUE(input$heatmap_use_color)) {
+      # Use palette colors for diverging heatmap
+      pal <- colorRampPalette(c(colors$heat_low, "#FFFFFF", colors$heat_high))(100)
+    } else {
+      pal <- gray.colors(100, start = 0.95, end = 0.2)
+    }
+    # sm is elements (rows) × constructs (cols)
+    n_elem <- nrow(sm)
+    n_cons <- ncol(sm)
+    # Flip elements so first appears at top
+    z <- sm[n_elem:1, ]
+
+    # Set margins to accommodate labels - scale with text size
+    par(mar = c(8 * txt_size, 14 * txt_size, 2, 2))
+
+    # Draw heatmap
+    image(
+      x = 1:n_elem, y = 1:n_cons, z = z,
+      col = pal, axes = FALSE, xlab = "", ylab = ""
+    )
+
+    # Add rating values as text in each cell - scale with cell_size
+    for (i in 1:n_elem) {
+      for (j in 1:n_cons) {
+        val <- z[i, j]
+        if (!is.na(val)) {
+          # Choose text color based on value for readability
+          text_col <- if (val > 4) "white" else "black"
+          text(i, j, sprintf("%.0f", val), col = text_col, cex = cell_size * 1.2, font = 2)
+        }
+      }
+    }
+
+    # Add axes with labels - scale with text_size
+    axis(1, at = 1:n_elem, labels = rev(rv$elements), las = 2, cex.axis = txt_size)
+    labs <- paste(rv$constructs$left, "-", rv$constructs$right)
+    axis(2, at = 1:n_cons, labels = labs, las = 1, cex.axis = txt_size)
+    box()
+
+    # Add axis titles - scale with text_size
+    mtext("Elements", side = 1, line = 6 * txt_size, cex = txt_size * 1.1)
+    mtext("Constructs", side = 2, line = 11 * txt_size, cex = txt_size * 1.1)
+  })
+
+  output$dend_elements <- renderPlot({
+    sm <- rv$scores_mat_last
+    if (is.null(sm)) {
+      plot.new()
+      text(0.5, 0.5, "No data available. Run analysis first.", cex = 1.2)
+      return()
+    }
+    if (nrow(sm) < 2) {
+      plot.new()
+      text(0.5, 0.5, "Need at least 2 elements for dendrogram.", cex = 1.2)
+      return()
+    }
+    d <- dist(sm)
+    if (any(is.na(d)) || length(d) == 0) {
+      plot.new()
+      text(0.5, 0.5, "Cannot compute distances. Check your data.", cex = 1.2)
+      return()
+    }
+
+    # Get colors and text size from settings
+    colors <- get_colors()
+    txt_size <- input$text_size
+
+    hc <- hclust(d)
+    par(mar = c(2, 10 * txt_size, 2, 2), cex = txt_size)
+    plot(hc, labels = rv$elements, main = "Elements", xlab = "", sub = "",
+         hang = -1, cex = txt_size)
+  })
+
+  output$dend_constructs <- renderPlot({
+    sm <- rv$scores_mat_last
+    if (is.null(sm)) {
+      plot.new()
+      text(0.5, 0.5, "No data available. Run analysis first.", cex = 1.2)
+      return()
+    }
+    if (ncol(sm) < 2) {
+      plot.new()
+      text(0.5, 0.5, "Need at least 2 constructs for dendrogram.", cex = 1.2)
+      return()
+    }
+    # Calculate distance matrix for constructs (columns)
+    d <- dist(t(sm))
+    # Check if distance matrix is valid
+    if (any(is.na(d)) || length(d) == 0) {
+      plot.new()
+      text(0.5, 0.5, "Cannot compute distances. Check your data.", cex = 1.2)
+      return()
+    }
+
+    # Get colors and text size from settings
+    colors <- get_colors()
+    txt_size <- input$text_size
+
+    hc <- hclust(d)
+    labs <- paste(rv$constructs$left, "-", rv$constructs$right)
+    par(mar = c(2, 14 * txt_size, 2, 2), cex = txt_size)
+    plot(hc, labels = labs, main = "Constructs", xlab = "", sub = "",
+         hang = -1, cex = txt_size)
+  })
+
+  # Statistics outputs
+  output$stats_elements <- renderPrint({
+    repgrid_obj <- rv$repgrid_last
+    if (is.null(repgrid_obj)) return()
+    statsElements(repgrid_obj, trim = 30)
+  })
+
+  output$stats_constructs <- renderPrint({
+    repgrid_obj <- rv$repgrid_last
+    if (is.null(repgrid_obj)) return()
+    statsConstructs(repgrid_obj, trim = 30)
   })
 
   # Crossplot Analysis
@@ -2026,34 +2049,79 @@ server <- function(input, output, session) {
     x_ratings <- sm[, x_idx]
     y_ratings <- sm[, y_idx]
 
-    # Get colors and text size from settings
-    colors <- get_colors()
+    # Get colors from crossplot-specific palette
+    colors <- get_palette_colors(input$crossplot_palette)
     txt_size <- input$text_size
 
     # Set up plot with scalable text
     par(mar = c(5, 5, 3, 2), cex.axis = txt_size, cex.lab = txt_size * 1.1, cex.main = txt_size * 1.2)
 
     # Use palette element color
-    point_col <- colors$element
+    base_col <- colors$element
 
-    plot(x_ratings, y_ratings,
-         xlim = c(1, 7), ylim = c(1, 7),
+    # Calculate opacity based on proximity - elements close together get different opacities
+    n_elem <- length(x_ratings)
+    opacities <- rep(1, n_elem)  # Start with full opacity
+
+    # Find clusters of overlapping points (within 0.3 units)
+    threshold <- 0.3
+    for (i in 1:n_elem) {
+      # Count how many points are close to this one
+      close_count <- sum(abs(x_ratings - x_ratings[i]) < threshold &
+                        abs(y_ratings - y_ratings[i]) < threshold)
+      if (close_count > 1) {
+        # Find rank within cluster for staggered opacity
+        cluster_indices <- which(abs(x_ratings - x_ratings[i]) < threshold &
+                                abs(y_ratings - y_ratings[i]) < threshold)
+        rank_in_cluster <- which(cluster_indices == i)
+        # Decrease opacity by 15% for each overlapping element
+        opacities[i] <- max(0.4, 1 - (rank_in_cluster - 1) * 0.15)
+      }
+    }
+
+    # Convert hex color to RGB and apply opacity
+    rgb_vals <- col2rgb(base_col)
+    point_cols <- sapply(opacities, function(alpha) {
+      rgb(rgb_vals[1], rgb_vals[2], rgb_vals[3], alpha = alpha * 255, maxColorValue = 255)
+    })
+
+    # Create empty plot first
+    plot(NULL, xlim = c(1, 7), ylim = c(1, 7),
          xlab = input$crossplot_x,
          ylab = input$crossplot_y,
          main = "Crossplot: Element Positions",
-         pch = 19, col = point_col, cex = txt_size * 1.6,
-         asp = 1)  # 1:1 aspect ratio for equal scaling
+         asp = 1)
 
-    # Add grid lines if requested
+    # Add grid lines if requested (before points so they're behind)
     if (input$crossplot_grid) {
       abline(h = 1:7, v = 1:7, col = "gray90", lty = 1)
       abline(h = 4, v = 4, col = "gray60", lty = 2, lwd = 1.5)
     }
 
+    # Plot points with varying opacity
+    points(x_ratings, y_ratings, pch = 19, col = point_cols, cex = txt_size * 1.6)
+
     # Add element labels if requested
     if (input$crossplot_labels) {
-      text(x_ratings, y_ratings, labels = rv$elements,
-           pos = 3, cex = txt_size, col = point_col, font = 2)
+      # Offset labels slightly for overlapping points
+      label_offsets <- rep(3, n_elem)  # Default: above
+      for (i in 1:n_elem) {
+        close_indices <- which(abs(x_ratings - x_ratings[i]) < threshold &
+                              abs(y_ratings - y_ratings[i]) < threshold)
+        if (length(close_indices) > 1) {
+          rank <- which(close_indices == i)
+          # Cycle through positions: above, right, below, left
+          label_offsets[i] <- ((rank - 1) %% 4) + 1
+        }
+      }
+      # Create label colors with same opacity
+      label_cols <- sapply(opacities, function(alpha) {
+        rgb(rgb_vals[1], rgb_vals[2], rgb_vals[3], alpha = alpha * 255, maxColorValue = 255)
+      })
+      for (i in 1:n_elem) {
+        text(x_ratings[i], y_ratings[i], labels = rv$elements[i],
+             pos = label_offsets[i], cex = txt_size, col = label_cols[i], font = 2)
+      }
     }
 
     # Add box around plot
@@ -2077,22 +2145,39 @@ server <- function(input, output, session) {
       x_ratings <- sm[, x_idx]
       y_ratings <- sm[, y_idx]
 
-      # Get colors and text size from settings
-      colors <- get_colors()
+      # Get colors from crossplot-specific palette
+      colors <- get_palette_colors(input$crossplot_palette)
       txt_size <- input$text_size
+      base_col <- colors$element
+
+      # Calculate opacity based on proximity
+      n_elem <- length(x_ratings)
+      opacities <- rep(1, n_elem)
+      threshold <- 0.3
+      for (i in 1:n_elem) {
+        close_count <- sum(abs(x_ratings - x_ratings[i]) < threshold &
+                          abs(y_ratings - y_ratings[i]) < threshold)
+        if (close_count > 1) {
+          cluster_indices <- which(abs(x_ratings - x_ratings[i]) < threshold &
+                                  abs(y_ratings - y_ratings[i]) < threshold)
+          rank_in_cluster <- which(cluster_indices == i)
+          opacities[i] <- max(0.4, 1 - (rank_in_cluster - 1) * 0.15)
+        }
+      }
+
+      rgb_vals <- col2rgb(base_col)
+      point_cols <- sapply(opacities, function(alpha) {
+        rgb(rgb_vals[1], rgb_vals[2], rgb_vals[3], alpha = alpha * 255, maxColorValue = 255)
+      })
 
       png(file, width = 1200, height = 1200, res = 120)
 
       par(mar = c(5, 5, 3, 2), cex.axis = txt_size, cex.lab = txt_size * 1.1, cex.main = txt_size * 1.2)
 
-      point_col <- colors$element
-
-      plot(x_ratings, y_ratings,
-           xlim = c(1, 7), ylim = c(1, 7),
+      plot(NULL, xlim = c(1, 7), ylim = c(1, 7),
            xlab = input$crossplot_x,
            ylab = input$crossplot_y,
            main = "Crossplot: Element Positions",
-           pch = 19, col = point_col, cex = txt_size * 1.5,
            asp = 1)
 
       if (input$crossplot_grid) {
@@ -2100,9 +2185,25 @@ server <- function(input, output, session) {
         abline(h = 4, v = 4, col = "gray60", lty = 2, lwd = 1.5)
       }
 
+      points(x_ratings, y_ratings, pch = 19, col = point_cols, cex = txt_size * 1.5)
+
       if (input$crossplot_labels) {
-        text(x_ratings, y_ratings, labels = rv$elements,
-             pos = 3, cex = txt_size * 0.8, col = point_col, font = 2)
+        label_offsets <- rep(3, n_elem)
+        for (i in 1:n_elem) {
+          close_indices <- which(abs(x_ratings - x_ratings[i]) < threshold &
+                                abs(y_ratings - y_ratings[i]) < threshold)
+          if (length(close_indices) > 1) {
+            rank <- which(close_indices == i)
+            label_offsets[i] <- ((rank - 1) %% 4) + 1
+          }
+        }
+        label_cols <- sapply(opacities, function(alpha) {
+          rgb(rgb_vals[1], rgb_vals[2], rgb_vals[3], alpha = alpha * 255, maxColorValue = 255)
+        })
+        for (i in 1:n_elem) {
+          text(x_ratings[i], y_ratings[i], labels = rv$elements[i],
+               pos = label_offsets[i], cex = txt_size * 0.8, col = label_cols[i], font = 2)
+        }
       }
 
       box()
@@ -2367,8 +2468,8 @@ server <- function(input, output, session) {
     req(focus_result())
     result <- focus_result()
 
-    # Get colors and sizes from settings
-    colors <- get_colors()
+    # Get colors from focus-specific palette
+    colors <- get_palette_colors(input$focus_palette)
     txt_size <- input$text_size
     cell_size <- input$grid_cell_size
 
@@ -2455,8 +2556,8 @@ server <- function(input, output, session) {
       req(focus_result())
       result <- focus_result()
 
-      # Get colors and sizes from settings
-      colors <- get_colors()
+      # Get colors from focus-specific palette
+      colors <- get_palette_colors(input$focus_palette)
       txt_size <- input$text_size
       cell_size <- input$grid_cell_size
 
