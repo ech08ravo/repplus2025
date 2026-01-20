@@ -715,11 +715,13 @@ server <- function(input, output, session) {
     scores_mat_last = NULL,
     repgrid_last = NULL,
     elicitation_active = FALSE,
-    elicitation_triad = NULL,
     show_constructs = FALSE,
     manual_mode = FALSE,
-    similar_elements = character(),
-    different_element = NULL
+    # Triadic elicitation tracking
+    all_triads = list(),        # List of all unique triads (each is vector of 3 element names)
+    current_triad_idx = 0,      # Current triad index (1-based)
+    triad_similar = character(), # Which 2 elements in current triad are similar
+    triad_different = NULL       # Which 1 element in current triad is different
   )
 
   # Load sample data (elements, constructs, ratings)
@@ -748,9 +750,15 @@ server <- function(input, output, session) {
     updateTextInput(session, "element_name", value = "")
   })
 
-  # Load sample fruit elements (no emojis to avoid rendering issues in plots)
+  # Load sample fruit elements with emoji icons
   observeEvent(input$load_sample_elements, {
-    sample_fruits <- c("Apple", "Banana", "Grapes", "Orange", "Strawberry")
+    sample_fruits <- c(
+      "\U0001F34E Apple",
+      "\U0001F34C Banana",
+      "\U0001F347 Grapes",
+      "\U0001F34A Orange",
+      "\U0001F353 Strawberry"
+    )
     rv$elements <- c(rv$elements, sample_fruits)
   })
 
@@ -763,28 +771,131 @@ server <- function(input, output, session) {
     rv$elicitation_active <- FALSE
   })
 
-  # Begin guided elicitation
+  # Begin guided elicitation - generate all unique triads
+
   observeEvent(input$begin_elicitation, {
     if (length(rv$elements) < 3) {
       showNotification("Need at least 3 elements to begin elicitation", type = "warning")
       return()
     }
+
+    # Generate all unique combinations of 3 elements
+    n <- length(rv$elements)
+    triads <- combn(rv$elements, 3, simplify = FALSE)
+
+    rv$all_triads <- triads
+    rv$current_triad_idx <- 1
+    rv$triad_similar <- character()
+    rv$triad_different <- NULL
     rv$show_constructs <- TRUE
     rv$manual_mode <- FALSE
     rv$elicitation_active <- TRUE
-    rv$similar_elements <- character()
-    rv$different_element <- NULL
+
+    showNotification(
+      paste0("Generated ", length(triads), " unique triads to explore."),
+      type = "message"
+    )
   })
 
   # Stop elicitation
   observeEvent(input$stop_elicitation, {
     rv$elicitation_active <- FALSE
+    rv$current_triad_idx <- 0
   })
 
-  # Clear selections for new construct
-  observeEvent(input$clear_selections, {
-    rv$similar_elements <- character()
-    rv$different_element <- NULL
+  # Skip current triad (move to next without adding construct)
+  observeEvent(input$skip_triad, {
+    if (rv$current_triad_idx < length(rv$all_triads)) {
+      rv$current_triad_idx <- rv$current_triad_idx + 1
+      rv$triad_similar <- character()
+      rv$triad_different <- NULL
+    } else {
+      showNotification("All triads completed!", type = "message")
+      rv$elicitation_active <- FALSE
+    }
+  })
+
+  # Clear selections for current triad
+  observeEvent(input$clear_triad, {
+    rv$triad_similar <- character()
+    rv$triad_different <- NULL
+  })
+
+  # Handle clicking on triad elements to assign as similar or different
+  observeEvent(input$triad_elem_1_similar, {
+    req(rv$elicitation_active, rv$current_triad_idx > 0)
+    triad <- rv$all_triads[[rv$current_triad_idx]]
+    elem <- triad[1]
+    # Toggle: if already similar, remove; if different, switch; otherwise add
+    if (elem %in% rv$triad_similar) {
+      rv$triad_similar <- setdiff(rv$triad_similar, elem)
+    } else if (identical(rv$triad_different, elem)) {
+      rv$triad_different <- NULL
+      if (length(rv$triad_similar) < 2) rv$triad_similar <- c(rv$triad_similar, elem)
+    } else if (length(rv$triad_similar) < 2) {
+      rv$triad_similar <- c(rv$triad_similar, elem)
+    }
+  })
+
+  observeEvent(input$triad_elem_2_similar, {
+    req(rv$elicitation_active, rv$current_triad_idx > 0)
+    triad <- rv$all_triads[[rv$current_triad_idx]]
+    elem <- triad[2]
+    if (elem %in% rv$triad_similar) {
+      rv$triad_similar <- setdiff(rv$triad_similar, elem)
+    } else if (identical(rv$triad_different, elem)) {
+      rv$triad_different <- NULL
+      if (length(rv$triad_similar) < 2) rv$triad_similar <- c(rv$triad_similar, elem)
+    } else if (length(rv$triad_similar) < 2) {
+      rv$triad_similar <- c(rv$triad_similar, elem)
+    }
+  })
+
+  observeEvent(input$triad_elem_3_similar, {
+    req(rv$elicitation_active, rv$current_triad_idx > 0)
+    triad <- rv$all_triads[[rv$current_triad_idx]]
+    elem <- triad[3]
+    if (elem %in% rv$triad_similar) {
+      rv$triad_similar <- setdiff(rv$triad_similar, elem)
+    } else if (identical(rv$triad_different, elem)) {
+      rv$triad_different <- NULL
+      if (length(rv$triad_similar) < 2) rv$triad_similar <- c(rv$triad_similar, elem)
+    } else if (length(rv$triad_similar) < 2) {
+      rv$triad_similar <- c(rv$triad_similar, elem)
+    }
+  })
+
+  observeEvent(input$triad_elem_1_different, {
+    req(rv$elicitation_active, rv$current_triad_idx > 0)
+    triad <- rv$all_triads[[rv$current_triad_idx]]
+    elem <- triad[1]
+    if (identical(rv$triad_different, elem)) {
+      rv$triad_different <- NULL
+    } else if (!(elem %in% rv$triad_similar)) {
+      rv$triad_different <- elem
+    }
+  })
+
+  observeEvent(input$triad_elem_2_different, {
+    req(rv$elicitation_active, rv$current_triad_idx > 0)
+    triad <- rv$all_triads[[rv$current_triad_idx]]
+    elem <- triad[2]
+    if (identical(rv$triad_different, elem)) {
+      rv$triad_different <- NULL
+    } else if (!(elem %in% rv$triad_similar)) {
+      rv$triad_different <- elem
+    }
+  })
+
+  observeEvent(input$triad_elem_3_different, {
+    req(rv$elicitation_active, rv$current_triad_idx > 0)
+    triad <- rv$all_triads[[rv$current_triad_idx]]
+    elem <- triad[3]
+    if (identical(rv$triad_different, elem)) {
+      rv$triad_different <- NULL
+    } else if (!(elem %in% rv$triad_similar)) {
+      rv$triad_different <- elem
+    }
   })
 
   # Handle element clicks using input$last_clicked pattern
@@ -827,24 +938,47 @@ server <- function(input, output, session) {
     }, ignoreInit = TRUE)
   })
 
-  # Add construct from elicitation
+  # Add construct from triadic elicitation
   observeEvent(input$add_elicited_construct, {
     req(input$elicit_left, input$elicit_right)
+
+    # Validate that 2 similar and 1 different are selected
+    if (length(rv$triad_similar) != 2) {
+      showNotification("Please select exactly 2 SIMILAR elements", type = "warning")
+      return()
+    }
+    if (is.null(rv$triad_different)) {
+      showNotification("Please select 1 DIFFERENT element", type = "warning")
+      return()
+    }
+
+    # Add the construct
     new_construct_label <- paste(input$elicit_left, "-", input$elicit_right)
     rv$constructs <- rbind(
       rv$constructs,
       data.frame(left = input$elicit_left, right = input$elicit_right, stringsAsFactors = FALSE)
     )
+
+    # Clear inputs
     updateTextInput(session, "elicit_left", value = "")
     updateTextInput(session, "elicit_right", value = "")
-    # Clear selections for next construct
-    rv$similar_elements <- character()
-    rv$different_element <- NULL
+
     # Select the new construct in the ratings dropdown
     updateSelectInput(session, "rating_construct", selected = new_construct_label)
-    # Reset to first element
     if (length(rv$elements) > 0) {
       updateSelectInput(session, "rating_element", selected = rv$elements[1])
+    }
+
+    # Advance to next triad
+    if (rv$current_triad_idx < length(rv$all_triads)) {
+      rv$current_triad_idx <- rv$current_triad_idx + 1
+      rv$triad_similar <- character()
+      rv$triad_different <- NULL
+    } else {
+      # All triads done
+      showNotification("All triads completed! You can now add ratings or continue adding constructs manually.", type = "message")
+      rv$elicitation_active <- FALSE
+      rv$manual_mode <- TRUE
     }
   })
 
@@ -865,65 +999,104 @@ server <- function(input, output, session) {
   output$constructs_section_ui <- renderUI({
     if (!rv$show_constructs) return(NULL)
 
-    if (rv$elicitation_active && !rv$manual_mode) {
-      # Guided elicitation mode with clickable elements
+    if (rv$elicitation_active && !rv$manual_mode && rv$current_triad_idx > 0) {
+      # Guided elicitation mode - show current triad
+      current_triad <- rv$all_triads[[rv$current_triad_idx]]
+      total_triads <- length(rv$all_triads)
+      progress_pct <- round(100 * (rv$current_triad_idx - 1) / total_triads)
+
       div(class = "elicit-section", style = "margin-top: 10px; background: #fff8e6;",
         div(class = "step-header",
-          h5("Step 2: Create Constructs (Guided)"),
+          h5("Step 2: Create Constructs (Triadic Elicitation)"),
           actionButton("info_constructs", "?", class = "btn-info info-btn")
         ),
         conditionalPanel(
           condition = "input.info_constructs % 2 == 1",
           div(class = "info-popup",
-            tags$strong("Triadic elicitation: "), "Select 2 elements that are SIMILAR and 1 that is DIFFERENT.",
+            tags$strong("Triadic elicitation: "), "For each triad of 3 elements, decide which 2 are SIMILAR and which 1 is DIFFERENT.",
             tags$br(),
             "Then describe what makes them similar (left pole) and different (right pole)."
           )
         ),
-        div(class = "triad-instruction",
-          tags$strong("Click elements to select:"),
-          " Choose 2 similar (green) and 1 different (red)"
-        ),
-        fluidRow(
-          column(6,
-            div(class = "pole-label", "Similar elements (click to select, max 2):"),
-            div(class = "pole-box similar",
-              lapply(seq_along(rv$elements), function(i) {
-                elem <- rv$elements[i]
-                is_selected <- elem %in% rv$similar_elements
-                is_different <- identical(rv$different_element, elem)
-                btn_class <- if (is_selected) "btn btn-success element-btn" else if (is_different) "btn btn-outline-secondary element-btn disabled" else "btn btn-outline-success element-btn"
-                actionButton(paste0("elem_similar_", i), elem, class = btn_class)
-              })
-            ),
-            textInput("elicit_left", NULL, placeholder = "What makes them similar? (left pole)")
+
+        # Progress indicator
+        div(style = "margin-bottom: 10px;",
+          tags$div(style = "font-size: 12px; font-weight: bold; margin-bottom: 4px;",
+            paste0("Triad ", rv$current_triad_idx, " of ", total_triads)
           ),
-          column(6,
-            div(class = "pole-label", "Different element (click to select, max 1):"),
-            div(class = "pole-box different",
-              lapply(seq_along(rv$elements), function(i) {
-                elem <- rv$elements[i]
-                is_selected <- identical(rv$different_element, elem)
-                is_similar <- elem %in% rv$similar_elements
-                btn_class <- if (is_selected) "btn btn-danger element-btn" else if (is_similar) "btn btn-outline-secondary element-btn disabled" else "btn btn-outline-danger element-btn"
-                actionButton(paste0("elem_different_", i), elem, class = btn_class)
-              })
-            ),
-            textInput("elicit_right", NULL, placeholder = "What makes it different? (right pole)")
+          tags$div(style = "background: #e9ecef; border-radius: 4px; height: 6px;",
+            tags$div(style = paste0("background: #ffc107; width: ", progress_pct, "%; height: 100%; border-radius: 4px;"))
           )
         ),
+
+        # Current triad display
+        div(class = "triad-instruction",
+          tags$strong("Current Triad: "), "Click to mark 2 as SIMILAR (green) and 1 as DIFFERENT (red)"
+        ),
+
+        # Three element cards side by side
+        fluidRow(
+          lapply(1:3, function(i) {
+            elem <- current_triad[i]
+            is_similar <- elem %in% rv$triad_similar
+            is_different <- identical(rv$triad_different, elem)
+
+            # Determine card style
+            card_style <- if (is_similar) {
+              "background: #d4edda; border: 2px solid #28a745; padding: 10px; border-radius: 8px; text-align: center; min-height: 120px;"
+            } else if (is_different) {
+              "background: #f8d7da; border: 2px solid #dc3545; padding: 10px; border-radius: 8px; text-align: center; min-height: 120px;"
+            } else {
+              "background: #f8f9fa; border: 2px solid #dee2e6; padding: 10px; border-radius: 8px; text-align: center; min-height: 120px;"
+            }
+
+            column(4,
+              div(style = card_style,
+                tags$div(style = "font-size: 14px; font-weight: bold; margin-bottom: 8px;", elem),
+                tags$div(style = "margin-top: 8px;",
+                  actionButton(paste0("triad_elem_", i, "_similar"), "Similar",
+                    class = if (is_similar) "btn btn-success btn-sm" else "btn btn-outline-success btn-sm",
+                    style = "margin: 2px;"),
+                  actionButton(paste0("triad_elem_", i, "_different"), "Different",
+                    class = if (is_different) "btn btn-danger btn-sm" else "btn btn-outline-danger btn-sm",
+                    style = "margin: 2px;")
+                ),
+                if (is_similar) tags$div(style = "color: #28a745; font-size: 11px; margin-top: 4px;", "SIMILAR")
+                else if (is_different) tags$div(style = "color: #dc3545; font-size: 11px; margin-top: 4px;", "DIFFERENT")
+              )
+            )
+          })
+        ),
+
+        # Construct poles input
+        fluidRow(style = "margin-top: 12px;",
+          column(6,
+            tags$label(style = "color: #28a745; font-weight: bold; font-size: 12px;",
+              "What makes the 2 SIMILAR? (Left pole)"),
+            textInput("elicit_left", NULL, placeholder = "e.g., friendly, warm, modern...")
+          ),
+          column(6,
+            tags$label(style = "color: #dc3545; font-weight: bold; font-size: 12px;",
+              "What makes the 1 DIFFERENT? (Right pole)"),
+            textInput("elicit_right", NULL, placeholder = "e.g., unfriendly, cold, traditional...")
+          )
+        ),
+
+        # Action buttons
         fluidRow(
           column(12, style = "text-align: center; margin-top: 8px;",
-            actionButton("add_elicited_construct", "Add Construct", class = "btn-warning"),
-            actionButton("clear_selections", "Clear", class = "btn-outline-secondary btn-sm", style = "margin-left: 8px;"),
+            actionButton("add_elicited_construct", "Add Construct & Next Triad", class = "btn-warning"),
+            actionButton("skip_triad", "Skip This Triad", class = "btn-outline-secondary btn-sm", style = "margin-left: 8px;"),
+            actionButton("clear_triad", "Clear Selection", class = "btn-outline-secondary btn-sm", style = "margin-left: 8px;"),
             actionButton("stop_elicitation", "Done with Constructs", class = "btn-outline-danger btn-sm", style = "margin-left: 8px;")
           )
         ),
+
         tags$div(style = "margin-top: 8px; font-size: 11px; color: #666;",
           tags$strong("Constructs added: "), textOutput("constructs_count", inline = TRUE)
         )
       )
-    } else {
+    } else if (!rv$elicitation_active || rv$manual_mode) {
       # Manual mode
       div(class = "elicit-section", style = "margin-top: 10px;",
         div(class = "step-header",
@@ -1444,7 +1617,20 @@ server <- function(input, output, session) {
 
   # Analyze
   observeEvent(input$analyze, {
-    req(nrow(rv$ratings) > 0)
+    # Validation: need at least some data
+    if (length(rv$elements) < 2) {
+      showNotification("Need at least 2 elements to run analysis.", type = "error")
+      return()
+    }
+    if (nrow(rv$constructs) < 2) {
+      showNotification("Need at least 2 constructs to run analysis.", type = "error")
+      return()
+    }
+    if (nrow(rv$ratings) == 0) {
+      showNotification("No ratings found. Please rate elements on constructs first.", type = "error")
+      return()
+    }
+
     construct_labels <- paste(rv$constructs$left, "-", rv$constructs$right)
     n_e <- length(rv$elements)
     n_c <- length(construct_labels)
