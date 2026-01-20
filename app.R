@@ -91,6 +91,10 @@ ui <- fluidPage(
       Shiny.addCustomMessageHandler("openMailto", function(url) {
         window.location.href = url;
       });
+      Shiny.addCustomMessageHandler("clickButton", function(id) {
+        var btn = document.getElementById(id);
+        if (btn) btn.click();
+      });
     '))
   ),
   titlePanel("RepGrid Elicitation"),
@@ -995,15 +999,62 @@ server <- function(input, output, session) {
     )
   })
 
+  # Triad cards UI - separate so clicking buttons doesn't reset text inputs
+
+  output$triad_cards_ui <- renderUI({
+    req(rv$elicitation_active, rv$current_triad_idx > 0)
+    req(length(rv$all_triads) >= rv$current_triad_idx)
+
+    current_triad <- rv$all_triads[[rv$current_triad_idx]]
+
+    # Three element cards side by side
+    fluidRow(
+      lapply(1:3, function(i) {
+        elem <- current_triad[i]
+        is_similar <- elem %in% rv$triad_similar
+        is_different <- identical(rv$triad_different, elem)
+
+        # Determine card style
+        card_style <- if (is_similar) {
+          "background: #d4edda; border: 2px solid #28a745; padding: 10px; border-radius: 8px; text-align: center; min-height: 120px;"
+        } else if (is_different) {
+          "background: #f8d7da; border: 2px solid #dc3545; padding: 10px; border-radius: 8px; text-align: center; min-height: 120px;"
+        } else {
+          "background: #f8f9fa; border: 2px solid #dee2e6; padding: 10px; border-radius: 8px; text-align: center; min-height: 120px;"
+        }
+
+        column(4,
+          div(style = card_style,
+            tags$div(style = "font-size: 14px; font-weight: bold; margin-bottom: 8px;", elem),
+            tags$div(style = "margin-top: 8px;",
+              actionButton(paste0("triad_elem_", i, "_similar"), "Similar",
+                class = if (is_similar) "btn btn-success btn-sm" else "btn btn-outline-success btn-sm",
+                style = "margin: 2px;"),
+              actionButton(paste0("triad_elem_", i, "_different"), "Different",
+                class = if (is_different) "btn btn-danger btn-sm" else "btn btn-outline-danger btn-sm",
+                style = "margin: 2px;")
+            ),
+            if (is_similar) tags$div(style = "color: #28a745; font-size: 11px; margin-top: 4px;", "SIMILAR")
+            else if (is_different) tags$div(style = "color: #dc3545; font-size: 11px; margin-top: 4px;", "DIFFERENT")
+          )
+        )
+      })
+    )
+  })
+
   # Constructs section UI - only shown after user clicks a button
   output$constructs_section_ui <- renderUI({
     if (!rv$show_constructs) return(NULL)
 
-    if (rv$elicitation_active && !rv$manual_mode && rv$current_triad_idx > 0) {
+    # Only depend on these values - NOT triad_similar/triad_different
+    elicit_active <- rv$elicitation_active
+    manual <- rv$manual_mode
+    triad_idx <- rv$current_triad_idx
+
+    if (elicit_active && !manual && triad_idx > 0) {
       # Guided elicitation mode - show current triad
-      current_triad <- rv$all_triads[[rv$current_triad_idx]]
       total_triads <- length(rv$all_triads)
-      progress_pct <- round(100 * (rv$current_triad_idx - 1) / total_triads)
+      progress_pct <- round(100 * (triad_idx - 1) / total_triads)
 
       div(class = "elicit-section", style = "margin-top: 10px; background: #fff8e6;",
         div(class = "step-header",
@@ -1022,7 +1073,7 @@ server <- function(input, output, session) {
         # Progress indicator
         div(style = "margin-bottom: 10px;",
           tags$div(style = "font-size: 12px; font-weight: bold; margin-bottom: 4px;",
-            paste0("Triad ", rv$current_triad_idx, " of ", total_triads)
+            paste0("Triad ", triad_idx, " of ", total_triads)
           ),
           tags$div(style = "background: #e9ecef; border-radius: 4px; height: 6px;",
             tags$div(style = paste0("background: #ffc107; width: ", progress_pct, "%; height: 100%; border-radius: 4px;"))
@@ -1034,41 +1085,10 @@ server <- function(input, output, session) {
           tags$strong("Current Triad: "), "Click to mark 2 as SIMILAR (green) and 1 as DIFFERENT (red)"
         ),
 
-        # Three element cards side by side
-        fluidRow(
-          lapply(1:3, function(i) {
-            elem <- current_triad[i]
-            is_similar <- elem %in% rv$triad_similar
-            is_different <- identical(rv$triad_different, elem)
+        # Triad cards - separate uiOutput so text inputs don't reset
+        uiOutput("triad_cards_ui"),
 
-            # Determine card style
-            card_style <- if (is_similar) {
-              "background: #d4edda; border: 2px solid #28a745; padding: 10px; border-radius: 8px; text-align: center; min-height: 120px;"
-            } else if (is_different) {
-              "background: #f8d7da; border: 2px solid #dc3545; padding: 10px; border-radius: 8px; text-align: center; min-height: 120px;"
-            } else {
-              "background: #f8f9fa; border: 2px solid #dee2e6; padding: 10px; border-radius: 8px; text-align: center; min-height: 120px;"
-            }
-
-            column(4,
-              div(style = card_style,
-                tags$div(style = "font-size: 14px; font-weight: bold; margin-bottom: 8px;", elem),
-                tags$div(style = "margin-top: 8px;",
-                  actionButton(paste0("triad_elem_", i, "_similar"), "Similar",
-                    class = if (is_similar) "btn btn-success btn-sm" else "btn btn-outline-success btn-sm",
-                    style = "margin: 2px;"),
-                  actionButton(paste0("triad_elem_", i, "_different"), "Different",
-                    class = if (is_different) "btn btn-danger btn-sm" else "btn btn-outline-danger btn-sm",
-                    style = "margin: 2px;")
-                ),
-                if (is_similar) tags$div(style = "color: #28a745; font-size: 11px; margin-top: 4px;", "SIMILAR")
-                else if (is_different) tags$div(style = "color: #dc3545; font-size: 11px; margin-top: 4px;", "DIFFERENT")
-              )
-            )
-          })
-        ),
-
-        # Construct poles input
+        # Construct poles input - these are OUTSIDE the reactive triad cards
         fluidRow(style = "margin-top: 12px;",
           column(6,
             tags$label(style = "color: #28a745; font-weight: bold; font-size: 12px;",
@@ -1096,7 +1116,7 @@ server <- function(input, output, session) {
           tags$strong("Constructs added: "), textOutput("constructs_count", inline = TRUE)
         )
       )
-    } else if (!rv$elicitation_active || rv$manual_mode) {
+    } else if (!elicit_active || manual) {
       # Manual mode
       div(class = "elicit-section", style = "margin-top: 10px;",
         div(class = "step-header",
@@ -1431,13 +1451,13 @@ server <- function(input, output, session) {
   })
 
   # Action link handlers for guidance panel
+  # Use JavaScript to click the analyze button
   observeEvent(input$goto_analysis, {
-    # Trigger analysis and switch to Biplot tab
-    click("analyze")
+    session$sendCustomMessage("clickButton", "analyze")
   })
 
   observeEvent(input$goto_analysis2, {
-    click("analyze")
+    session$sendCustomMessage("clickButton", "analyze")
   })
 
   observeEvent(input$add_more_constructs, {
