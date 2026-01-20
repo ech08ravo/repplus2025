@@ -9,7 +9,7 @@ source("R/claude_api.R")
 
 ui <- fluidPage(
   tags$head(
-    tags$style(HTML('
+        tags$style(HTML('
       .container-fluid { max-width: 1400px; }
       body { font-size: 13px; }
       .form-group { margin-bottom: 8px; }
@@ -58,6 +58,18 @@ ui <- fluidPage(
       .step-header h5 { margin: 0; }
       .ratings-section { background: #f0f7ff; padding: 10px; border-radius: 4px; border: 1px solid #b8daff; margin-top: 10px; }
       .ratings-section h5 { color: #004085; margin-top: 0; }
+      .element-btn { margin: 2px; padding: 4px 8px; font-size: 11px; }
+      .element-btn.selected-similar { background: #28a745; color: white; border-color: #28a745; }
+      .element-btn.selected-different { background: #dc3545; color: white; border-color: #dc3545; }
+      .triad-instruction { background: #fff3cd; padding: 8px; border-radius: 4px; border: 1px solid #ffc107; margin-bottom: 8px; font-size: 12px; }
+      .triad-elements { margin: 8px 0; }
+      .pole-label { font-size: 11px; color: #666; margin-bottom: 4px; }
+      .pole-box { background: #f8f9fa; padding: 6px; border-radius: 4px; min-height: 36px; margin-bottom: 6px; border: 1px dashed #ccc; }
+      .pole-box.similar { border-color: #28a745; background: #f0fff0; }
+      .pole-box.different { border-color: #dc3545; background: #fff0f0; }
+      .construct-section { display: none; }
+      .construct-section.visible { display: block; }
+      .next-step-buttons { text-align: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd; }
     ')),
     tags$script(HTML('
       Shiny.addCustomMessageHandler("copyToClipboard", function(text) {
@@ -107,107 +119,48 @@ ui <- fluidPage(
           "Build Grid",
           div(class = "elicit-panel",
             h4("Build Your Repertory Grid"),
-            fluidRow(
-              column(6,
-                div(class = "elicit-section",
-                  div(class = "step-header",
-                    h5("Step 1: Elements"),
-                    actionButton("info_elements", "?", class = "btn-info info-btn"),
-                    actionButton("load_sample_elements", "Try Sample", class = "btn-outline-secondary btn-sm", style = "margin-left: 8px; font-size: 10px;")
-                  ),
-                  conditionalPanel(
-                    condition = "input.info_elements % 2 == 1",
-                    div(class = "info-popup",
-                      tags$strong("Elements"), " are the things you want to compare - people, objects, situations, etc.",
-                      tags$br(),
-                      "Examples: Mother, Father, Best friend, Ideal self, Boss",
-                      tags$br(),
-                      tags$em("Tip: Add at least 6-12 elements for meaningful analysis.")
-                    )
-                  ),
-                  fluidRow(
-                    column(6,
-                      textInput("element_name", NULL, placeholder = "Type element name"),
-                      actionButton("add_element", "Add", class = "btn-warning btn-sm")
-                    ),
-                    column(6,
-                      tags$small("Or paste list:"),
-                      tags$textarea(id = "elements_bulk", rows = 2, style = "width: 100%; font-size: 11px;", placeholder = "One per line"),
-                      actionButton("add_elements_bulk", "Add All", class = "btn-warning btn-sm", style = "margin-top: 2px;")
-                    )
-                  ),
-                  tags$div(style = "margin-top: 6px; font-size: 11px; color: #666;",
-                    tags$strong("Added: "), textOutput("elements_count", inline = TRUE)
-                  ),
-                  tags$hr(),
-                  tags$div(style = "text-align: center;",
-                    actionButton("begin_elicitation", "Begin Construct Elicitation", class = "btn-success btn-sm"),
-                    tags$br(),
-                    tags$small(style = "color: #666;", "Start eliciting constructs from your elements (can also add constructs manually)")
-                  )
+
+            # Step 1: Elements (always visible)
+            div(class = "elicit-section",
+              div(class = "step-header",
+                h5("Step 1: Add Elements"),
+                actionButton("info_elements", "?", class = "btn-info info-btn"),
+                actionButton("load_sample_elements", "Try Sample Fruits", class = "btn-outline-secondary btn-sm", style = "margin-left: 8px; font-size: 10px;")
+              ),
+              conditionalPanel(
+                condition = "input.info_elements % 2 == 1",
+                div(class = "info-popup",
+                  tags$strong("Elements"), " are the things you want to compare - people, objects, situations, etc.",
+                  tags$br(),
+                  "Examples: Mother, Father, Best friend, Ideal self, Boss",
+                  tags$br(),
+                  tags$em("Tip: Add at least 6-12 elements for meaningful analysis.")
                 )
               ),
-              column(6,
-                div(class = "elicit-section",
-                  div(class = "step-header",
-                    h5("Step 2: Constructs"),
-                    actionButton("info_constructs", "?", class = "btn-info info-btn")
-                  ),
-                  conditionalPanel(
-                    condition = "input.info_constructs % 2 == 1",
-                    div(class = "info-popup",
-                      tags$strong("Constructs"), " are bipolar dimensions you use to distinguish between elements.",
-                      tags$br(),
-                      "Each construct has two opposite poles: e.g., friendly - unfriendly",
-                      tags$br(),
-                      tags$em("You can add constructs manually OR use 'Begin Elicitation' to be guided through the process.")
-                    )
-                  ),
-                  uiOutput("elicitation_ui"),
-                  fluidRow(
-                    column(6,
-                      textInput("construct_left", NULL, placeholder = "Left pole"),
-                      textInput("construct_right", NULL, placeholder = "Right pole"),
-                      actionButton("add_construct", "Add", class = "btn-warning btn-sm")
-                    ),
-                    column(6,
-                      tags$small("Or paste list (left - right):"),
-                      tags$textarea(id = "constructs_bulk", rows = 2, style = "width: 100%; font-size: 11px;", placeholder = "friendly - unfriendly"),
-                      actionButton("add_constructs_bulk", "Add All", class = "btn-warning btn-sm", style = "margin-top: 2px;")
-                    )
-                  ),
-                  tags$div(style = "margin-top: 6px; font-size: 11px; color: #666;",
-                    tags$strong("Added: "), textOutput("constructs_count", inline = TRUE)
-                  )
+              fluidRow(
+                column(6,
+                  textInput("element_name", NULL, placeholder = "Type element name"),
+                  actionButton("add_element", "Add", class = "btn-warning btn-sm")
+                ),
+                column(6,
+                  tags$small("Or paste list:"),
+                  tags$textarea(id = "elements_bulk", rows = 2, style = "width: 100%; font-size: 11px;", placeholder = "One per line"),
+                  actionButton("add_elements_bulk", "Add All", class = "btn-warning btn-sm", style = "margin-top: 2px;")
                 )
+              ),
+              uiOutput("elements_display"),
+              div(class = "next-step-buttons",
+                actionButton("begin_elicitation", "Begin Guided Elicitation", class = "btn-success"),
+                actionButton("show_manual_constructs", "Add Constructs Manually", class = "btn-outline-primary", style = "margin-left: 8px;")
               )
-            )
+            ),
+
+            # Step 2: Constructs - shown via UI output based on mode
+            uiOutput("constructs_section_ui")
           ),
-          div(class = "ratings-section",
-            div(class = "step-header",
-              h5("Step 3: Rate Each Element on Each Construct"),
-              actionButton("info_ratings", "?", class = "btn-info info-btn")
-            ),
-            conditionalPanel(
-              condition = "input.info_ratings % 2 == 1",
-              div(class = "info-popup",
-                tags$strong("Rating: "), "For each element-construct pair, rate where the element falls on the scale.",
-                tags$br(),
-                "1 = strongly matches LEFT pole, 4 = neutral/middle, 7 = strongly matches RIGHT pole",
-                tags$br(),
-                tags$em("Example: If construct is 'friendly - unfriendly' and element is 'Mother', rate 1 if very friendly, 7 if very unfriendly.")
-              )
-            ),
-            fluidRow(
-              column(3, selectInput("rating_element", "Element:", choices = NULL)),
-              column(4, selectInput("rating_construct", "Construct:", choices = NULL)),
-              column(3, sliderInput("rating_score", "Rating:", min = 1, max = 7, value = 4, width = "100%")),
-              column(2, tags$div(style = "margin-top: 25px;", actionButton("add_rating", "Add", class = "btn-warning btn-sm")))
-            ),
-            h5("Ratings Table"),
-            DTOutput("ratings_table"),
-            actionButton("remove_rating", "Remove Selected", class = "btn-danger btn-sm")
-          )
+
+          # Step 3: Ratings - only show when constructs exist
+          uiOutput("ratings_section_ui")
         ),
         tabPanel(
           "Grid Summary",
@@ -660,7 +613,11 @@ server <- function(input, output, session) {
     scores_mat_last = NULL,
     repgrid_last = NULL,
     elicitation_active = FALSE,
-    elicitation_triad = NULL
+    elicitation_triad = NULL,
+    show_constructs = FALSE,
+    manual_mode = FALSE,
+    similar_elements = character(),
+    different_element = NULL
   )
 
   # Load sample data (elements, constructs, ratings)
@@ -702,28 +659,76 @@ server <- function(input, output, session) {
   })
 
   # Begin elicitation - triadic method
+  # Show manual constructs mode
+
+  observeEvent(input$show_manual_constructs, {
+    rv$show_constructs <- TRUE
+    rv$manual_mode <- TRUE
+    rv$elicitation_active <- FALSE
+  })
+
+  # Begin guided elicitation
   observeEvent(input$begin_elicitation, {
     if (length(rv$elements) < 3) {
       showNotification("Need at least 3 elements to begin elicitation", type = "warning")
       return()
     }
+    rv$show_constructs <- TRUE
+    rv$manual_mode <- FALSE
     rv$elicitation_active <- TRUE
-    # Pick 3 random elements for triadic elicitation
-    rv$elicitation_triad <- sample(rv$elements, 3)
+    rv$similar_elements <- character()
+    rv$different_element <- NULL
   })
 
   # Stop elicitation
   observeEvent(input$stop_elicitation, {
     rv$elicitation_active <- FALSE
-    rv$elicitation_triad <- NULL
   })
 
-  # New triad button
+  # Clear selections for new construct
+  observeEvent(input$clear_selections, {
+    rv$similar_elements <- character()
+    rv$different_element <- NULL
+  })
 
-  observeEvent(input$new_triad, {
-    if (length(rv$elements) >= 3) {
-      rv$elicitation_triad <- sample(rv$elements, 3)
-    }
+  # Handle element clicks using input$last_clicked pattern
+  # We'll use a hidden input to track which element was clicked
+
+  # Create observers for each possible element button (up to 20 elements)
+  lapply(1:20, function(i) {
+    # Similar button observer
+    observeEvent(input[[paste0("elem_similar_", i)]], {
+      req(rv$elicitation_active)
+      req(i <= length(rv$elements))
+      elem <- rv$elements[i]
+
+      if (elem %in% rv$similar_elements) {
+        # Deselect
+        rv$similar_elements <- setdiff(rv$similar_elements, elem)
+      } else if (length(rv$similar_elements) < 2) {
+        # Select if not already different
+        diff_elem <- rv$different_element
+        if (is.null(diff_elem) || elem != diff_elem) {
+          rv$similar_elements <- c(rv$similar_elements, elem)
+        }
+      }
+    }, ignoreInit = TRUE)
+
+    # Different button observer
+    observeEvent(input[[paste0("elem_different_", i)]], {
+      req(rv$elicitation_active)
+      req(i <= length(rv$elements))
+      elem <- rv$elements[i]
+
+      diff_elem <- rv$different_element
+      if (!is.null(diff_elem) && elem == diff_elem) {
+        # Deselect
+        rv$different_element <- NULL
+      } else if (!(elem %in% rv$similar_elements)) {
+        # Select
+        rv$different_element <- elem
+      }
+    }, ignoreInit = TRUE)
   })
 
   # Add construct from elicitation
@@ -735,36 +740,147 @@ server <- function(input, output, session) {
     )
     updateTextInput(session, "elicit_left", value = "")
     updateTextInput(session, "elicit_right", value = "")
-    # Get new triad
-    if (length(rv$elements) >= 3) {
-      rv$elicitation_triad <- sample(rv$elements, 3)
+    # Clear selections for next construct
+    rv$similar_elements <- character()
+    rv$different_element <- NULL
+  })
+
+  # Elements display with count
+  output$elements_display <- renderUI({
+    if (length(rv$elements) == 0) {
+      return(tags$div(style = "margin-top: 8px; color: #666; font-size: 12px;",
+        tags$em("No elements added yet. Add elements above or try sample fruits.")
+      ))
+    }
+    tags$div(style = "margin-top: 8px;",
+      tags$strong(paste0(length(rv$elements), " elements: "), style = "font-size: 11px;"),
+      tags$span(paste(rv$elements, collapse = ", "), style = "font-size: 11px; color: #666;")
+    )
+  })
+
+  # Constructs section UI - only shown after user clicks a button
+  output$constructs_section_ui <- renderUI({
+    if (!rv$show_constructs) return(NULL)
+
+    if (rv$elicitation_active && !rv$manual_mode) {
+      # Guided elicitation mode with clickable elements
+      div(class = "elicit-section", style = "margin-top: 10px; background: #fff8e6;",
+        div(class = "step-header",
+          h5("Step 2: Create Constructs (Guided)"),
+          actionButton("info_constructs", "?", class = "btn-info info-btn")
+        ),
+        conditionalPanel(
+          condition = "input.info_constructs % 2 == 1",
+          div(class = "info-popup",
+            tags$strong("Triadic elicitation: "), "Select 2 elements that are SIMILAR and 1 that is DIFFERENT.",
+            tags$br(),
+            "Then describe what makes them similar (left pole) and different (right pole)."
+          )
+        ),
+        div(class = "triad-instruction",
+          tags$strong("Click elements to select:"),
+          " Choose 2 similar (green) and 1 different (red)"
+        ),
+        fluidRow(
+          column(6,
+            div(class = "pole-label", "Similar elements (click to select, max 2):"),
+            div(class = "pole-box similar",
+              lapply(seq_along(rv$elements), function(i) {
+                elem <- rv$elements[i]
+                is_selected <- elem %in% rv$similar_elements
+                is_different <- identical(rv$different_element, elem)
+                btn_class <- if (is_selected) "btn btn-success element-btn" else if (is_different) "btn btn-outline-secondary element-btn disabled" else "btn btn-outline-success element-btn"
+                actionButton(paste0("elem_similar_", i), elem, class = btn_class)
+              })
+            ),
+            textInput("elicit_left", NULL, placeholder = "What makes them similar? (left pole)")
+          ),
+          column(6,
+            div(class = "pole-label", "Different element (click to select, max 1):"),
+            div(class = "pole-box different",
+              lapply(seq_along(rv$elements), function(i) {
+                elem <- rv$elements[i]
+                is_selected <- identical(rv$different_element, elem)
+                is_similar <- elem %in% rv$similar_elements
+                btn_class <- if (is_selected) "btn btn-danger element-btn" else if (is_similar) "btn btn-outline-secondary element-btn disabled" else "btn btn-outline-danger element-btn"
+                actionButton(paste0("elem_different_", i), elem, class = btn_class)
+              })
+            ),
+            textInput("elicit_right", NULL, placeholder = "What makes it different? (right pole)")
+          )
+        ),
+        fluidRow(
+          column(12, style = "text-align: center; margin-top: 8px;",
+            actionButton("add_elicited_construct", "Add Construct", class = "btn-warning"),
+            actionButton("clear_selections", "Clear", class = "btn-outline-secondary btn-sm", style = "margin-left: 8px;"),
+            actionButton("stop_elicitation", "Done with Constructs", class = "btn-outline-danger btn-sm", style = "margin-left: 8px;")
+          )
+        ),
+        tags$div(style = "margin-top: 8px; font-size: 11px; color: #666;",
+          tags$strong("Constructs added: "), textOutput("constructs_count", inline = TRUE)
+        )
+      )
+    } else {
+      # Manual mode
+      div(class = "elicit-section", style = "margin-top: 10px;",
+        div(class = "step-header",
+          h5("Step 2: Add Constructs"),
+          actionButton("info_constructs", "?", class = "btn-info info-btn"),
+          actionButton("begin_elicitation", "Switch to Guided Mode", class = "btn-outline-success btn-sm", style = "margin-left: 8px;")
+        ),
+        conditionalPanel(
+          condition = "input.info_constructs % 2 == 1",
+          div(class = "info-popup",
+            tags$strong("Constructs"), " are bipolar dimensions with two opposite poles.",
+            tags$br(),
+            "Example: friendly - unfriendly, warm - cold"
+          )
+        ),
+        fluidRow(
+          column(6,
+            textInput("construct_left", NULL, placeholder = "Left pole"),
+            textInput("construct_right", NULL, placeholder = "Right pole"),
+            actionButton("add_construct", "Add", class = "btn-warning btn-sm")
+          ),
+          column(6,
+            tags$small("Or paste list (left - right):"),
+            tags$textarea(id = "constructs_bulk", rows = 2, style = "width: 100%; font-size: 11px;", placeholder = "friendly - unfriendly"),
+            actionButton("add_constructs_bulk", "Add All", class = "btn-warning btn-sm", style = "margin-top: 2px;")
+          )
+        ),
+        tags$div(style = "margin-top: 6px; font-size: 11px; color: #666;",
+          tags$strong("Added: "), textOutput("constructs_count", inline = TRUE)
+        )
+      )
     }
   })
 
-  # Elicitation UI
-  output$elicitation_ui <- renderUI({
-    if (!rv$elicitation_active) return(NULL)
+  # Ratings section UI - only shown when constructs exist
+  output$ratings_section_ui <- renderUI({
+    if (nrow(rv$constructs) == 0) return(NULL)
 
-    triad <- rv$elicitation_triad
-    if (is.null(triad)) return(NULL)
-
-    div(class = "info-popup", style = "background: #fff3cd; border-color: #ffc107;",
-      tags$strong("Triadic Elicitation"),
-      tags$br(),
-      tags$span("Consider these 3 elements: "),
-      tags$strong(paste(triad, collapse = ", ")),
-      tags$br(),
-      tags$em("How are 2 of them similar, and different from the 3rd?"),
-      tags$br(), tags$br(),
-      fluidRow(
-        column(5, textInput("elicit_left", NULL, placeholder = "Similar (left pole)")),
-        column(5, textInput("elicit_right", NULL, placeholder = "Different (right pole)")),
-        column(2, actionButton("add_elicited_construct", "Add", class = "btn-warning btn-sm", style = "margin-top: 0;"))
+    div(class = "ratings-section",
+      div(class = "step-header",
+        h5("Step 3: Rate Each Element on Each Construct"),
+        actionButton("info_ratings", "?", class = "btn-info info-btn")
+      ),
+      conditionalPanel(
+        condition = "input.info_ratings % 2 == 1",
+        div(class = "info-popup",
+          tags$strong("Rating: "), "For each element-construct pair, rate where the element falls.",
+          tags$br(),
+          "1 = strongly LEFT pole, 4 = neutral, 7 = strongly RIGHT pole"
+        )
       ),
       fluidRow(
-        column(6, actionButton("new_triad", "New Triad", class = "btn-outline-secondary btn-sm")),
-        column(6, actionButton("stop_elicitation", "Done", class = "btn-outline-danger btn-sm"))
-      )
+        column(3, selectInput("rating_element", "Element:", choices = rv$elements)),
+        column(4, selectInput("rating_construct", "Construct:", choices = paste(rv$constructs$left, "-", rv$constructs$right))),
+        column(3, sliderInput("rating_score", "Rating:", min = 1, max = 7, value = 4, width = "100%")),
+        column(2, tags$div(style = "margin-top: 25px;", actionButton("add_rating", "Add", class = "btn-warning btn-sm")))
+      ),
+      h5("Ratings Table"),
+      DTOutput("ratings_table"),
+      actionButton("remove_rating", "Remove Selected", class = "btn-danger btn-sm")
     )
   })
 
@@ -894,7 +1010,10 @@ server <- function(input, output, session) {
   output$constructs_count <- renderText({
     n <- nrow(rv$constructs)
     if (n == 0) "None yet"
-    else paste(n, "constructs")
+    else {
+      labels <- paste(rv$constructs$left, "-", rv$constructs$right)
+      paste0(n, " (", paste(labels, collapse = "; "), ")")
+    }
   })
 
   output$ratings_table <- renderDT({
