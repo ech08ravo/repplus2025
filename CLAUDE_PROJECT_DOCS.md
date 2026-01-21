@@ -288,6 +288,7 @@ Plots defined outside `observeEvent(input$analyze, ...)` will automatically upda
 
 ## Known Issues / Future Enhancements
 
+- **Focus cluster dendrogram alignment** - The dendrograms are currently out of alignment with the main grid; needs fixing
 - Focus cluster dendrograms generate harmless `horiz` warnings (cosmetic only)
 - Consider adding: export to PDF, more clustering methods, statistical tests
 - Grid completion tracking could be more prominent

@@ -100,40 +100,51 @@ plot_focus_cluster <- function(focus_result, title = "Focus Cluster Analysis",
                               text_size = 1.0, cell_size = 1.0,
                               heat_low = "#0072B2", heat_high = "#D55E00") {
 
+  # Get dimensions for adaptive layout
+  n_elem <- nrow(focus_result$sorted_matrix)
+  n_const <- ncol(focus_result$sorted_matrix)
+
   # Set up plotting layout: dendrograms + main plot
+  # Adjust proportions based on grid size
   layout_matrix <- matrix(c(0, 1, 0,
                            2, 3, 4),
                          nrow = 2, byrow = TRUE)
 
+  # Make dendrogram heights proportional but not too small
+  dendro_height <- max(0.12, min(0.2, 0.15))
+  main_height <- 1 - dendro_height
+
+  # Side panels proportional to content
+  side_width <- max(0.12, min(0.18, 0.15))
+  main_width <- 1 - 2 * side_width
+
   layout(layout_matrix,
-         widths = c(0.2, 0.6, 0.2),
-         heights = c(0.2, 0.8))
+         widths = c(side_width, main_width, side_width),
+         heights = c(dendro_height, main_height))
 
   # Top dendrogram (constructs)
-  par(mar = c(0, 4, 2, 1), cex.main = text_size)
+  par(mar = c(0, 4, 2, 1), cex = text_size, cex.main = text_size * 1.2)
   plot(as.dendrogram(focus_result$construct_hclust),
        horiz = FALSE, leaflab = "none",
        main = title, axes = FALSE)
 
   # Left dendrogram (elements)
-  par(mar = c(4, 0, 0, 0))
+  par(mar = c(4, 0, 0, 0), cex = text_size)
   plot(as.dendrogram(focus_result$element_hclust),
        horiz = TRUE, leaflab = "none", axes = FALSE)
 
   # Main grid plot - adjust margins based on label length and text size
   sorted_matrix <- focus_result$sorted_matrix
-  n_elem <- nrow(sorted_matrix)
-  n_const <- ncol(sorted_matrix)
 
   # Calculate adaptive margins - scale with text_size
   max_elem_chars <- max(nchar(focus_result$sorted_elements))
   max_const_chars <- max(nchar(focus_result$sorted_constructs))
-  left_mar <- min(14 * text_size, max(4, max_elem_chars * 0.5 * text_size))
-  bottom_mar <- min(14 * text_size, max(4, max_const_chars * 0.3 * text_size))
+  left_mar <- min(12 * text_size, max(4, max_elem_chars * 0.4 * text_size))
+  bottom_mar <- min(10 * text_size, max(4, max_const_chars * 0.25 * text_size))
 
-  par(mar = c(bottom_mar, left_mar, 0, 1))
+  par(mar = c(bottom_mar, left_mar, 0.5, 0.5), cex = text_size)
 
-  # Create image plot with 1:1 aspect ratio
+  # Create image plot - NO asp=1 to allow proper sizing
   if (show_shading) {
     # Use greyscale by default, color if requested with palette colors
     if (use_color) {
@@ -142,12 +153,11 @@ plot_focus_cluster <- function(focus_result, title = "Focus Cluster Analysis",
       colors <- gray.colors(100, start = 0.95, end = 0.2)
     }
     image(1:n_const, 1:n_elem, t(sorted_matrix[n_elem:1, , drop = FALSE]),
-          col = colors, axes = FALSE, xlab = "Constructs", ylab = "Elements",
-          asp = 1)
+          col = colors, axes = FALSE, xlab = "", ylab = "")
   } else {
-    # Just boxes with 1:1 aspect ratio
+    # Just boxes without aspect constraint
     plot(1, type = "n", xlim = c(0.5, n_const + 0.5), ylim = c(0.5, n_elem + 0.5),
-         xlab = "Constructs", ylab = "Elements", axes = FALSE, asp = 1)
+         xlab = "", ylab = "", axes = FALSE)
 
     for (i in 1:n_elem) {
       for (j in 1:n_const) {
@@ -158,9 +168,9 @@ plot_focus_cluster <- function(focus_result, title = "Focus Cluster Analysis",
 
   # Add values if requested
   if (show_values) {
-    # Scale text size based on grid size AND cell_size parameter
+    # Scale text size based on grid size, cell_size, AND text_size parameters
     base_cex <- min(0.8, max(0.4, 15 / max(n_elem, n_const)))
-    value_cex <- base_cex * cell_size
+    value_cex <- base_cex * cell_size * text_size
 
     for (i in 1:n_elem) {
       for (j in 1:n_const) {
@@ -173,14 +183,14 @@ plot_focus_cluster <- function(focus_result, title = "Focus Cluster Analysis",
   }
 
   # Add axis labels with adaptive sizing - scale with text_size
-  # Calculate label size based on number of items
-  const_cex <- min(0.7, max(0.4, 10 / n_const)) * text_size
-  elem_cex <- min(0.7, max(0.4, 10 / n_elem)) * text_size
+  # Calculate label size based on number of items - larger minimum
+  const_cex <- min(0.9, max(0.55, 12 / n_const)) * text_size
+  elem_cex <- min(0.9, max(0.55, 12 / n_elem)) * text_size
 
   axis(1, at = 1:n_const, labels = focus_result$sorted_constructs,
-       las = 2, cex.axis = const_cex)
+       las = 2, cex.axis = const_cex, tck = -0.02)
   axis(2, at = 1:n_elem, labels = rev(focus_result$sorted_elements),
-       las = 2, cex.axis = elem_cex)
+       las = 2, cex.axis = elem_cex, tck = -0.02)
   box()
 
   # Right panel - similarity matrices or stats

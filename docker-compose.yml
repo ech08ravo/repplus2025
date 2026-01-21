@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  repplus:
+    build: .
+    container_name: repplus
+    restart: unless-stopped
+    ports:
+      - "3838:3838"
+    environment:
+      - SHINY_LOG_LEVEL=INFO

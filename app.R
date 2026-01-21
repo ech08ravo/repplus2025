@@ -15,8 +15,11 @@ ui <- fluidPage(
       body { font-size: 13px; }
       .form-group { margin-bottom: 8px; }
       .form-control { padding: 4px 8px; height: auto; font-size: 13px; }
-      .btn { padding: 4px 10px; font-size: 12px; margin: 2px 0; }
-      .btn-sm { padding: 2px 6px; font-size: 11px; }
+      .btn { padding: 4px 10px; font-size: 12px; margin: 5px 0; }
+      .btn-sm { padding: 4px 10px; font-size: 11px; }
+      .sidebar .btn, .sidebar .btn-sm { display: block; width: 100%; margin-bottom: 10px; }
+      .sidebar .shiny-input-container { margin-bottom: 10px; }
+      .sidebar .form-group { margin-bottom: 10px; }
       label { margin-bottom: 2px; font-size: 12px; }
       h4 { font-size: 16px; margin: 8px 0; }
       h5 { font-size: 14px; margin: 6px 0; }
@@ -71,6 +74,7 @@ ui <- fluidPage(
       .construct-section { display: none; }
       .construct-section.visible { display: block; }
       .next-step-buttons { text-align: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd; }
+      .sidebar hr { margin: 10px 0; }
     ')),
     tags$script(HTML('
       Shiny.addCustomMessageHandler("copyToClipboard", function(text) {
@@ -95,22 +99,41 @@ ui <- fluidPage(
         var btn = document.getElementById(id);
         if (btn) btn.click();
       });
+      Shiny.addCustomMessageHandler("scrollToElement", function(id) {
+        var el = document.getElementById(id);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      });
     '))
   ),
   titlePanel("RepGrid Elicitation"),
   sidebarLayout(
     sidebarPanel(
-      width = 3,
+      width = 2,
+      class = "sidebar",
       h4("File Operations"),
       fileInput("import_file", "Import Grid", accept = c(".rgrid", ".json")),
-      actionButton("import_grid", "Load Grid", class = "btn-sm"),
+      actionButton("import_grid", "Load Grid", class = "btn-secondary btn-sm"),
       tags$small(class = "text-muted", "Accepts .rgrid or .json files"),
-      tags$hr(),
-      actionButton("load_sample", "Load Sample Data", class = "btn-outline-secondary btn-sm"),
+      actionButton("load_sample", "Load Sample Data", class = "btn-outline-info btn-sm", style = "margin-top: 8px;"),
       tags$hr(),
       h4("Analysis"),
-      actionButton("analyze", "Analyze Grid", class = "btn-primary"),
-      checkboxInput("impute_missing", "Impute missing ratings (use 4)", value = FALSE),
+      actionButton("analyze", "Analyse Grid", class = "btn-primary"),
+      div(style = "display: inline-flex; align-items: center; margin-top: 8px;",
+        checkboxInput("impute_missing", "Impute missing", value = FALSE),
+        actionButton("info_impute", "?", class = "btn-info info-btn",
+                     style = "margin-left: -5px; margin-top: -18px; padding: 0 6px; height: 20px; line-height: 18px;")
+      ),
+      conditionalPanel(
+        condition = "input.info_impute % 2 == 1",
+        div(class = "info-popup", style = "font-size: 11px;",
+          tags$strong("Impute Missing Ratings"), tags$br(),
+          "When checked, any missing ratings will be replaced with the midpoint value (4 on a 1-7 scale) before analysis.",
+          tags$br(), tags$br(),
+          tags$em("Use this when: "), "You have incomplete ratings but want to run analysis anyway. The imputed values are neutral and won't strongly influence results."
+        )
+      ),
       tags$hr(),
       h4("Display Options"),
       p("Each visualization has its own color palette selector.", style = "font-size: 11px; color: #666;"),
@@ -121,10 +144,12 @@ ui <- fluidPage(
       tags$hr(),
       h4("Export"),
       downloadButton("download_grid", "Download Grid as CSV"),
-      downloadButton("download_rgrid", "Download Grid as .rgrid")
+      downloadButton("download_rgrid", "Download Grid as .rgrid"),
+      tags$hr(),
+      actionButton("clear_all", "Clear All Data", class = "btn-outline-danger btn-sm")
     ),
     mainPanel(
-      width = 9,
+      width = 10,
       tabsetPanel(
         tabPanel(
           "Build Grid",
@@ -770,6 +795,21 @@ server <- function(input, output, session) {
     triad_different = NULL       # Which 1 element in current triad is different
   )
 
+  # Clear all data
+  observeEvent(input$clear_all, {
+    rv$elements <- character()
+    rv$constructs <- data.frame(left = character(), right = character(), stringsAsFactors = FALSE)
+    rv$ratings <- data.frame(element = character(), construct = character(), rating = numeric(), stringsAsFactors = FALSE)
+    rv$scores_mat_last <- NULL
+    rv$repgrid_last <- NULL
+    rv$show_constructs <- FALSE
+    rv$elicitation_active <- FALSE
+    rv$manual_mode <- FALSE
+    rv$all_triads <- list()
+    rv$current_triad_idx <- 0
+    showNotification("All data cleared", type = "message")
+  })
+
   # Load sample data (elements, constructs, ratings)
   observeEvent(input$load_sample, {
     rv$elements <- c("e1", "e2", "e3")
@@ -796,14 +836,14 @@ server <- function(input, output, session) {
     updateTextInput(session, "element_name", value = "")
   })
 
-  # Load sample fruit elements with emoji icons
+  # Load sample fruit elements (plain text for compatibility)
   observeEvent(input$load_sample_elements, {
     sample_fruits <- c(
-      "\U0001F34E Apple",
-      "\U0001F34C Banana",
-      "\U0001F347 Grapes",
-      "\U0001F34A Orange",
-      "\U0001F353 Strawberry"
+      "Apple",
+      "Banana",
+      "Grapes",
+      "Orange",
+      "Strawberry"
     )
     rv$elements <- c(rv$elements, sample_fruits)
   })
@@ -1098,7 +1138,7 @@ server <- function(input, output, session) {
       total_triads <- length(rv$all_triads)
       progress_pct <- round(100 * (triad_idx - 1) / total_triads)
 
-      div(class = "elicit-section", style = "margin-top: 10px; background: #fff8e6;",
+      div(id = "constructs_section", class = "elicit-section", style = "margin-top: 10px; background: #fff8e6;",
         div(class = "step-header",
           h5("Step 2: Create Constructs (Triadic Elicitation)"),
           actionButton("info_constructs", "?", class = "btn-info info-btn")
@@ -1506,12 +1546,14 @@ server <- function(input, output, session) {
     rv$show_constructs <- TRUE
     rv$elicitation_active <- TRUE
     rv$manual_mode <- FALSE
+    session$sendCustomMessage("scrollToElement", "constructs_section")
   })
 
   observeEvent(input$add_more_constructs2, {
     rv$show_constructs <- TRUE
     rv$elicitation_active <- TRUE
     rv$manual_mode <- FALSE
+    session$sendCustomMessage("scrollToElement", "constructs_section")
   })
 
   # Save grid as JSON
@@ -1867,8 +1909,9 @@ server <- function(input, output, session) {
     colors <- get_palette_colors(input$biplot_palette)
     txt_size <- input$text_size
 
-    # Calculate expanded plot limits to accommodate labels
-    all_points <- rbind(ex, load)
+    # PrinGrid format: show both poles (left at negative end, right at positive end)
+    # Include both positive and negative endpoints for construct lines
+    all_points <- rbind(ex, load, -load)
     x_range <- range(all_points[, 1])
     y_range <- range(all_points[, 2])
     x_expand <- diff(x_range) * 0.25  # 25% padding
@@ -1882,10 +1925,25 @@ server <- function(input, output, session) {
     plot(ex, type = "n", xlab = "PC1", ylab = "PC2", xlim = xlim, ylim = ylim)
     points(ex, pch = 19, col = colors$element, cex = txt_size * 1.3)
     text(ex, labels = rv$elements, pos = 3, col = colors$element, cex = txt_size, font = 2)
-    # arrows for constructs - label with RIGHT pole only (high-scoring direction, rating=7)
-    arrows(0, 0, load[,1], load[,2], length = 0.15, col = colors$construct, lwd = 2)
-    text(load[,1], load[,2], labels = rv$constructs$right,
+
+    # PrinGrid format: draw lines through origin with both poles labeled
+    # Line extends from negative to positive direction
+    for (i in 1:nrow(load)) {
+      # Draw full line through origin
+      lines(c(-load[i, 1], load[i, 1]), c(-load[i, 2], load[i, 2]),
+            col = colors$construct, lwd = 2)
+      # Add small tick marks at the ends
+      points(load[i, 1], load[i, 2], pch = 4, col = colors$construct, cex = 0.8)
+      points(-load[i, 1], -load[i, 2], pch = 4, col = colors$construct, cex = 0.8)
+    }
+
+    # Label RIGHT pole at positive direction (high rating = 7)
+    text(load[, 1], load[, 2], labels = rv$constructs$right,
          pos = 4, col = colors$construct, cex = txt_size, font = 2)
+    # Label LEFT pole at negative direction (low rating = 1)
+    text(-load[, 1], -load[, 2], labels = rv$constructs$left,
+         pos = 2, col = colors$construct, cex = txt_size, font = 3)
+
     abline(h = 0, v = 0, lty = 3, col = "gray50")
   })
 
@@ -1938,9 +1996,9 @@ server <- function(input, output, session) {
     axis(2, at = 1:n_cons, labels = labs, las = 1, cex.axis = txt_size)
     box()
 
-    # Add axis titles - scale with text_size
-    mtext("Elements", side = 1, line = 6 * txt_size, cex = txt_size * 1.1)
-    mtext("Constructs", side = 2, line = 11 * txt_size, cex = txt_size * 1.1)
+    # Add axis titles at ends - scale with text_size
+    mtext("Elements", side = 1, line = 6 * txt_size, cex = txt_size * 1.1, adj = 1)
+    mtext("Constructs", side = 2, line = 11 * txt_size, cex = txt_size * 1.1, adj = 1)
   })
 
   output$dend_elements <- renderPlot({
@@ -2305,20 +2363,20 @@ server <- function(input, output, session) {
 
       par(mar = c(5, 4, 4, 5), cex.axis = txt_size, cex.lab = txt_size * 1.1, cex.main = txt_size * 1.2)
 
-      # Bar plot for variance explained
-      barplot(variance_explained[1:n_components],
-              names.arg = 1:n_components,
-              main = "Scree Plot - Variance Explained by Components",
-              xlab = "Principal Component",
-              ylab = "Variance Explained (%)",
-              col = bar_color,
-              border = "white",
-              ylim = c(0, max(variance_explained[1:n_components]) * 1.2))
+      # Line plot for variance explained (scree plot style)
+      plot(1:n_components, variance_explained[1:n_components],
+           type = "b", pch = 19, col = bar_color, lwd = 2, cex = 1.5,
+           main = "Scree Plot - Variance Explained by Components",
+           xlab = "Principal Component",
+           ylab = "Variance Explained (%)",
+           ylim = c(0, max(variance_explained[1:n_components]) * 1.2),
+           xaxt = "n")
+      axis(1, at = 1:n_components)
 
       # Add cumulative line on secondary axis
       par(new = TRUE)
       plot(1:n_components, cumulative_var[1:n_components],
-           type = "b", pch = 19, col = mean_color, lwd = 2,
+           type = "b", pch = 17, col = mean_color, lwd = 2, cex = 1.2,
            axes = FALSE, xlab = "", ylab = "",
            ylim = c(0, 100))
 
@@ -2328,8 +2386,8 @@ server <- function(input, output, session) {
       legend("right",
              legend = c("Individual", "Cumulative"),
              col = c(bar_color, mean_color),
-             lty = c(NA, 1), pch = c(15, 19),
-             pt.cex = c(2, 1), cex = txt_size * 0.9)
+             lty = 1, pch = c(19, 17),
+             pt.cex = c(1.5, 1.2), cex = txt_size * 0.9)
     }
   })
 
@@ -2416,18 +2474,19 @@ server <- function(input, output, session) {
 
         par(mar = c(5, 4, 4, 5))
 
-        barplot(variance_explained[1:n_components],
-                names.arg = 1:n_components,
-                main = "Scree Plot - Variance Explained by Components",
-                xlab = "Principal Component",
-                ylab = "Variance Explained (%)",
-                col = bar_color,
-                border = "white",
-                ylim = c(0, max(variance_explained[1:n_components]) * 1.2))
+        # Line plot for variance explained (scree plot style)
+        plot(1:n_components, variance_explained[1:n_components],
+             type = "b", pch = 19, col = bar_color, lwd = 2, cex = 1.5,
+             main = "Scree Plot - Variance Explained by Components",
+             xlab = "Principal Component",
+             ylab = "Variance Explained (%)",
+             ylim = c(0, max(variance_explained[1:n_components]) * 1.2),
+             xaxt = "n")
+        axis(1, at = 1:n_components)
 
         par(new = TRUE)
         plot(1:n_components, cumulative_var[1:n_components],
-             type = "b", pch = 19, col = "red", lwd = 2,
+             type = "b", pch = 17, col = "red", lwd = 2, cex = 1.2,
              axes = FALSE, xlab = "", ylab = "",
              ylim = c(0, 100))
 
@@ -2437,8 +2496,8 @@ server <- function(input, output, session) {
         legend("right",
                legend = c("Individual", "Cumulative"),
                col = c(bar_color, "red"),
-               lty = c(NA, 1), pch = c(15, 19),
-               pt.cex = c(2, 1))
+               lty = 1, pch = c(19, 17),
+               pt.cex = c(1.5, 1.2))
       }
 
       dev.off()
@@ -2470,15 +2529,20 @@ server <- function(input, output, session) {
 
     # Get colors from focus-specific palette
     colors <- get_palette_colors(input$focus_palette)
+
+    # Explicitly capture reactive inputs to ensure dependency tracking
     txt_size <- input$text_size
     cell_size <- input$grid_cell_size
+    show_vals <- input$focus_show_values
+    show_shade <- input$focus_show_shading
+    use_col <- input$focus_use_color
 
     plot_focus_cluster(
       focus_result = result,
       title = "Focus Cluster Analysis",
-      show_values = input$focus_show_values,
-      show_shading = input$focus_show_shading,
-      use_color = input$focus_use_color,
+      show_values = show_vals,
+      show_shading = show_shade,
+      use_color = use_col,
       text_size = txt_size,
       cell_size = cell_size,
       heat_low = colors$heat_low,

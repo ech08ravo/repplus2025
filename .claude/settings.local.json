@@ -3,7 +3,10 @@
     "allow": [
       "Bash(Rscript:*)",
       "Bash(R -e:*)",
-      "Bash(~/.Renviron)"
+      "Bash(~/.Renviron)",
+      "Bash(scp:*)",
+      "Bash(ssh -i ~/.ssh/dreamcompute_rsa ubuntu@208.113.135.63 \"sudo ss -tlnp | grep 3838\")",
+      "Bash(host:*)"
     ],
     "deny": [],
     "ask": []
