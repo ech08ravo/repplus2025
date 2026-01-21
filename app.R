@@ -3,10 +3,12 @@ library(OpenRepGrid)
 library(DT)
 library(uuid)
 library(jsonlite)
+library(igraph)
 
 # Source the focus analysis functions
 source("R/focus_analysis.r")
 source("R/claude_api.R")
+source("R/multigrid_analysis.r")
 
 ui <- fluidPage(
   tags$head(
@@ -146,6 +148,13 @@ ui <- fluidPage(
       h4("Export"),
       downloadButton("download_grid", "Download Grid as CSV"),
       downloadButton("download_rgrid", "Download Grid as .rgrid"),
+      tags$hr(),
+      h4("Multi-Grid"),
+      fileInput("import_multi_grid", "Add Grid(s)",
+                accept = c(".rgrid", ".json"), multiple = TRUE),
+      actionButton("add_current_grid", "Add Current Grid",
+                   class = "btn-outline-success btn-sm"),
+      uiOutput("grid_collection_summary"),
       tags$hr(),
       actionButton("clear_all", "Clear All Data", class = "btn-outline-danger btn-sm")
     ),
@@ -717,6 +726,190 @@ ui <- fluidPage(
                      uiOutput("stats_response")
                    )
                  )
+        ),
+
+        # ===== MULTI-GRID TABS =====
+        tabPanel("Grid Collection",
+                 h4("Manage Grid Collection"),
+                 p("Upload multiple grids to compare and analyze relationships between them."),
+                 fluidRow(
+                   column(6,
+                          h5("Loaded Grids"),
+                          DTOutput("grid_collection_table"),
+                          div(style = "margin-top: 10px;",
+                            actionButton("select_all_grids", "Select All", class = "btn-outline-primary btn-sm"),
+                            actionButton("deselect_all_grids", "Deselect All", class = "btn-outline-secondary btn-sm"),
+                            actionButton("remove_selected_grids", "Remove Selected", class = "btn-outline-danger btn-sm")
+                          )
+                   ),
+                   column(6,
+                          h5("Common Structure"),
+                          uiOutput("common_structure_info"),
+                          tags$hr(),
+                          h5("Grid Preview"),
+                          selectInput("preview_grid_select", "Select Grid to Preview:", choices = NULL),
+                          verbatimTextOutput("grid_preview")
+                   )
+                 ),
+                 tags$hr(),
+                 actionButton("help_collection", "Help me understand this", class = "btn-info help-btn"),
+                 conditionalPanel(
+                   condition = "input.help_collection % 2 == 1",
+                   div(class = "help-content",
+                     h5("Grid Collection"),
+                     p("This tab allows you to manage multiple repertory grids for comparative analysis."),
+                     tags$ul(
+                       tags$li(tags$strong("Add grids"), " using the sidebar: upload .rgrid/.json files or add your current grid"),
+                       tags$li(tags$strong("Select grids"), " by clicking rows in the table to include them in analysis"),
+                       tags$li(tags$strong("Common elements"), " are detected automatically - these are used for comparison")
+                     ),
+                     h5("Requirements for multi-grid analysis"),
+                     tags$ul(
+                       tags$li("At least 2 grids selected"),
+                       tags$li("At least 2 common elements across selected grids")
+                     )
+                   )
+                 )
+        ),
+
+        tabPanel("Socionets",
+                 h4("Socionets Analysis"),
+                 p("Network visualization showing relationships between grids based on construct matching."),
+                 fluidRow(
+                   column(3,
+                          sliderInput("socionet_cutoff", "Match Cutoff (%)",
+                                      min = 0, max = 100, value = 70, step = 5),
+                          checkboxInput("socionet_symmetric", "Symmetric Matching", value = FALSE),
+                          checkboxInput("socionet_show_weights", "Show Match Percentages", value = TRUE),
+                          actionButton("compute_socionets", "Compute Matches", class = "btn-primary"),
+                          tags$hr(),
+                          downloadButton("download_match_matrix", "Download Match Matrix (CSV)"),
+                          downloadButton("download_socionets_plot", "Download Plot")
+                   ),
+                   column(9,
+                          plotOutput("socionet_plot", height = "500px")
+                   )
+                 ),
+                 tags$hr(),
+                 h5("Match Matrix"),
+                 DTOutput("match_matrix_table"),
+                 tags$hr(),
+                 actionButton("help_socionets", "Help me understand this visualisation", class = "btn-info help-btn"),
+                 conditionalPanel(
+                   condition = "input.help_socionets % 2 == 1",
+                   div(class = "help-content",
+                     h5("Socionets Analysis"),
+                     p("Socionets (Shaw, 1980) shows how similar different grids are based on construct matching."),
+                     tags$ul(
+                       tags$li(tags$strong("Nodes"), " represent individual grids (participants)"),
+                       tags$li(tags$strong("Edges"), " show match percentages - how well one person could understand another's constructs"),
+                       tags$li(tags$strong("Arrow direction"), " indicates asymmetric matching: A->B means A's constructs match B's ratings"),
+                       tags$li(tags$strong("Edge thickness"), " indicates strength of match")
+                     ),
+                     h5("Parameters"),
+                     tags$ul(
+                       tags$li(tags$strong("Match Cutoff"), " - only show connections above this similarity threshold"),
+                       tags$li(tags$strong("Symmetric Matching"), " - average bidirectional matches (A->B and B->A)")
+                     ),
+                     h5("Interpretation"),
+                     tags$ul(
+                       tags$li("High match % = similar way of construing the elements"),
+                       tags$li("Clusters of connected grids = groups with shared understanding"),
+                       tags$li("Isolated nodes = outliers with different perspective")
+                     )
+                   )
+                 )
+        ),
+
+        tabPanel("Mode Grid",
+                 h4("Mode (Consensus) Grid"),
+                 p("Generate a consensus grid representing commonality across multiple participants."),
+                 fluidRow(
+                   column(4,
+                          selectInput("mode_method", "Consensus Method:",
+                                      choices = c("Average" = "average", "Median" = "median")),
+                          selectInput("mode_construct_handling", "Construct Handling:",
+                                      choices = c("Fold Identical" = "fold", "Collect All" = "collect")),
+                          actionButton("generate_mode_grid", "Generate Mode Grid", class = "btn-primary"),
+                          tags$hr(),
+                          actionButton("use_mode_as_current", "Use as Current Grid", class = "btn-success btn-sm"),
+                          downloadButton("download_mode_grid", "Download Mode Grid (.rgrid)")
+                   ),
+                   column(8,
+                          h5("Mode Grid Preview"),
+                          verbatimTextOutput("mode_grid_summary"),
+                          plotOutput("mode_grid_heatmap", height = "400px")
+                   )
+                 ),
+                 tags$hr(),
+                 actionButton("help_mode", "Help me understand this", class = "btn-info help-btn"),
+                 conditionalPanel(
+                   condition = "input.help_mode % 2 == 1",
+                   div(class = "help-content",
+                     h5("Mode Grid"),
+                     p("A Mode Grid represents the consensus or 'typical' grid from a group of participants."),
+                     h5("Consensus Method"),
+                     tags$ul(
+                       tags$li(tags$strong("Average"), " - mean of ratings across all grids"),
+                       tags$li(tags$strong("Median"), " - middle value, more robust to outliers")
+                     ),
+                     h5("Construct Handling"),
+                     tags$ul(
+                       tags$li(tags$strong("Fold Identical"), " - combine constructs with same labels, average their ratings"),
+                       tags$li(tags$strong("Collect All"), " - include all constructs from all grids (labeled by source)")
+                     ),
+                     h5("Use cases"),
+                     tags$ul(
+                       tags$li("Identifying shared understanding in a team"),
+                       tags$li("Creating a baseline for comparison"),
+                       tags$li("Reducing multiple perspectives to a single representation")
+                     )
+                   )
+                 )
+        ),
+
+        tabPanel("Composite Grid",
+                 h4("Composite Grid"),
+                 p("Merge multiple grids into a single combined grid for unified analysis."),
+                 fluidRow(
+                   column(4,
+                          radioButtons("composite_merge_on", "Merge Strategy:",
+                                       choices = c("Common Elements + All Constructs" = "elements",
+                                                  "Common Constructs + All Elements" = "constructs")),
+                          checkboxInput("composite_label_source", "Label Items by Source Grid", value = TRUE),
+                          actionButton("generate_composite_grid", "Generate Composite Grid", class = "btn-primary"),
+                          tags$hr(),
+                          actionButton("use_composite_as_current", "Use as Current Grid", class = "btn-success btn-sm"),
+                          downloadButton("download_composite_grid", "Download Composite Grid (.rgrid)")
+                   ),
+                   column(8,
+                          h5("Composite Grid Preview"),
+                          verbatimTextOutput("composite_grid_summary"),
+                          DTOutput("composite_grid_table")
+                   )
+                 ),
+                 tags$hr(),
+                 actionButton("help_composite", "Help me understand this", class = "btn-info help-btn"),
+                 conditionalPanel(
+                   condition = "input.help_composite % 2 == 1",
+                   div(class = "help-content",
+                     h5("Composite Grid"),
+                     p("A Composite Grid merges data from multiple grids into one for unified analysis."),
+                     h5("Merge Strategies"),
+                     tags$ul(
+                       tags$li(tags$strong("Common Elements + All Constructs"), " - Use shared elements as rows, include all constructs from all grids as columns. Good for comparing how different people construe the same elements."),
+                       tags$li(tags$strong("Common Constructs + All Elements"), " - Use shared constructs as columns, include all elements from all grids as rows. Good for comparing how the same dimensions apply to different elements.")
+                     ),
+                     h5("Source Labeling"),
+                     p("When enabled, constructs/elements are labeled with their source grid name (e.g., 'friendly [Grid1]') to track origin."),
+                     h5("Use cases"),
+                     tags$ul(
+                       tags$li("PrinGrid trajectories showing change over time"),
+                       tags$li("Comparing perspectives on shared elements"),
+                       tags$li("Focus analysis across multiple participants")
+                     )
+                   )
+                 )
         )
       )
     )
@@ -793,7 +986,29 @@ server <- function(input, output, session) {
     all_triads = list(),        # List of all unique triads (each is vector of 3 element names)
     current_triad_idx = 0,      # Current triad index (1-based)
     triad_similar = character(), # Which 2 elements in current triad are similar
-    triad_different = NULL       # Which 1 element in current triad is different
+    triad_different = NULL,      # Which 1 element in current triad is different
+
+    # Multi-grid storage
+    grid_collection = list(),    # Named list of grid objects
+    grid_metadata = data.frame(  # Metadata for each grid
+      grid_id = character(),
+      name = character(),
+      n_elements = integer(),
+      n_constructs = integer(),
+      scale_min = integer(),
+      scale_max = integer(),
+      imported_at = as.POSIXct(character()),
+      stringsAsFactors = FALSE
+    ),
+    selected_grids = character(),    # Vector of selected grid_ids for analysis
+    common_elements = character(),   # Elements shared across selected grids
+    common_constructs = character(), # Constructs shared (by label match)
+
+    # Multi-grid analysis results
+    match_matrix = NULL,             # Grid-to-grid match percentages
+    socionet_data = NULL,            # Network data for visualization
+    mode_grid = NULL,                # Generated Mode (consensus) grid
+    composite_grid = NULL            # Generated Composite grid
   )
 
   # Clear all data
@@ -3054,6 +3269,557 @@ server <- function(input, output, session) {
     context <- generate_claude_context("Statistics", question, generate_grid_summary(), extra)
     session$sendCustomMessage("copyToClipboard", context)
   })
+
+  # ===== MULTI-GRID SERVER LOGIC =====
+
+  # Helper function to parse grid file (reused from import_grid observer)
+  parse_grid_file <- function(file_path, file_name) {
+    ext <- tolower(tools::file_ext(file_name))
+    grid_data <- list(
+      name = tools::file_path_sans_ext(file_name),
+      elements = character(),
+      constructs = data.frame(left = character(), right = character(), stringsAsFactors = FALSE),
+      ratings = data.frame(element = character(), construct = character(), rating = numeric(), stringsAsFactors = FALSE),
+      scores_mat = NULL,
+      scale = c(1, 7)
+    )
+
+    if (ext == "json") {
+      json_data <- tryCatch(fromJSON(file_path), error = function(e) NULL)
+      if (is.null(json_data)) stop("Failed to parse JSON file")
+
+      grid_data$elements <- json_data$elements
+      if (is.list(json_data$constructs) && !is.data.frame(json_data$constructs)) {
+        grid_data$constructs <- data.frame(
+          left = sapply(json_data$constructs, function(x) x$left),
+          right = sapply(json_data$constructs, function(x) x$right),
+          stringsAsFactors = FALSE
+        )
+      } else {
+        grid_data$constructs <- as.data.frame(json_data$constructs)
+      }
+      if (!is.null(json_data$ratings)) {
+        grid_data$ratings <- as.data.frame(json_data$ratings)
+      }
+      if (!is.null(json_data$name)) grid_data$name <- json_data$name
+
+    } else if (ext == "rgrid") {
+      lines <- readLines(file_path, warn = FALSE)
+
+      # Parse constructs
+      construct_lines <- grep("^C\\d+\t", lines, value = TRUE)
+      for (cl in construct_lines) {
+        parts <- strsplit(cl, "\t")[[1]]
+        if (length(parts) >= 3) {
+          grid_data$constructs <- rbind(grid_data$constructs, data.frame(
+            left = parts[2], right = parts[3], stringsAsFactors = FALSE
+          ))
+        }
+      }
+
+      # Parse elements and ratings
+      element_lines <- grep("^E\\d+\t", lines, value = TRUE)
+      n_c <- nrow(grid_data$constructs)
+      scores_list <- list()
+
+      for (el in element_lines) {
+        parts <- strsplit(el, "\t")[[1]]
+        if (length(parts) >= 2) {
+          elem_name <- parts[2]
+          grid_data$elements <- c(grid_data$elements, elem_name)
+          if (length(parts) >= 2 + n_c) {
+            scores <- as.numeric(parts[3:(2 + n_c)])
+            scores_list[[elem_name]] <- scores
+          }
+        }
+      }
+
+      # Build scores matrix
+      if (length(scores_list) > 0) {
+        grid_data$scores_mat <- do.call(rbind, scores_list)
+        rownames(grid_data$scores_mat) <- grid_data$elements
+
+        # Convert to ratings data frame
+        construct_labels <- paste(grid_data$constructs$left, "-", grid_data$constructs$right)
+        for (i in seq_along(grid_data$elements)) {
+          for (j in seq_along(construct_labels)) {
+            grid_data$ratings <- rbind(grid_data$ratings, data.frame(
+              element = grid_data$elements[i],
+              construct = construct_labels[j],
+              rating = grid_data$scores_mat[i, j],
+              stringsAsFactors = FALSE
+            ))
+          }
+        }
+      }
+
+      # Try to detect scale from ratings
+      all_ratings <- grid_data$scores_mat[!is.na(grid_data$scores_mat)]
+      if (length(all_ratings) > 0) {
+        grid_data$scale <- c(min(all_ratings), max(all_ratings))
+      }
+    }
+
+    # Build scores_mat if not already done
+    if (is.null(grid_data$scores_mat) && nrow(grid_data$ratings) > 0) {
+      n_e <- length(grid_data$elements)
+      n_c <- nrow(grid_data$constructs)
+      construct_labels <- paste(grid_data$constructs$left, "-", grid_data$constructs$right)
+      grid_data$scores_mat <- matrix(NA_real_, nrow = n_e, ncol = n_c)
+      rownames(grid_data$scores_mat) <- grid_data$elements
+      colnames(grid_data$scores_mat) <- construct_labels
+
+      for (i in seq_len(n_e)) {
+        for (j in seq_len(n_c)) {
+          idx <- which(grid_data$ratings$element == grid_data$elements[i] &
+                       grid_data$ratings$construct == construct_labels[j])
+          if (length(idx) > 0) {
+            grid_data$scores_mat[i, j] <- grid_data$ratings$rating[idx[1]]
+          }
+        }
+      }
+    }
+
+    grid_data
+  }
+
+  # Add grids from file upload
+  observeEvent(input$import_multi_grid, {
+    req(input$import_multi_grid)
+
+    for (i in seq_len(nrow(input$import_multi_grid))) {
+      file_path <- input$import_multi_grid$datapath[i]
+      file_name <- input$import_multi_grid$name[i]
+
+      tryCatch({
+        grid_data <- parse_grid_file(file_path, file_name)
+        grid_id <- uuid::UUIDgenerate()
+        grid_data$id <- grid_id
+        grid_data$source <- "imported"
+
+        # Add to collection
+        rv$grid_collection[[grid_id]] <- grid_data
+
+        # Update metadata
+        rv$grid_metadata <- rbind(rv$grid_metadata, data.frame(
+          grid_id = grid_id,
+          name = grid_data$name,
+          n_elements = length(grid_data$elements),
+          n_constructs = nrow(grid_data$constructs),
+          scale_min = grid_data$scale[1],
+          scale_max = grid_data$scale[2],
+          imported_at = Sys.time(),
+          stringsAsFactors = FALSE
+        ))
+
+        showNotification(paste("Added:", grid_data$name), type = "message")
+      }, error = function(e) {
+        showNotification(paste("Error loading", file_name, ":", e$message), type = "error")
+      })
+    }
+  })
+
+  # Add current grid to collection
+  observeEvent(input$add_current_grid, {
+    req(length(rv$elements) >= 2, nrow(rv$constructs) >= 2)
+
+    if (is.null(rv$scores_mat_last)) {
+      showNotification("Please run 'Analyse Grid' first before adding to collection", type = "warning")
+      return()
+    }
+
+    grid_id <- uuid::UUIDgenerate()
+    grid_name <- paste("Current Grid", format(Sys.time(), "%H:%M"))
+
+    grid_data <- list(
+      id = grid_id,
+      name = grid_name,
+      elements = rv$elements,
+      constructs = rv$constructs,
+      ratings = rv$ratings,
+      scores_mat = rv$scores_mat_last,
+      scale = c(1, 7),
+      source = "current"
+    )
+
+    rv$grid_collection[[grid_id]] <- grid_data
+
+    rv$grid_metadata <- rbind(rv$grid_metadata, data.frame(
+      grid_id = grid_id,
+      name = grid_name,
+      n_elements = length(rv$elements),
+      n_constructs = nrow(rv$constructs),
+      scale_min = 1,
+      scale_max = 7,
+      imported_at = Sys.time(),
+      stringsAsFactors = FALSE
+    ))
+
+    showNotification(paste("Added current grid as:", grid_name), type = "message")
+  })
+
+  # Grid collection summary in sidebar
+  output$grid_collection_summary <- renderUI({
+    n_grids <- nrow(rv$grid_metadata)
+    if (n_grids == 0) {
+      tags$small(class = "text-muted", "No grids in collection")
+    } else {
+      tags$small(class = "text-muted", paste(n_grids, "grid(s) in collection"))
+    }
+  })
+
+  # Grid collection table
+  output$grid_collection_table <- renderDT({
+    req(nrow(rv$grid_metadata) > 0)
+    df <- rv$grid_metadata[, c("name", "n_elements", "n_constructs")]
+    colnames(df) <- c("Name", "Elements", "Constructs")
+    datatable(df, selection = "multiple", options = list(pageLength = 10, dom = "t"))
+  })
+
+  # Track selected grids from table
+  observe({
+    selected_rows <- input$grid_collection_table_rows_selected
+    if (length(selected_rows) > 0) {
+      rv$selected_grids <- rv$grid_metadata$grid_id[selected_rows]
+    } else {
+      rv$selected_grids <- character()
+    }
+  })
+
+  # Select/deselect all grids
+  observeEvent(input$select_all_grids, {
+    proxy <- dataTableProxy("grid_collection_table")
+    selectRows(proxy, seq_len(nrow(rv$grid_metadata)))
+  })
+
+  observeEvent(input$deselect_all_grids, {
+    proxy <- dataTableProxy("grid_collection_table")
+    selectRows(proxy, NULL)
+  })
+
+  # Remove selected grids
+  observeEvent(input$remove_selected_grids, {
+    req(length(rv$selected_grids) > 0)
+    for (gid in rv$selected_grids) {
+      rv$grid_collection[[gid]] <- NULL
+    }
+    rv$grid_metadata <- rv$grid_metadata[!rv$grid_metadata$grid_id %in% rv$selected_grids, ]
+    rv$selected_grids <- character()
+    rv$match_matrix <- NULL
+    rv$socionet_data <- NULL
+    showNotification("Selected grids removed", type = "message")
+  })
+
+  # Update common elements/constructs when selection changes
+  observe({
+    if (length(rv$selected_grids) >= 2) {
+      selected <- rv$grid_collection[rv$selected_grids]
+      rv$common_elements <- Reduce(intersect, lapply(selected, function(g) g$elements))
+
+      all_labels <- lapply(selected, function(g) {
+        paste(g$constructs$left, "-", g$constructs$right)
+      })
+      rv$common_constructs <- Reduce(intersect, all_labels)
+    } else {
+      rv$common_elements <- character()
+      rv$common_constructs <- character()
+    }
+  })
+
+  # Common structure info display
+  output$common_structure_info <- renderUI({
+    n_selected <- length(rv$selected_grids)
+    n_common_elem <- length(rv$common_elements)
+    n_common_const <- length(rv$common_constructs)
+
+    if (n_selected < 2) {
+      div(class = "info-popup", style = "background: #fff3cd;",
+        tags$strong("Select at least 2 grids"), tags$br(),
+        "Click rows in the grid table to select grids for analysis."
+      )
+    } else {
+      div(class = "info-popup",
+        tags$strong(n_selected, " grids selected"), tags$br(),
+        tags$strong("Common elements: "), n_common_elem,
+        if (n_common_elem > 0) paste0(" (", paste(head(rv$common_elements, 3), collapse = ", "),
+                                      if (n_common_elem > 3) "..." else "", ")") else "",
+        tags$br(),
+        tags$strong("Common constructs: "), n_common_const
+      )
+    }
+  })
+
+  # Grid preview dropdown choices
+  observe({
+    choices <- setNames(rv$grid_metadata$grid_id, rv$grid_metadata$name)
+    updateSelectInput(session, "preview_grid_select", choices = choices)
+  })
+
+  # Grid preview output
+  output$grid_preview <- renderPrint({
+    req(input$preview_grid_select)
+    req(input$preview_grid_select %in% names(rv$grid_collection))
+    g <- rv$grid_collection[[input$preview_grid_select]]
+
+    cat("Grid:", g$name, "\n")
+    cat("Elements (", length(g$elements), "):", paste(g$elements, collapse = ", "), "\n\n")
+    cat("Constructs (", nrow(g$constructs), "):\n")
+    for (i in seq_len(min(5, nrow(g$constructs)))) {
+      cat("  ", g$constructs$left[i], " - ", g$constructs$right[i], "\n")
+    }
+    if (nrow(g$constructs) > 5) cat("  ...\n")
+    cat("\nScale:", g$scale[1], "-", g$scale[2], "\n")
+  })
+
+  # ===== SOCIONETS ANALYSIS =====
+
+  observeEvent(input$compute_socionets, {
+    req(length(rv$selected_grids) >= 2)
+    req(length(rv$common_elements) >= 1)
+
+    selected_grids <- rv$grid_collection[rv$selected_grids]
+    names(selected_grids) <- sapply(selected_grids, function(g) g$name)
+
+    # Compute match matrix
+    rv$match_matrix <- compute_match_matrix(
+      selected_grids,
+      rv$common_elements,
+      power = 1.0
+    )
+
+    # Prepare network data
+    rv$socionet_data <- prepare_socionet_data(
+      rv$match_matrix,
+      cutoff = input$socionet_cutoff,
+      symmetric = input$socionet_symmetric
+    )
+
+    showNotification("Socionets analysis complete", type = "message")
+  })
+
+  # Update network when cutoff changes (no recomputation)
+  observe({
+    req(rv$match_matrix)
+    rv$socionet_data <- prepare_socionet_data(
+      rv$match_matrix,
+      cutoff = input$socionet_cutoff,
+      symmetric = input$socionet_symmetric
+    )
+  })
+
+  # Socionets plot
+  output$socionet_plot <- renderPlot({
+    req(rv$socionet_data)
+    plot_socionets(
+      rv$socionet_data,
+      title = "Socionets: Grid Relationships",
+      show_weights = input$socionet_show_weights
+    )
+  })
+
+  # Match matrix table
+  output$match_matrix_table <- renderDT({
+    req(rv$match_matrix)
+    df <- as.data.frame(round(rv$match_matrix, 1))
+    datatable(df, options = list(pageLength = 20, dom = "t", scrollX = TRUE))
+  })
+
+  # Download match matrix
+  output$download_match_matrix <- downloadHandler(
+    filename = function() paste0("match-matrix-", Sys.Date(), ".csv"),
+    content = function(file) {
+      req(rv$match_matrix)
+      write.csv(rv$match_matrix, file)
+    }
+  )
+
+  # Download socionets plot
+  output$download_socionets_plot <- downloadHandler(
+    filename = function() paste0("socionets-", Sys.Date(), ".png"),
+    content = function(file) {
+      req(rv$socionet_data)
+      png(file, width = 800, height = 600)
+      plot_socionets(
+        rv$socionet_data,
+        title = "Socionets: Grid Relationships",
+        show_weights = input$socionet_show_weights
+      )
+      dev.off()
+    }
+  )
+
+  # ===== MODE GRID GENERATION =====
+
+  observeEvent(input$generate_mode_grid, {
+    req(length(rv$selected_grids) >= 2)
+    req(length(rv$common_elements) >= 2)
+
+    selected_grids <- rv$grid_collection[rv$selected_grids]
+    names(selected_grids) <- sapply(selected_grids, function(g) g$name)
+
+    tryCatch({
+      rv$mode_grid <- generate_mode_grid(
+        selected_grids,
+        common_elements = rv$common_elements,
+        method = input$mode_method,
+        construct_handling = input$mode_construct_handling
+      )
+      showNotification("Mode grid generated", type = "message")
+    }, error = function(e) {
+      showNotification(paste("Error generating mode grid:", e$message), type = "error")
+    })
+  })
+
+  # Mode grid summary
+  output$mode_grid_summary <- renderPrint({
+    req(rv$mode_grid)
+    g <- rv$mode_grid
+    cat("Mode Grid:", g$name, "\n")
+    cat("Source grids:", paste(g$source_grids, collapse = ", "), "\n\n")
+    cat("Elements (", length(g$elements), "):", paste(g$elements, collapse = ", "), "\n")
+    cat("Constructs:", nrow(g$constructs), "\n")
+  })
+
+  # Mode grid heatmap
+  output$mode_grid_heatmap <- renderPlot({
+    req(rv$mode_grid)
+    g <- rv$mode_grid
+
+    par(mar = c(8, 10, 4, 2))
+    image(1:ncol(g$scores_mat), 1:nrow(g$scores_mat),
+          t(g$scores_mat[nrow(g$scores_mat):1, , drop = FALSE]),
+          col = colorRampPalette(c("#0072B2", "#FFFFFF", "#D55E00"))(100),
+          axes = FALSE, xlab = "", ylab = "",
+          main = "Mode Grid Ratings")
+
+    construct_labels <- paste(g$constructs$left, "-", g$constructs$right)
+    axis(1, at = 1:ncol(g$scores_mat), labels = construct_labels, las = 2, cex.axis = 0.7)
+    axis(2, at = 1:nrow(g$scores_mat), labels = rev(g$elements), las = 2, cex.axis = 0.8)
+    box()
+  })
+
+  # Use mode grid as current
+  observeEvent(input$use_mode_as_current, {
+    req(rv$mode_grid)
+    g <- rv$mode_grid
+
+    rv$elements <- g$elements
+    rv$constructs <- g$constructs[, c("left", "right")]
+    rv$ratings <- g$ratings
+    rv$scores_mat_last <- g$scores_mat
+    rv$repgrid_last <- NULL
+
+    showNotification("Mode grid loaded as current grid", type = "message")
+  })
+
+  # Download mode grid
+  output$download_mode_grid <- downloadHandler(
+    filename = function() paste0("mode-grid-", Sys.Date(), ".rgrid"),
+    content = function(file) {
+      req(rv$mode_grid)
+      g <- rv$mode_grid
+
+      lines <- character()
+      # Write constructs
+      for (i in seq_len(nrow(g$constructs))) {
+        lines <- c(lines, paste0("C", i - 1, "\t", g$constructs$left[i], "\t", g$constructs$right[i]))
+      }
+      # Write elements with ratings
+      for (i in seq_along(g$elements)) {
+        scores_str <- paste(round(g$scores_mat[i, ], 1), collapse = "\t")
+        lines <- c(lines, paste0("E", i - 1, "\t", g$elements[i], "\t", scores_str))
+      }
+      # Write metadata
+      lines <- c(lines, paste0("_UID\t", g$id))
+      lines <- c(lines, paste0("_Date\t", format(Sys.time(), "%Y-%m-%d")))
+      lines <- c(lines, paste0("_Time\t", format(Sys.time(), "%H:%M:%S")))
+
+      writeLines(lines, file)
+    }
+  )
+
+  # ===== COMPOSITE GRID GENERATION =====
+
+  observeEvent(input$generate_composite_grid, {
+    req(length(rv$selected_grids) >= 2)
+
+    selected_grids <- rv$grid_collection[rv$selected_grids]
+    names(selected_grids) <- sapply(selected_grids, function(g) g$name)
+
+    tryCatch({
+      rv$composite_grid <- generate_composite_grid(
+        selected_grids,
+        merge_on = input$composite_merge_on,
+        label_source = input$composite_label_source
+      )
+      showNotification("Composite grid generated", type = "message")
+    }, error = function(e) {
+      showNotification(paste("Error generating composite grid:", e$message), type = "error")
+    })
+  })
+
+  # Composite grid summary
+  output$composite_grid_summary <- renderPrint({
+    req(rv$composite_grid)
+    g <- rv$composite_grid
+    cat("Composite Grid:", g$name, "\n")
+    cat("Source grids:", paste(g$source_grids, collapse = ", "), "\n\n")
+    cat("Elements:", length(g$elements), "\n")
+    cat("Constructs:", nrow(g$constructs), "\n")
+  })
+
+  # Composite grid table
+  output$composite_grid_table <- renderDT({
+    req(rv$composite_grid)
+    g <- rv$composite_grid
+
+    df <- as.data.frame(round(g$scores_mat, 1))
+    construct_labels <- paste(g$constructs$left, "-", g$constructs$right)
+    colnames(df) <- construct_labels
+    df <- cbind(Element = g$elements, df)
+
+    datatable(df, options = list(pageLength = 20, scrollX = TRUE, dom = "t"))
+  })
+
+  # Use composite grid as current
+  observeEvent(input$use_composite_as_current, {
+    req(rv$composite_grid)
+    g <- rv$composite_grid
+
+    rv$elements <- g$elements
+    rv$constructs <- g$constructs[, c("left", "right")]
+    rv$ratings <- g$ratings
+    rv$scores_mat_last <- g$scores_mat
+    rv$repgrid_last <- NULL
+
+    showNotification("Composite grid loaded as current grid", type = "message")
+  })
+
+  # Download composite grid
+  output$download_composite_grid <- downloadHandler(
+    filename = function() paste0("composite-grid-", Sys.Date(), ".rgrid"),
+    content = function(file) {
+      req(rv$composite_grid)
+      g <- rv$composite_grid
+
+      lines <- character()
+      # Write constructs
+      for (i in seq_len(nrow(g$constructs))) {
+        lines <- c(lines, paste0("C", i - 1, "\t", g$constructs$left[i], "\t", g$constructs$right[i]))
+      }
+      # Write elements with ratings
+      for (i in seq_along(g$elements)) {
+        scores_str <- paste(round(g$scores_mat[i, ], 1), collapse = "\t")
+        lines <- c(lines, paste0("E", i - 1, "\t", g$elements[i], "\t", scores_str))
+      }
+      # Write metadata
+      lines <- c(lines, paste0("_UID\t", g$id))
+      lines <- c(lines, paste0("_Date\t", format(Sys.time(), "%Y-%m-%d")))
+      lines <- c(lines, paste0("_Time\t", format(Sys.time(), "%H:%M:%S")))
+
+      writeLines(lines, file)
+    }
+  )
 }
 
 shinyApp(ui, server)
