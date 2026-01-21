@@ -103,45 +103,43 @@ plot_focus_cluster <- function(focus_result, title = "Focus Cluster Analysis",
   # Get dimensions for adaptive layout
   n_elem <- nrow(focus_result$sorted_matrix)
   n_const <- ncol(focus_result$sorted_matrix)
+  sorted_matrix <- focus_result$sorted_matrix
+
+  # Calculate adaptive margins FIRST so dendrograms can use them
+  max_elem_chars <- max(nchar(focus_result$sorted_elements))
+  max_const_chars <- max(nchar(focus_result$sorted_constructs))
+  left_mar <- min(12 * text_size, max(4, max_elem_chars * 0.4 * text_size))
+  bottom_mar <- min(10 * text_size, max(4, max_const_chars * 0.25 * text_size))
 
   # Set up plotting layout: dendrograms + main plot
-  # Adjust proportions based on grid size
   layout_matrix <- matrix(c(0, 1, 0,
                            2, 3, 4),
                          nrow = 2, byrow = TRUE)
 
   # Make dendrogram heights proportional but not too small
-  dendro_height <- max(0.12, min(0.2, 0.15))
+  dendro_height <- max(0.15, min(0.22, 0.18))
   main_height <- 1 - dendro_height
 
   # Side panels proportional to content
-  side_width <- max(0.12, min(0.18, 0.15))
+  side_width <- max(0.14, min(0.20, 0.17))
   main_width <- 1 - 2 * side_width
 
   layout(layout_matrix,
          widths = c(side_width, main_width, side_width),
          heights = c(dendro_height, main_height))
 
-  # Top dendrogram (constructs)
-  par(mar = c(0, 4, 2, 1), cex = text_size, cex.main = text_size * 1.2)
+  # Top dendrogram (constructs) - left margin matches main grid
+  par(mar = c(0, left_mar, 2, 0.5), cex = text_size, cex.main = text_size * 1.2)
   plot(as.dendrogram(focus_result$construct_hclust),
        horiz = FALSE, leaflab = "none",
        main = title, axes = FALSE)
 
-  # Left dendrogram (elements)
-  par(mar = c(4, 0, 0, 0), cex = text_size)
+  # Left dendrogram (elements) - bottom margin matches main grid
+  par(mar = c(bottom_mar, 0, 0.5, 0), cex = text_size)
   plot(as.dendrogram(focus_result$element_hclust),
        horiz = TRUE, leaflab = "none", axes = FALSE)
 
-  # Main grid plot - adjust margins based on label length and text size
-  sorted_matrix <- focus_result$sorted_matrix
-
-  # Calculate adaptive margins - scale with text_size
-  max_elem_chars <- max(nchar(focus_result$sorted_elements))
-  max_const_chars <- max(nchar(focus_result$sorted_constructs))
-  left_mar <- min(12 * text_size, max(4, max_elem_chars * 0.4 * text_size))
-  bottom_mar <- min(10 * text_size, max(4, max_const_chars * 0.25 * text_size))
-
+  # Main grid plot
   par(mar = c(bottom_mar, left_mar, 0.5, 0.5), cex = text_size)
 
   # Create image plot - NO asp=1 to allow proper sizing
@@ -168,8 +166,8 @@ plot_focus_cluster <- function(focus_result, title = "Focus Cluster Analysis",
 
   # Add values if requested
   if (show_values) {
-    # Scale text size based on grid size, cell_size, AND text_size parameters
-    base_cex <- min(0.8, max(0.4, 15 / max(n_elem, n_const)))
+    # Scale text size - minimum 1.0 cex (~12pt) for readability
+    base_cex <- max(1.0, min(1.4, 18 / max(n_elem, n_const)))
     value_cex <- base_cex * cell_size * text_size
 
     for (i in 1:n_elem) {

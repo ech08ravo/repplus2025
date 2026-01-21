@@ -120,10 +120,10 @@ ui <- fluidPage(
       tags$hr(),
       h4("Analysis"),
       actionButton("analyze", "Analyse Grid", class = "btn-primary"),
-      div(style = "display: inline-flex; align-items: center; margin-top: 8px;",
+      div(style = "display: flex; align-items: center; gap: 6px; margin-top: 8px;",
         checkboxInput("impute_missing", "Impute missing", value = FALSE),
-        actionButton("info_impute", "?", class = "btn-info info-btn",
-                     style = "margin-left: -5px; margin-top: -18px; padding: 0 6px; height: 20px; line-height: 18px;")
+        actionButton("info_impute", "?", class = "btn-info",
+                     style = "width: 18px; height: 18px; padding: 0; font-size: 11px; line-height: 18px; border-radius: 50%; margin-top: -20px;")
       ),
       conditionalPanel(
         condition = "input.info_impute % 2 == 1",
@@ -2027,7 +2027,7 @@ server <- function(input, output, session) {
     hc <- hclust(d)
     par(mar = c(2, 10 * txt_size, 2, 2), cex = txt_size)
     plot(hc, labels = rv$elements, main = "Elements", xlab = "", sub = "",
-         hang = -1, cex = txt_size)
+         ylab = "Distance (Euclidean)", hang = -1, cex = txt_size)
   })
 
   output$dend_constructs <- renderPlot({
@@ -2059,7 +2059,7 @@ server <- function(input, output, session) {
     labs <- paste(rv$constructs$left, "-", rv$constructs$right)
     par(mar = c(2, 14 * txt_size, 2, 2), cex = txt_size)
     plot(hc, labels = labs, main = "Constructs", xlab = "", sub = "",
-         hang = -1, cex = txt_size)
+         ylab = "Distance (Euclidean)", hang = -1, cex = txt_size)
   })
 
   # Statistics outputs
@@ -2143,12 +2143,24 @@ server <- function(input, output, session) {
       rgb(rgb_vals[1], rgb_vals[2], rgb_vals[3], alpha = alpha * 255, maxColorValue = 255)
     })
 
+    # Get pole labels for selected constructs
+    x_left_pole <- rv$constructs$left[x_idx]
+    x_right_pole <- rv$constructs$right[x_idx]
+    y_left_pole <- rv$constructs$left[y_idx]
+    y_right_pole <- rv$constructs$right[y_idx]
+
     # Create empty plot first
     plot(NULL, xlim = c(1, 7), ylim = c(1, 7),
-         xlab = input$crossplot_x,
-         ylab = input$crossplot_y,
+         xlab = "",
+         ylab = "",
          main = "Crossplot: Element Positions",
          asp = 1)
+
+    # Add pole labels at axis ends
+    mtext(x_left_pole, side = 1, at = 1, line = 2.5, cex = txt_size * 0.9, adj = 0, font = 3)
+    mtext(x_right_pole, side = 1, at = 7, line = 2.5, cex = txt_size * 0.9, adj = 1, font = 3)
+    mtext(y_left_pole, side = 2, at = 1, line = 2.5, cex = txt_size * 0.9, adj = 0, font = 3)
+    mtext(y_right_pole, side = 2, at = 7, line = 2.5, cex = txt_size * 0.9, adj = 1, font = 3)
 
     # Add grid lines if requested (before points so they're behind)
     if (input$crossplot_grid) {
@@ -2228,15 +2240,27 @@ server <- function(input, output, session) {
         rgb(rgb_vals[1], rgb_vals[2], rgb_vals[3], alpha = alpha * 255, maxColorValue = 255)
       })
 
+      # Get pole labels
+      x_left_pole <- rv$constructs$left[x_idx]
+      x_right_pole <- rv$constructs$right[x_idx]
+      y_left_pole <- rv$constructs$left[y_idx]
+      y_right_pole <- rv$constructs$right[y_idx]
+
       png(file, width = 1200, height = 1200, res = 120)
 
       par(mar = c(5, 5, 3, 2), cex.axis = txt_size, cex.lab = txt_size * 1.1, cex.main = txt_size * 1.2)
 
       plot(NULL, xlim = c(1, 7), ylim = c(1, 7),
-           xlab = input$crossplot_x,
-           ylab = input$crossplot_y,
+           xlab = "",
+           ylab = "",
            main = "Crossplot: Element Positions",
            asp = 1)
+
+      # Add pole labels at axis ends
+      mtext(x_left_pole, side = 1, at = 1, line = 2.5, cex = txt_size * 0.9, adj = 0, font = 3)
+      mtext(x_right_pole, side = 1, at = 7, line = 2.5, cex = txt_size * 0.9, adj = 1, font = 3)
+      mtext(y_left_pole, side = 2, at = 1, line = 2.5, cex = txt_size * 0.9, adj = 0, font = 3)
+      mtext(y_right_pole, side = 2, at = 7, line = 2.5, cex = txt_size * 0.9, adj = 1, font = 3)
 
       if (input$crossplot_grid) {
         abline(h = 1:7, v = 1:7, col = "gray90", lty = 1)
