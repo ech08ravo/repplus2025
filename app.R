@@ -114,12 +114,13 @@ ui <- fluidPage(
       class = "sidebar",
       h4("File Operations"),
       fileInput("import_file", "Import Grid", accept = c(".rgrid", ".json")),
+      uiOutput("load_grid_prompt"),
       actionButton("import_grid", "Load Grid", class = "btn-secondary btn-sm"),
       tags$small(class = "text-muted", "Accepts .rgrid or .json files"),
       actionButton("load_sample", "Load Sample Data", class = "btn-outline-info btn-sm", style = "margin-top: 8px;"),
       tags$hr(),
       h4("Analysis"),
-      actionButton("analyze", "Analyse Grid", class = "btn-primary"),
+      uiOutput("analyse_button_ui"),
       div(style = "display: flex; align-items: center; gap: 6px; margin-top: 8px;",
         checkboxInput("impute_missing", "Impute missing", value = FALSE),
         actionButton("info_impute", "?", class = "btn-info",
@@ -808,6 +809,41 @@ server <- function(input, output, session) {
     rv$all_triads <- list()
     rv$current_triad_idx <- 0
     showNotification("All data cleared", type = "message")
+  })
+
+  # Dynamic UI: Show prompt when file is uploaded but not loaded
+  output$load_grid_prompt <- renderUI({
+    if (!is.null(input$import_file) && length(rv$elements) == 0) {
+      div(style = "background: #fff3cd; padding: 6px 8px; border-radius: 4px; margin-bottom: 8px; font-size: 11px; border: 1px solid #ffc107;",
+        tags$strong("\u2193 Click 'Load Grid' to import your file")
+      )
+    }
+  })
+
+  # Dynamic UI: Analyse button with highlight when grid is loaded
+  output$analyse_button_ui <- renderUI({
+    has_data <- length(rv$elements) >= 2 && nrow(rv$constructs) >= 2
+    has_analysis <- !is.null(rv$scores_mat_last)
+
+    if (has_data && !has_analysis) {
+      # Grid loaded but not analysed - highlight the button
+      div(
+        actionButton("analyze", "Analyse Grid", class = "btn-primary",
+                     style = "animation: pulse 1.5s infinite; box-shadow: 0 0 10px #007bff;"),
+        tags$style(HTML("
+          @keyframes pulse {
+            0% { box-shadow: 0 0 5px #007bff; }
+            50% { box-shadow: 0 0 15px #007bff; }
+            100% { box-shadow: 0 0 5px #007bff; }
+          }
+        ")),
+        div(style = "background: #d4edda; padding: 6px 8px; border-radius: 4px; margin-top: 8px; font-size: 11px; border: 1px solid #c3e6cb;",
+          tags$strong("\u2191 Click to analyse your grid")
+        )
+      )
+    } else {
+      actionButton("analyze", "Analyse Grid", class = "btn-primary")
+    }
   })
 
   # Load sample data (elements, constructs, ratings)
@@ -2156,11 +2192,11 @@ server <- function(input, output, session) {
          main = "Crossplot: Element Positions",
          asp = 1)
 
-    # Add pole labels at axis ends
+    # Add pole labels at axis ends - x-axis at ends, y-axis at origin with arrows
     mtext(x_left_pole, side = 1, at = 1, line = 2.5, cex = txt_size * 0.9, adj = 0, font = 3)
     mtext(x_right_pole, side = 1, at = 7, line = 2.5, cex = txt_size * 0.9, adj = 1, font = 3)
-    mtext(y_left_pole, side = 2, at = 1, line = 2.5, cex = txt_size * 0.9, adj = 0, font = 3)
-    mtext(y_right_pole, side = 2, at = 7, line = 2.5, cex = txt_size * 0.9, adj = 1, font = 3)
+    # Y-axis labels at origin (bottom) with arrow indicating direction
+    mtext(paste0(y_left_pole, " \u2192 ", y_right_pole), side = 2, line = 3, cex = txt_size * 0.85, font = 3)
 
     # Add grid lines if requested (before points so they're behind)
     if (input$crossplot_grid) {
@@ -2256,11 +2292,11 @@ server <- function(input, output, session) {
            main = "Crossplot: Element Positions",
            asp = 1)
 
-      # Add pole labels at axis ends
+      # Add pole labels at axis ends - x-axis at ends, y-axis at origin with arrows
       mtext(x_left_pole, side = 1, at = 1, line = 2.5, cex = txt_size * 0.9, adj = 0, font = 3)
       mtext(x_right_pole, side = 1, at = 7, line = 2.5, cex = txt_size * 0.9, adj = 1, font = 3)
-      mtext(y_left_pole, side = 2, at = 1, line = 2.5, cex = txt_size * 0.9, adj = 0, font = 3)
-      mtext(y_right_pole, side = 2, at = 7, line = 2.5, cex = txt_size * 0.9, adj = 1, font = 3)
+      # Y-axis labels at origin (bottom) with arrow indicating direction
+      mtext(paste0(y_left_pole, " \u2192 ", y_right_pole), side = 2, line = 3, cex = txt_size * 0.85, font = 3)
 
       if (input$crossplot_grid) {
         abline(h = 1:7, v = 1:7, col = "gray90", lty = 1)
