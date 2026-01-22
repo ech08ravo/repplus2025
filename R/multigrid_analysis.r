@@ -120,6 +120,11 @@ compute_match_matrix <- function(grids, common_elements = NULL, power = 1.0) {
   grid_names <- names(grids)
   if (is.null(grid_names)) grid_names <- paste0("Grid", seq_len(n))
 
+  # Ensure unique names
+  if (anyDuplicated(grid_names)) {
+    grid_names <- make.unique(grid_names, sep = "_")
+  }
+
   # Find common elements if not provided
   if (is.null(common_elements)) {
     common_elements <- Reduce(intersect, lapply(grids, function(g) g$elements))
@@ -509,6 +514,13 @@ prepare_socionet_data <- function(match_matrix, cutoff = 70, symmetric = FALSE) 
   grid_names <- rownames(match_matrix)
   n <- nrow(match_matrix)
 
+  # Ensure unique names by appending suffix if duplicates exist
+  if (anyDuplicated(grid_names)) {
+    grid_names <- make.unique(grid_names, sep = "_")
+    rownames(match_matrix) <- grid_names
+    colnames(match_matrix) <- grid_names
+  }
+
   nodes <- data.frame(
     name = grid_names,
     stringsAsFactors = FALSE
@@ -564,9 +576,10 @@ prepare_socionet_data <- function(match_matrix, cutoff = 70, symmetric = FALSE) 
 #' @param node_color Color for nodes
 #' @param edge_color Color for edges
 #' @param show_weights Whether to show edge weight labels
+#' @param text_size Text size multiplier
 plot_socionets <- function(socionet_data, title = "Socionets: Grid Relationships",
-                          node_color = "#0072B2", edge_color = "#666666",
-                          show_weights = TRUE) {
+                          node_color = "steelblue", edge_color = "darkgrey",
+                          show_weights = TRUE, text_size = 1.2) {
   if (!requireNamespace("igraph", quietly = TRUE)) {
     stop("igraph package required for Socionets visualization")
   }
@@ -577,47 +590,72 @@ plot_socionets <- function(socionet_data, title = "Socionets: Grid Relationships
 
   if (nrow(edges) == 0) {
     # No edges above cutoff - just plot nodes
+    par(cex = text_size, family = "sans")
     plot(1, type = "n", xlim = c(0, 1), ylim = c(0, 1),
          xlab = "", ylab = "", axes = FALSE, main = title)
     n <- nrow(nodes)
     if (n > 0) {
-      # Arrange nodes in a circle
+      # Arrange nodes in a circle with more spacing
       angles <- seq(0, 2 * pi, length.out = n + 1)[1:n]
-      x <- 0.5 + 0.3 * cos(angles)
-      y <- 0.5 + 0.3 * sin(angles)
-      points(x, y, pch = 21, bg = node_color, cex = 3)
-      text(x, y, labels = nodes$name, pos = 3, cex = 0.8)
+      x <- 0.5 + 0.4 * cos(angles)
+      y <- 0.5 + 0.4 * sin(angles)
+      points(x, y, pch = 21, bg = node_color, cex = 2 * text_size)
+      text(x, y, labels = nodes$name, pos = 3, cex = 0.7 * text_size, family = "sans")
     }
-    text(0.5, 0.1, "No connections above cutoff", col = "gray50")
+    text(0.5, 0.05, "No connections above cutoff", col = "gray50", cex = text_size, family = "sans")
     return(invisible(NULL))
   }
 
   # Create igraph object
   g <- igraph::graph_from_data_frame(edges, directed = !symmetric, vertices = nodes)
 
-  # Layout
-  layout <- igraph::layout_with_fr(g)
+  # Use circular layout for cleaner spacing with many nodes
+  n_nodes <- igraph::vcount(g)
+  if (n_nodes <= 3) {
+    layout <- igraph::layout_with_fr(g)
+  } else {
+    # Circular layout provides more predictable spacing
+    layout <- igraph::layout_in_circle(g)
+  }
+  # Normalize and expand layout for more spacing
+  layout <- igraph::norm_coords(layout, xmin = -2, xmax = 2, ymin = -2, ymax = 2)
 
-  # Scale edge widths
-  edge_widths <- igraph::E(g)$weight / 30  # 90% -> 3, 60% -> 2
-  edge_widths <- pmax(edge_widths, 0.5)
+  # Scale edge widths - thinner lines
+  edge_widths <- igraph::E(g)$weight / 60  # 90% -> 1.5, 60% -> 1
+  edge_widths <- pmax(edge_widths, 0.3)
+  edge_widths <- pmin(edge_widths, 2)  # Cap maximum width
 
-  # Plot
+  # Calculate edge curvature to avoid overlapping edges between same node pairs
+  edge_curved <- rep(0.2, igraph::ecount(g))  # Slight curve on all edges
+
+  # Make edge color semi-transparent
+  edge_col_alpha <- adjustcolor(edge_color, alpha.f = 0.6)
+
+  # Plot with text size scaling and sans-serif font
+  par(cex = text_size, family = "sans", mar = c(1, 1, 3, 1))
   plot(g,
        layout = layout,
-       vertex.size = 25,
-       vertex.color = node_color,
-       vertex.frame.color = "white",
+       vertex.size = 12 * text_size,  # Smaller nodes
+       vertex.color = adjustcolor(node_color, alpha.f = 0.8),
+       vertex.frame.color = adjustcolor(node_color, alpha.f = 0.9),
+       vertex.frame.width = 1,
        vertex.label = igraph::V(g)$name,
-       vertex.label.color = "black",
-       vertex.label.cex = 0.8,
-       edge.width = edge_widths,
-       edge.color = edge_color,
-       edge.arrow.size = if (symmetric) 0 else 0.4,
+       vertex.label.color = "gray20",
+       vertex.label.cex = 0.65 * text_size,  # Smaller labels
+       vertex.label.family = "sans",
+       vertex.label.dist = 2,  # Labels further from nodes
+       vertex.label.degree = -pi/2,  # Labels above nodes
+       edge.width = edge_widths * text_size,
+       edge.color = edge_col_alpha,
+       edge.curved = edge_curved,
+       edge.arrow.size = if (symmetric) 0 else 0.25 * text_size,  # Smaller arrows
+       edge.arrow.width = if (symmetric) 0 else 0.8,
        edge.label = if (show_weights) paste0(igraph::E(g)$weight, "%") else NA,
-       edge.label.cex = 0.7,
-       edge.label.color = "gray30",
-       main = title)
+       edge.label.cex = 0.5 * text_size,  # Much smaller edge labels
+       edge.label.color = "gray40",
+       edge.label.family = "sans",
+       main = title,
+       margin = c(0, 0, 0, 0))
 
   invisible(g)
 }
