@@ -1,8 +1,19 @@
-# RepPlusApp - Claude Project Documentation
+# WebGrid.Online - Claude Project Documentation
+
+## Deployment
+
+- **Account**: ech08ravo
+- **App URL**: https://ech08ravo.shinyapps.io/repplus2025/
+- **Deploy command**: `rsconnect::deployApp(appName = "repplus2025")`
 
 ## Overview
 
-RepPlusApp is a Shiny application for Repertory Grid analysis, a psychological research method developed by George Kelly. The app allows users to elicit personal constructs through triadic comparison of elements, rate elements on bipolar construct scales, and analyze the resulting grid using various statistical and visual methods.
+WebGrid.Online (formerly RepPlusApp) is a Shiny application for Repertory Grid analysis, a psychological research method developed by George Kelly. The app allows users to elicit personal constructs through triadic comparison of elements, rate elements on bipolar construct scales, and analyze the resulting grid using various statistical and visual methods.
+
+**Key Features**:
+- Single grid elicitation and analysis
+- Multi-grid analysis (Shaw's SOCIOGRIDS methodology)
+- Socionets, Mode Grid, and Composite Grid visualizations
 
 ## Project Structure
 
@@ -10,8 +21,10 @@ RepPlusApp is a Shiny application for Repertory Grid analysis, a psychological r
 RepPlusApp/
 ├── app.R                    # Main Shiny application (UI + Server)
 ├── R/
-│   └── focus_analysis.r     # Focus clustering algorithm (Shaw 1980)
+│   ├── focus_analysis.r     # Focus clustering algorithm (Shaw 1980)
+│   └── multigrid_analysis.r # Multi-grid analysis (SOCIOGRIDS)
 ├── CLAUDE_PROJECT_DOCS.md   # This documentation
+├── Dockerfile               # Docker deployment config
 └── .gitignore
 ```
 
@@ -293,8 +306,28 @@ Plots defined outside `observeEvent(input$analyze, ...)` will automatically upda
 - Consider adding: export to PDF, more clustering methods, statistical tests
 - Grid completion tracking could be more prominent
 
+## Multi-Grid Analysis (R/multigrid_analysis.r)
+
+Implements Shaw's (1980) SOCIOGRIDS methodology for comparing multiple repertory grids.
+
+### Key Functions
+
+- `compute_match_matrix()` - Pairwise grid similarity using Minkowski distance
+- `prepare_socionet_data()` - Prepares network data for visualization
+- `plot_socionets()` - Network graph showing grid relationships
+- `generate_mode_grid()` - Creates consensus grid from multiple grids
+- `generate_composite_grid()` - Merges grids by elements or constructs
+
+### Multi-Grid Tabs
+
+- **Grid Collection** - Upload and manage multiple .rgrid files
+- **Socionets** - Network visualization of grid similarities
+- **Mode Grid** - Consensus/average grid heatmap
+- **Composite Grid** - Merged grid combining all constructs/elements
+
 ## References
 
 - Kelly, G.A. (1955). The Psychology of Personal Constructs
 - Shaw, M.L.G. (1980). On Becoming a Personal Scientist
+- Shaw, M.L.G. (1980). SOCIOGRIDS methodology for multi-grid comparison
 - OpenRepGrid R package documentation

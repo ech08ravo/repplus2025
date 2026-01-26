@@ -125,7 +125,7 @@ ui <- fluidPage(
       });
     '))
   ),
-  titlePanel("RepGrid Elicitation"),
+  titlePanel("WebGrid.Online"),
   sidebarLayout(
     sidebarPanel(
       width = 2,
@@ -3685,16 +3685,64 @@ server <- function(input, output, session) {
     showNotification(paste("Loaded", g$name, "to editor"), type = "message")
   })
 
-  # Navigation links from Grid Collection to analysis tabs
+  # Navigation links from Grid Collection to analysis tabs - also trigger analysis
   observeEvent(input$goto_socionets, {
+    # Trigger socionets analysis if grids are selected
+    if (length(rv$selected_grids) >= 2 && length(rv$common_elements) >= 1) {
+      selected_grids <- rv$grid_collection[rv$selected_grids]
+      names(selected_grids) <- sapply(selected_grids, function(g) g$name)
+
+      rv$match_matrix <- compute_match_matrix(
+        selected_grids,
+        rv$common_elements,
+        power = 1.0
+      )
+
+      rv$socionet_data <- prepare_socionet_data(
+        rv$match_matrix,
+        cutoff = input$socionet_cutoff,
+        symmetric = input$socionet_symmetric
+      )
+    }
     updateTabsetPanel(session, "main_tabs", selected = "Socionets")
   })
 
   observeEvent(input$goto_mode, {
+    # Trigger mode grid generation if grids are selected
+    if (length(rv$selected_grids) >= 2 && length(rv$common_elements) >= 2) {
+      selected_grids <- rv$grid_collection[rv$selected_grids]
+      names(selected_grids) <- sapply(selected_grids, function(g) g$name)
+
+      tryCatch({
+        rv$mode_grid <- generate_mode_grid(
+          selected_grids,
+          common_elements = rv$common_elements,
+          method = input$mode_method,
+          construct_handling = input$mode_construct_handling
+        )
+      }, error = function(e) {
+        showNotification(paste("Error generating mode grid:", e$message), type = "error")
+      })
+    }
     updateTabsetPanel(session, "main_tabs", selected = "Mode Grid")
   })
 
   observeEvent(input$goto_composite, {
+    # Trigger composite grid generation if grids are selected
+    if (length(rv$selected_grids) >= 2) {
+      selected_grids <- rv$grid_collection[rv$selected_grids]
+      names(selected_grids) <- sapply(selected_grids, function(g) g$name)
+
+      tryCatch({
+        rv$composite_grid <- generate_composite_grid(
+          selected_grids,
+          merge_on = input$composite_merge_on,
+          label_source = input$composite_label_source
+        )
+      }, error = function(e) {
+        showNotification(paste("Error generating composite grid:", e$message), type = "error")
+      })
+    }
     updateTabsetPanel(session, "main_tabs", selected = "Composite Grid")
   })
 
