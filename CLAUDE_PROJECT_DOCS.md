@@ -1,6 +1,20 @@
 # WebGrid.Online - Claude Project Documentation
 
-## Deployment
+## Deployment (Primary: DreamCompute)
+
+- **Live URL**: https://webgrid.online
+- **Server**: 208.113.135.63 (DreamCompute Ubuntu 24.04, 8GB RAM)
+- **SSH**: `ssh ubuntu@208.113.135.63` (key: `~/.ssh/council_api_rsa`)
+- **Stack**: Docker (rocker/shiny) + nginx reverse proxy + Let's Encrypt SSL
+- **SSL cert**: Auto-renewing, expires Apr 28 2026
+- **Repo on server**: `/home/ubuntu/repplus2025`
+- **Nginx config**: `/home/ubuntu/nginx/webgrid.conf`
+- **Redeploy command**:
+  ```bash
+  ssh ubuntu@208.113.135.63 "cd /home/ubuntu/repplus2025 && git pull && sudo docker build -t webgrid-online . && sudo docker rm -f webgrid && sudo docker run -d --name webgrid --restart unless-stopped -p 3838:3838 webgrid-online"
+  ```
+
+### Backup: shinyapps.io (inactive)
 
 - **Account**: ech08ravo
 - **App URL**: https://ech08ravo.shinyapps.io/repplus2025/
