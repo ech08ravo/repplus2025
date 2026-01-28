@@ -93,6 +93,28 @@ ui <- fluidPage(
         border-bottom-color: #fff;
       }
       .multigrid-icon { margin-right: 4px; font-size: 10px; }
+      /* Landing page styles */
+      .landing-page { max-width: 600px; margin: 60px auto; padding: 40px; background: #fff; border-radius: 12px; box-shadow: 0 2px 20px rgba(0,0,0,0.08); }
+      .landing-page h2 { margin-bottom: 8px; color: #333; }
+      .landing-page p.subtitle { color: #666; margin-bottom: 24px; font-size: 15px; }
+      .landing-page .item-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+      .landing-page .item-number { font-size: 18px; font-weight: bold; color: #0072B2; min-width: 28px; text-align: center; }
+      .landing-page .item-input { flex: 1; }
+      .landing-page .item-input .form-control { font-size: 15px; padding: 8px 12px; height: auto; }
+      .landing-page .continue-btn { margin-top: 24px; text-align: center; }
+      .landing-page .continue-btn .btn { font-size: 16px; padding: 10px 40px; }
+      /* Triads wizard page */
+      .triad-wizard .progress-text { color: #666; font-size: 13px; margin-bottom: 16px; }
+      .triad-wizard .triad-cards { display: flex; gap: 16px; margin: 20px 0; justify-content: center; flex-wrap: wrap; }
+      .triad-wizard .triad-card { border: 2px solid #ddd; border-radius: 10px; padding: 16px 20px; min-width: 120px; text-align: center; cursor: pointer; font-size: 16px; font-weight: 500; transition: all 0.15s; background: #fff; user-select: none; }
+      .triad-wizard .triad-card:hover { border-color: #999; }
+      .triad-wizard .triad-card.is-similar { border-color: #28a745; background: #e8f5e9; color: #1b5e20; }
+      .triad-wizard .triad-card.is-different { border-color: #dc3545; background: #fce4ec; color: #b71c1c; }
+      .triad-wizard .pole-inputs { margin-top: 20px; }
+      .triad-wizard .pole-inputs label { font-size: 13px; font-weight: 600; }
+      .triad-wizard .pole-inputs .form-control { font-size: 15px; padding: 8px 12px; height: auto; }
+      .triad-wizard .wizard-buttons { margin-top: 24px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+      .triad-wizard .instruction-text { background: #fff3cd; padding: 10px 14px; border-radius: 6px; border: 1px solid #ffc107; font-size: 13px; margin-bottom: 16px; }
     ')),
     tags$script(HTML('
       Shiny.addCustomMessageHandler("copyToClipboard", function(text) {
@@ -126,6 +148,66 @@ ui <- fluidPage(
     '))
   ),
   titlePanel("WebGrid.Online"),
+  # Landing page - shown initially
+  conditionalPanel(
+    condition = "output.landing_step == 'elements'",
+    div(class = "landing-page",
+      h2("Welcome to WebGrid.Online"),
+      p(class = "subtitle", "A repertory grid helps you explore how you think about things by comparing them."),
+      p("To get started, list 5 things you'd like to compare. They could be people, places, products, ideas — anything in the same category."),
+      p(tags$em("For example: 5 friends, 5 cities you've lived in, 5 programming languages, 5 foods you eat regularly."), style = "color: #888; font-size: 12px;"),
+      div(class = "item-row", span(class = "item-number", "1."), div(class = "item-input", textInput("landing_item1", NULL, placeholder = "e.g. Pizza"))),
+      div(class = "item-row", span(class = "item-number", "2."), div(class = "item-input", textInput("landing_item2", NULL, placeholder = "e.g. Sushi"))),
+      div(class = "item-row", span(class = "item-number", "3."), div(class = "item-input", textInput("landing_item3", NULL, placeholder = "e.g. Tacos"))),
+      div(class = "item-row", span(class = "item-number", "4."), div(class = "item-input", textInput("landing_item4", NULL, placeholder = "e.g. Pasta"))),
+      div(class = "item-row", span(class = "item-number", "5."), div(class = "item-input", textInput("landing_item5", NULL, placeholder = "e.g. Curry"))),
+      div(class = "continue-btn",
+        actionButton("landing_continue", "Continue", class = "btn-success btn-lg")
+      )
+    )
+  ),
+  # Triads wizard page
+  conditionalPanel(
+    condition = "output.landing_step == 'triads'",
+    div(class = "landing-page triad-wizard",
+      h2("How do these compare?"),
+      p(class = "subtitle", "We'll show you 3 items at a time. Tap 2 that are similar, and 1 that is different."),
+      uiOutput("wizard_progress"),
+      div(class = "instruction-text",
+        "Click each card to mark it as ", tags$strong("Similar"), " (green) or ", tags$strong("Different"), " (red). Pick 2 similar and 1 different."
+      ),
+      uiOutput("wizard_triad_cards"),
+      div(class = "pole-inputs",
+        textInput("wizard_left_pole", "How are the two similar ones alike?", placeholder = "e.g. sweet"),
+        textInput("wizard_right_pole", "How is the different one different?", placeholder = "e.g. savoury")
+      ),
+      div(class = "wizard-buttons",
+        actionButton("wizard_next", "Next", class = "btn-success btn-lg"),
+        actionButton("wizard_skip", "Skip", class = "btn-outline-secondary"),
+        actionButton("wizard_finish", "Finish & See Results", class = "btn-outline-primary")
+      )
+    )
+  ),
+  # Results page - simple analysis view
+  conditionalPanel(
+    condition = "output.landing_step == 'results'",
+    div(class = "landing-page",
+      h2("Your Grid So Far"),
+      uiOutput("wizard_results_summary"),
+      plotOutput("wizard_biplot", height = "400px"),
+      uiOutput("wizard_results_message"),
+      div(class = "continue-btn", style = "margin-top: 20px;",
+        actionButton("results_to_app", "Explore in Full App",
+                     class = "btn-success btn-lg"),
+        actionButton("results_back", "Add More Constructs",
+                     class = "btn-outline-secondary",
+                     style = "margin-left: 10px;")
+      )
+    )
+  ),
+  # Main app - shown after results
+  conditionalPanel(
+    condition = "output.landing_step == 'done'",
   sidebarLayout(
     sidebarPanel(
       width = 2,
@@ -1002,6 +1084,7 @@ ui <- fluidPage(
       )
     )
   )
+  )  # end conditionalPanel for main app
 )
 
 server <- function(input, output, session) {
@@ -1051,6 +1134,13 @@ server <- function(input, output, session) {
     get_palette_colors(palette)
   })
 
+  # Landing page state
+  landing <- reactiveValues(step = "elements")
+
+  # Output flag for conditionalPanel
+  output$landing_step <- reactive({ landing$step })
+  outputOptions(output, "landing_step", suspendWhenHidden = FALSE)
+
   rv <- reactiveValues(
     elements = character(),
     constructs = data.frame(
@@ -1098,6 +1188,225 @@ server <- function(input, output, session) {
     mode_grid = NULL,                # Generated Mode (consensus) grid
     composite_grid = NULL            # Generated Composite grid
   )
+
+  # Handle landing page continue button
+  observeEvent(input$landing_continue, {
+    items <- c(input$landing_item1, input$landing_item2,
+               input$landing_item3, input$landing_item4,
+               input$landing_item5)
+    items <- trimws(items)
+    items <- items[items != ""]
+    if (length(items) >= 3) {
+      rv$elements <- items
+      triads <- combn(items, 3, simplify = FALSE)
+      rv$all_triads <- triads
+      rv$current_triad_idx <- 1
+      rv$triad_similar <- character()
+      rv$triad_different <- NULL
+      landing$step <- "triads"
+    } else {
+      showNotification("Please enter at least 3 items.",
+                       type = "warning")
+    }
+  })
+
+  # Wizard: progress indicator
+  output$wizard_progress <- renderUI({
+    req(rv$current_triad_idx > 0, length(rv$all_triads) > 0)
+    total <- length(rv$all_triads)
+    idx <- rv$current_triad_idx
+    pct <- round(100 * (idx - 1) / total)
+    tagList(
+      p(class = "progress-text",
+        paste0("Triad ", idx, " of ", total)),
+      div(style = paste0(
+        "background: #e0e0e0; border-radius: 4px; height: 6px; ",
+        "margin-bottom: 16px;"),
+        div(style = paste0(
+          "background: #28a745; height: 6px; border-radius: 4px; ",
+          "width: ", pct, "%;"))
+      )
+    )
+  })
+
+  # Wizard: render 3 triad cards
+  output$wizard_triad_cards <- renderUI({
+    req(rv$current_triad_idx > 0)
+    req(length(rv$all_triads) >= rv$current_triad_idx)
+    triad <- rv$all_triads[[rv$current_triad_idx]]
+    cards <- lapply(seq_along(triad), function(i) {
+      elem <- triad[i]
+      cls <- "triad-card"
+      if (elem %in% rv$triad_similar) cls <- paste(cls, "is-similar")
+      if (identical(rv$triad_different, elem)) {
+        cls <- paste(cls, "is-different")
+      }
+      actionButton(
+        paste0("wiz_card_", i),
+        elem,
+        class = cls
+      )
+    })
+    div(class = "triad-cards", cards)
+  })
+
+  # Wizard: card click handlers (toggle similar/different)
+  observe({
+    req(rv$current_triad_idx > 0)
+    req(length(rv$all_triads) >= rv$current_triad_idx)
+    triad <- rv$all_triads[[rv$current_triad_idx]]
+    lapply(1:3, function(i) {
+      observeEvent(input[[paste0("wiz_card_", i)]], {
+        elem <- triad[i]
+        if (elem %in% rv$triad_similar) {
+          rv$triad_similar <- setdiff(rv$triad_similar, elem)
+        } else if (identical(rv$triad_different, elem)) {
+          rv$triad_different <- NULL
+        } else if (length(rv$triad_similar) < 2) {
+          rv$triad_similar <- c(rv$triad_similar, elem)
+        } else {
+          rv$triad_different <- elem
+        }
+      }, ignoreInit = TRUE)
+    })
+  })
+
+  # Wizard: Next button - save construct and advance
+  observeEvent(input$wizard_next, {
+    left <- trimws(input$wizard_left_pole)
+    right <- trimws(input$wizard_right_pole)
+    if (length(rv$triad_similar) != 2 ||
+        is.null(rv$triad_different)) {
+      showNotification("Pick 2 similar and 1 different.",
+                       type = "warning")
+      return()
+    }
+    if (left == "" || right == "") {
+      showNotification("Enter both poles.", type = "warning")
+      return()
+    }
+    rv$constructs <- rbind(rv$constructs,
+      data.frame(left = left, right = right,
+                 stringsAsFactors = FALSE))
+    updateTextInput(session, "wizard_left_pole", value = "")
+    updateTextInput(session, "wizard_right_pole", value = "")
+    if (rv$current_triad_idx < length(rv$all_triads)) {
+      rv$current_triad_idx <- rv$current_triad_idx + 1
+      rv$triad_similar <- character()
+      rv$triad_different <- NULL
+    } else {
+      landing$step <- "results"
+    }
+  })
+
+  # Wizard: Skip button
+  observeEvent(input$wizard_skip, {
+    if (rv$current_triad_idx < length(rv$all_triads)) {
+      rv$current_triad_idx <- rv$current_triad_idx + 1
+      rv$triad_similar <- character()
+      rv$triad_different <- NULL
+      updateTextInput(session, "wizard_left_pole", value = "")
+      updateTextInput(session, "wizard_right_pole", value = "")
+    } else {
+      landing$step <- "results"
+    }
+  })
+
+  # Wizard: Finish early button
+  observeEvent(input$wizard_finish, {
+    landing$step <- "results"
+  })
+
+  # Results page: summary of what was built
+  output$wizard_results_summary <- renderUI({
+    n_elem <- length(rv$elements)
+    n_const <- if (is.data.frame(rv$constructs)) nrow(rv$constructs) else 0
+    tagList(
+      p(paste0("You created ", n_elem, " elements and ",
+               n_const, " constructs.")),
+      if (n_const > 0) {
+        tags$ul(lapply(seq_len(n_const), function(i) {
+          tags$li(paste0(rv$constructs$left[i], " vs ",
+                         rv$constructs$right[i]))
+        }))
+      }
+    )
+  })
+
+  # Results page: simple biplot with imputed midpoint ratings
+  output$wizard_biplot <- renderPlot({
+    req(is.data.frame(rv$constructs), nrow(rv$constructs) >= 2)
+    req(length(rv$elements) >= 2)
+    n_e <- length(rv$elements)
+    n_c <- nrow(rv$constructs)
+    # Use midpoint ratings (all 4s) as placeholder
+    sm <- matrix(4, nrow = n_e, ncol = n_c)
+    # Check if any real ratings exist and use them
+    if (is.data.frame(rv$ratings) && nrow(rv$ratings) > 0) {
+      construct_labels <- paste(rv$constructs$left, "-",
+                                rv$constructs$right)
+      for (i in seq_len(n_e)) {
+        for (j in seq_len(n_c)) {
+          idx <- rv$ratings$element == rv$elements[i] &
+            rv$ratings$construct == construct_labels[j]
+          if (any(idx)) sm[i, j] <- rv$ratings$rating[idx][1]
+        }
+      }
+    }
+    # Can't do PCA on constant matrix - add small jitter
+    if (sd(sm) == 0) sm <- sm + matrix(
+      rnorm(n_e * n_c, 0, 0.1), nrow = n_e)
+    pc <- prcomp(sm, scale. = TRUE)
+    ex <- pc$x[, 1:min(2, ncol(pc$x))]
+    if (is.null(dim(ex))) return()
+    load <- cor(sm, pc$x)[, 1:min(2, ncol(pc$x))]
+    if (is.null(dim(load))) return()
+    par(mar = c(4, 4, 2, 2))
+    all_pts <- rbind(ex, load, -load)
+    xr <- range(all_pts[, 1]) * 1.3
+    yr <- range(all_pts[, 2]) * 1.3
+    plot(ex, type = "n", xlab = "PC1", ylab = "PC2",
+         xlim = xr, ylim = yr,
+         main = "Preview (ratings not yet entered)")
+    points(ex, pch = 19, col = "#0072B2", cex = 1.3)
+    text(ex, labels = rv$elements, pos = 3,
+         col = "#0072B2", font = 2)
+    for (i in seq_len(nrow(load))) {
+      lines(c(-load[i, 1], load[i, 1]),
+            c(-load[i, 2], load[i, 2]),
+            col = "#D55E00", lwd = 2)
+    }
+    text(load[, 1], load[, 2],
+         labels = rv$constructs$right,
+         pos = 4, col = "#D55E00", font = 2)
+    text(-load[, 1], -load[, 2],
+         labels = rv$constructs$left,
+         pos = 2, col = "#D55E00", font = 3)
+    abline(h = 0, v = 0, lty = 3, col = "gray50")
+  })
+
+  # Results page: message about next steps
+  output$wizard_results_message <- renderUI({
+    n_const <- if (is.data.frame(rv$constructs)) nrow(rv$constructs) else 0
+    if (n_const < 2) {
+      p(tags$em("Add at least 2 constructs to see a preview plot."),
+        style = "color: #888;")
+    } else {
+      p(tags$em("This is a preview. Enter ratings in the full app ",
+                "for a meaningful analysis."),
+        style = "color: #888; font-size: 12px;")
+    }
+  })
+
+  # Results page: go to full app
+  observeEvent(input$results_to_app, {
+    landing$step <- "done"
+  })
+
+  # Results page: go back to add more constructs
+  observeEvent(input$results_back, {
+    landing$step <- "triads"
+  })
 
   # Clear all data
   observeEvent(input$clear_all, {
