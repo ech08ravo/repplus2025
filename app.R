@@ -81,14 +81,24 @@ ui <- fluidPage(
       .nav-tabs > li > a[data-value="Grid Collection"],
       .nav-tabs > li > a[data-value="Socionets"],
       .nav-tabs > li > a[data-value="Mode Grid"],
-      .nav-tabs > li > a[data-value="Composite Grid"] {
+      .nav-tabs > li > a[data-value="Composite Grid"],
+      .nav-tabs > li > a[data-value="MINUS"],
+      .nav-tabs > li > a[data-value="CORE"],
+      .nav-tabs > li > a[data-value="PrinGrid Trajectories"],
+      .nav-tabs > li > a[data-value="Exchange Grids"],
+      .nav-tabs > li > a[data-value="Class Metagrids"] {
         background: linear-gradient(135deg, #e8f4f8 0%, #d4e8ed 100%);
         border-color: #b8d4dc;
       }
       .nav-tabs > li.active > a[data-value="Grid Collection"],
       .nav-tabs > li.active > a[data-value="Socionets"],
       .nav-tabs > li.active > a[data-value="Mode Grid"],
-      .nav-tabs > li.active > a[data-value="Composite Grid"] {
+      .nav-tabs > li.active > a[data-value="Composite Grid"],
+      .nav-tabs > li.active > a[data-value="MINUS"],
+      .nav-tabs > li.active > a[data-value="CORE"],
+      .nav-tabs > li.active > a[data-value="PrinGrid Trajectories"],
+      .nav-tabs > li.active > a[data-value="Exchange Grids"],
+      .nav-tabs > li.active > a[data-value="Class Metagrids"] {
         background: #fff;
         border-bottom-color: #fff;
       }
@@ -705,6 +715,7 @@ ui <- fluidPage(
                           checkboxInput("focus_show_values", "Show Rating Values", value = TRUE),
                           checkboxInput("focus_show_shading", "Show Shading", value = TRUE),
                           checkboxInput("focus_use_color", "Use color shading", value = TRUE),
+                          checkboxInput("focus_spaced", "SPACED: Proportional Spacing", value = FALSE),
                           selectInput("focus_palette", "Color Palette",
                                       choices = c(
                                         "Accessible (Wong)" = "wong",
@@ -780,6 +791,21 @@ ui <- fluidPage(
                        span(class = "copy-feedback", style = "display:none;")
                      ),
                      uiOutput("focus_response")
+                   )
+                 ),
+                 tags$hr(),
+                 actionButton("foci_interpret", "FOCI: Generate Interpretation", class = "btn-warning"),
+                 conditionalPanel(
+                   condition = "input.foci_interpret % 2 == 1",
+                   div(class = "chat-panel", style = "background: #fff3cd; padding: 15px; border-radius: 8px; margin-top: 10px;",
+                     h5("FOCI: Automated Focus Interpretation"),
+                     p("Sends your Focus analysis data to Claude for structured interpretation of clusters and patterns."),
+                     div(class = "btn-group-chat",
+                       actionButton("run_foci", "Generate Interpretation", class = "btn-primary"),
+                       actionButton("copy_foci", "Copy Context to Clipboard", class = "btn-secondary"),
+                       tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary", "Open Claude.ai")
+                     ),
+                     uiOutput("foci_response")
                    )
                  )
         ),
@@ -880,6 +906,56 @@ ui <- fluidPage(
                               condition = "input.info_composite_link % 2 == 1",
                               tags$small(class = "text-muted", style = "display: block; margin-left: 10px;",
                                         "Merges all grids into one large grid, combining constructs from all participants for unified analysis.")
+                            )
+                          ),
+                          div(style = "margin-bottom: 8px;",
+                            actionLink("goto_minus", "MINUS Analysis", style = "font-weight: bold;"),
+                            actionButton("info_minus_link", "i", class = "btn-info btn-xs",
+                                        style = "width: 16px; height: 16px; padding: 0; font-size: 10px; line-height: 16px; border-radius: 50%; margin-left: 4px;"),
+                            conditionalPanel(
+                              condition = "input.info_minus_link % 2 == 1",
+                              tags$small(class = "text-muted", style = "display: block; margin-left: 10px;",
+                                        "Subtracts one grid from another to show cell-by-cell differences. Requires grids with shared elements AND constructs.")
+                            )
+                          ),
+                          div(style = "margin-bottom: 8px;",
+                            actionLink("goto_core", "CORE Analysis", style = "font-weight: bold;"),
+                            actionButton("info_core_link", "i", class = "btn-info btn-xs",
+                                        style = "width: 16px; height: 16px; padding: 0; font-size: 10px; line-height: 16px; border-radius: 50%; margin-left: 4px;"),
+                            conditionalPanel(
+                              condition = "input.info_core_link % 2 == 1",
+                              tags$small(class = "text-muted", style = "display: block; margin-left: 10px;",
+                                        "Iteratively removes least-agreed items to reveal the core of shared construing between two grids.")
+                            )
+                          ),
+                          div(style = "margin-bottom: 8px;",
+                            actionLink("goto_trajectories", "PrinGrid Trajectories", style = "font-weight: bold;"),
+                            actionButton("info_traj_link", "i", class = "btn-info btn-xs",
+                                        style = "width: 16px; height: 16px; padding: 0; font-size: 10px; line-height: 16px; border-radius: 50%; margin-left: 4px;"),
+                            conditionalPanel(
+                              condition = "input.info_traj_link % 2 == 1",
+                              tags$small(class = "text-muted", style = "display: block; margin-left: 10px;",
+                                        "PCA biplot showing how elements move across grids, with trajectory arrows connecting same elements.")
+                            )
+                          ),
+                          div(style = "margin-bottom: 8px;",
+                            actionLink("goto_exchange", "Exchange Grids", style = "font-weight: bold;"),
+                            actionButton("info_exchange_link", "i", class = "btn-info btn-xs",
+                                        style = "width: 16px; height: 16px; padding: 0; font-size: 10px; line-height: 16px; border-radius: 50%; margin-left: 4px;"),
+                            conditionalPanel(
+                              condition = "input.info_exchange_link % 2 == 1",
+                              tags$small(class = "text-muted", style = "display: block; margin-left: 10px;",
+                                        "6-grid protocol measuring agreement and understanding between two people using CORE analysis.")
+                            )
+                          ),
+                          div(style = "margin-bottom: 8px;",
+                            actionLink("goto_metagrids", "Class Metagrids", style = "font-weight: bold;"),
+                            actionButton("info_metagrid_link", "i", class = "btn-info btn-xs",
+                                        style = "width: 16px; height: 16px; padding: 0; font-size: 10px; line-height: 16px; border-radius: 50%; margin-left: 4px;"),
+                            conditionalPanel(
+                              condition = "input.info_metagrid_link % 2 == 1",
+                              tags$small(class = "text-muted", style = "display: block; margin-left: 10px;",
+                                        "Create a higher-order grid where your grids become elements, rated on custom constructs for classification.")
                             )
                           ),
                           tags$hr(),
@@ -1080,6 +1156,279 @@ ui <- fluidPage(
                      )
                    )
                  )
+        ),
+
+        # ===== MINUS Analysis Tab =====
+        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), "MINUS"),
+                 value = "MINUS",
+                 h4("MINUS Analysis: Grid Differences"),
+                 p("Subtract one grid from another to see differences in construing. Requires two grids with shared elements AND constructs."),
+                 fluidRow(
+                   column(8,
+                          plotOutput("minus_plot", height = "500px")
+                   ),
+                   column(4,
+                          selectInput("minus_grid_a", "Grid A:", choices = NULL),
+                          selectInput("minus_grid_b", "Grid B:", choices = NULL),
+                          checkboxInput("minus_show_values", "Show Difference Values", value = TRUE),
+                          checkboxInput("minus_show_pct", "Show as Percentage", value = FALSE),
+                          sliderInput("minus_text_size", "Text Size",
+                                      min = 0.8, max = 2.0, value = 1.2, step = 0.1),
+                          actionButton("compute_minus", "Compute MINUS", class = "btn-primary"),
+                          tags$hr(),
+                          downloadButton("download_minus_plot", "Download Plot"),
+                          downloadButton("download_minus_csv", "Download Differences (CSV)")
+                   )
+                 ),
+                 tags$hr(),
+                 h5("Difference Summary"),
+                 verbatimTextOutput("minus_summary"),
+                 tags$hr(),
+                 actionButton("help_minus", "Help me understand this", class = "btn-info help-btn"),
+                 conditionalPanel(
+                   condition = "input.help_minus % 2 == 1",
+                   div(class = "help-content",
+                     h5("MINUS Analysis"),
+                     p("MINUS subtracts ratings in Grid B from Grid A, cell by cell, to show where two people (or the same person at different times) differ in their construing."),
+                     h5("Reading the plot"),
+                     tags$ul(
+                       tags$li(tags$strong("Blue cells"), " - Grid A rated lower than Grid B on this element/construct"),
+                       tags$li(tags$strong("White cells"), " - No difference (identical ratings)"),
+                       tags$li(tags$strong("Orange cells"), " - Grid A rated higher than Grid B")
+                     ),
+                     h5("Requirements"),
+                     tags$ul(
+                       tags$li("Exactly 2 grids selected"),
+                       tags$li("Grids must share both elements AND constructs")
+                     )
+                   )
+                 )
+        ),
+
+        # ===== CORE Analysis Tab =====
+        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), "CORE"),
+                 value = "CORE",
+                 h4("CORE Analysis: Shared Construing"),
+                 p("Iteratively removes the least agreed-upon elements and constructs, revealing the core of shared understanding between two grids."),
+                 fluidRow(
+                   column(8,
+                          plotOutput("core_plot", height = "450px"),
+                          tags$hr(),
+                          h5("Removal Log"),
+                          DTOutput("core_steps_table")
+                   ),
+                   column(4,
+                          selectInput("core_grid_a", "Grid A:", choices = NULL),
+                          selectInput("core_grid_b", "Grid B:", choices = NULL),
+                          sliderInput("core_min_elements", "Minimum Elements to Retain",
+                                      min = 2, max = 10, value = 2, step = 1),
+                          sliderInput("core_min_constructs", "Minimum Constructs to Retain",
+                                      min = 1, max = 10, value = 1, step = 1),
+                          sliderInput("core_text_size", "Text Size",
+                                      min = 0.8, max = 2.0, value = 1.2, step = 0.1),
+                          actionButton("compute_core", "Run CORE Analysis", class = "btn-primary"),
+                          tags$hr(),
+                          actionButton("core_to_focus", "Analyse Core with FOCUS", class = "btn-success btn-sm"),
+                          downloadButton("download_core_plot", "Download Plot"),
+                          downloadButton("download_core_csv", "Download Removal Log (CSV)")
+                   )
+                 ),
+                 tags$hr(),
+                 h5("Core Grid Summary"),
+                 verbatimTextOutput("core_summary"),
+                 tags$hr(),
+                 actionButton("help_core", "Help me understand this", class = "btn-info help-btn"),
+                 conditionalPanel(
+                   condition = "input.help_core % 2 == 1",
+                   div(class = "help-content",
+                     h5("CORE Analysis"),
+                     p("CORE (Shaw, 1980) finds the core of shared construing between two grids by iteratively removing elements or constructs that contribute most to disagreement."),
+                     h5("How it works"),
+                     tags$ol(
+                       tags$li("Start with all common elements and constructs"),
+                       tags$li("Calculate overall match percentage"),
+                       tags$li("Try removing each element/construct and see which removal improves the match most"),
+                       tags$li("Remove that item and record the improvement"),
+                       tags$li("Repeat until minimum size is reached or no improvement possible")
+                     ),
+                     h5("Interpretation"),
+                     tags$ul(
+                       tags$li("Elements/constructs removed early = greatest sources of disagreement"),
+                       tags$li("The final remaining grid = the core of shared construing"),
+                       tags$li("Use 'Analyse Core with FOCUS' to examine the shared structure in detail")
+                     )
+                   )
+                 )
+        ),
+
+        # ===== PrinGrid Trajectories Tab =====
+        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), "PrinGrid Trajectories"),
+                 value = "PrinGrid Trajectories",
+                 h4("PrinGrid Trajectories"),
+                 p("PCA-based visualisation showing how elements move in construct space across multiple grids (e.g., over time or between people)."),
+                 fluidRow(
+                   column(8,
+                          plotOutput("pringrid_traj_plot", height = "600px")
+                   ),
+                   column(4,
+                          checkboxInput("traj_show_arrows", "Show Movement Arrows", value = TRUE),
+                          checkboxInput("traj_show_labels", "Show Element Labels", value = TRUE),
+                          checkboxInput("traj_show_constructs", "Show Construct Lines", value = TRUE),
+                          sliderInput("traj_text_size", "Text Size",
+                                      min = 0.8, max = 2.0, value = 1.2, step = 0.1),
+                          actionButton("compute_trajectories", "Compute Trajectories", class = "btn-primary"),
+                          tags$hr(),
+                          downloadButton("download_traj_plot", "Download Plot"),
+                          downloadButton("download_traj_csv", "Download Positions (CSV)")
+                   )
+                 ),
+                 tags$hr(),
+                 h5("Variance Explained"),
+                 verbatimTextOutput("traj_variance"),
+                 tags$hr(),
+                 actionButton("help_trajectories", "Help me understand this", class = "btn-info help-btn"),
+                 conditionalPanel(
+                   condition = "input.help_trajectories % 2 == 1",
+                   div(class = "help-content",
+                     h5("PrinGrid Trajectories"),
+                     p("Trajectories extend the PCA biplot to show how the same elements are positioned differently across multiple grids."),
+                     h5("Reading the plot"),
+                     tags$ul(
+                       tags$li("Each grid's elements are shown in a different colour"),
+                       tags$li("Arrows connect the same element across grids, showing movement in construct space"),
+                       tags$li("Long arrows = large changes in how that element is construed"),
+                       tags$li("Short/no arrows = stable, consistent construing")
+                     ),
+                     h5("Use cases"),
+                     tags$ul(
+                       tags$li("Tracking change over time (pre/post interventions)"),
+                       tags$li("Comparing different perspectives on the same elements"),
+                       tags$li("Identifying which elements changed most in a learning context")
+                     )
+                   )
+                 )
+        ),
+
+        # ===== Exchange Grids Tab =====
+        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), "Exchange Grids"),
+                 value = "Exchange Grids",
+                 h4("Exchange Grid Analysis"),
+                 p("Structured protocol for measuring agreement and understanding between two people using Shaw's (1980) exchange procedure."),
+                 fluidRow(
+                   column(8,
+                     h5("Protocol Setup"),
+                     p("Assign each grid to its role in the exchange protocol:"),
+                     fluidRow(
+                       column(6,
+                         h5("Person A"),
+                         selectInput("exchange_1", "1. A's own grid:", choices = NULL),
+                         selectInput("exchange_4", "4. A fills B's grid (as A wants):", choices = NULL),
+                         selectInput("exchange_6", "6. A predicts B's ratings:", choices = NULL)
+                       ),
+                       column(6,
+                         h5("Person B"),
+                         selectInput("exchange_2", "2. B's own grid:", choices = NULL),
+                         selectInput("exchange_3", "3. B fills A's grid (as B wants):", choices = NULL),
+                         selectInput("exchange_5", "5. B predicts A's ratings:", choices = NULL)
+                       )
+                     ),
+                     tags$hr(),
+                     h5("Results"),
+                     plotOutput("exchange_plot", height = "400px"),
+                     DTOutput("exchange_results_table")
+                   ),
+                   column(4,
+                     actionButton("compute_exchange", "Run Exchange Analysis", class = "btn-primary"),
+                     tags$hr(),
+                     h5("Quick Summary"),
+                     verbatimTextOutput("exchange_summary"),
+                     tags$hr(),
+                     downloadButton("download_exchange_plot", "Download Plot"),
+                     downloadButton("download_exchange_csv", "Download Results (CSV)")
+                   )
+                 ),
+                 tags$hr(),
+                 actionButton("help_exchange", "Help me understand this", class = "btn-info help-btn"),
+                 conditionalPanel(
+                   condition = "input.help_exchange % 2 == 1",
+                   div(class = "help-content",
+                     h5("Exchange Grid Protocol"),
+                     p("The Exchange Grid protocol (Shaw, 1980) measures both agreement and understanding between two people."),
+                     h5("The 6 grids"),
+                     tags$ol(
+                       tags$li("A's own grid - A rates elements on A's constructs"),
+                       tags$li("B's own grid - B rates elements on B's constructs"),
+                       tags$li("B fills A's grid as B would - shows B's perspective on A's constructs"),
+                       tags$li("A fills B's grid as A would - shows A's perspective on B's constructs"),
+                       tags$li("B predicts A's ratings - shows B's understanding of how A construes"),
+                       tags$li("A predicts B's ratings - shows A's understanding of how B construes")
+                     ),
+                     h5("Measurements"),
+                     tags$ul(
+                       tags$li(tags$strong("Agreement (grids 1&3, 2&4):"), " Do they construe elements similarly?"),
+                       tags$li(tags$strong("Understanding (grids 1&5, 2&6):"), " Can they predict how the other person rates elements?")
+                     )
+                   )
+                 )
+        ),
+
+        # ===== Class Metagrids Tab =====
+        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), "Class Metagrids"),
+                 value = "Class Metagrids",
+                 h4("Class Metagrids"),
+                 p("Create a higher-order grid where your grids become elements, rated on user-defined constructs for classification and comparison."),
+                 fluidRow(
+                   column(8,
+                     h5("Grid Elements (from your collection)"),
+                     DTOutput("metagrid_grids_table"),
+                     tags$hr(),
+                     h5("Define Meta-Constructs"),
+                     fluidRow(
+                       column(5, textInput("meta_left_pole", "Left Pole:", placeholder = "e.g., Expert perspective")),
+                       column(5, textInput("meta_right_pole", "Right Pole:", placeholder = "e.g., Novice perspective")),
+                       column(2, actionButton("add_meta_construct", "Add", class = "btn-primary btn-sm",
+                                              style = "margin-top: 24px;"))
+                     ),
+                     DTOutput("meta_constructs_table"),
+                     tags$hr(),
+                     h5("Rate Grids on Meta-Constructs"),
+                     uiOutput("meta_ratings_ui")
+                   ),
+                   column(4,
+                     actionButton("build_metagrid", "Build Metagrid", class = "btn-primary"),
+                     tags$hr(),
+                     actionButton("use_metagrid_as_current", "Analyse as Current Grid", class = "btn-success btn-sm"),
+                     tags$small(class = "text-muted", "Loads the metagrid into the editor for full analysis with all single-grid tools."),
+                     tags$hr(),
+                     downloadButton("download_metagrid", "Download Metagrid (.rgrid)")
+                   )
+                 ),
+                 tags$hr(),
+                 h5("Metagrid Preview"),
+                 DTOutput("metagrid_preview"),
+                 tags$hr(),
+                 actionButton("help_metagrid", "Help me understand this", class = "btn-info help-btn"),
+                 conditionalPanel(
+                   condition = "input.help_metagrid % 2 == 1",
+                   div(class = "help-content",
+                     h5("Class Metagrids"),
+                     p("A metagrid treats your grid collection as a set of elements and lets you classify them using new constructs."),
+                     h5("How to use"),
+                     tags$ol(
+                       tags$li("Your loaded grids automatically become the elements"),
+                       tags$li("Define bipolar constructs for classifying grids (e.g., 'Expert - Novice')"),
+                       tags$li("Rate each grid on each construct using the 1-7 scale"),
+                       tags$li("Click 'Build Metagrid' to create the higher-order grid"),
+                       tags$li("Click 'Analyse as Current Grid' to run FOCUS, PCA, etc. on the metagrid")
+                     ),
+                     h5("Example constructs"),
+                     tags$ul(
+                       tags$li("'Expert perspective - Novice perspective'"),
+                       tags$li("'Detailed grid - Sparse grid'"),
+                       tags$li("'Positive overall - Negative overall'")
+                     )
+                   )
+                 )
         )
       )
     )
@@ -1186,7 +1535,15 @@ server <- function(input, output, session) {
     match_matrix = NULL,             # Grid-to-grid match percentages
     socionet_data = NULL,            # Network data for visualization
     mode_grid = NULL,                # Generated Mode (consensus) grid
-    composite_grid = NULL            # Generated Composite grid
+    composite_grid = NULL,           # Generated Composite grid
+
+    # New analysis results
+    minus_result = NULL,             # MINUS grid differences
+    core_result = NULL,              # CORE iterative comparison
+    traj_result = NULL,              # PrinGrid Trajectories PCA
+    exchange_result = NULL,          # Exchange Grid 6-grid protocol
+    metagrid = NULL,                 # Class Metagrid
+    meta_constructs = data.frame(left = character(), right = character(), stringsAsFactors = FALSE)
   )
 
   # Handle landing page continue button
@@ -3208,18 +3565,33 @@ server <- function(input, output, session) {
     show_vals <- input$focus_show_values
     show_shade <- input$focus_show_shading
     use_col <- input$focus_use_color
+    use_spaced <- isTRUE(input$focus_spaced)
 
-    plot_focus_cluster(
-      focus_result = result,
-      title = "Focus Cluster Analysis",
-      show_values = show_vals,
-      show_shading = show_shade,
-      use_color = use_col,
-      text_size = txt_size,
-      cell_size = cell_size,
-      heat_low = colors$heat_low,
-      heat_high = colors$heat_high
-    )
+    if (use_spaced) {
+      plot_focus_spaced(
+        focus_result = result,
+        title = "SPACED: Focus Cluster Analysis",
+        show_values = show_vals,
+        show_shading = show_shade,
+        use_color = use_col,
+        text_size = txt_size,
+        cell_size = cell_size,
+        heat_low = colors$heat_low,
+        heat_high = colors$heat_high
+      )
+    } else {
+      plot_focus_cluster(
+        focus_result = result,
+        title = "Focus Cluster Analysis",
+        show_values = show_vals,
+        show_shading = show_shade,
+        use_color = use_col,
+        text_size = txt_size,
+        cell_size = cell_size,
+        heat_low = colors$heat_low,
+        heat_high = colors$heat_high
+      )
+    }
   })
 
   output$focus_element_matches <- renderPrint({
@@ -3296,19 +3668,34 @@ server <- function(input, output, session) {
       colors <- get_palette_colors(input$focus_palette)
       txt_size <- input$text_size
       cell_size <- input$grid_cell_size
+      use_spaced <- isTRUE(input$focus_spaced)
 
       png(file, width = 1200, height = 900, res = 120)
-      plot_focus_cluster(
-        focus_result = result,
-        title = "Focus Cluster Analysis",
-        show_values = input$focus_show_values,
-        show_shading = input$focus_show_shading,
-        use_color = input$focus_use_color,
-        text_size = txt_size,
-        cell_size = cell_size,
-        heat_low = colors$heat_low,
-        heat_high = colors$heat_high
-      )
+      if (use_spaced) {
+        plot_focus_spaced(
+          focus_result = result,
+          title = "SPACED: Focus Cluster Analysis",
+          show_values = input$focus_show_values,
+          show_shading = input$focus_show_shading,
+          use_color = input$focus_use_color,
+          text_size = txt_size,
+          cell_size = cell_size,
+          heat_low = colors$heat_low,
+          heat_high = colors$heat_high
+        )
+      } else {
+        plot_focus_cluster(
+          focus_result = result,
+          title = "Focus Cluster Analysis",
+          show_values = input$focus_show_values,
+          show_shading = input$focus_show_shading,
+          use_color = input$focus_use_color,
+          text_size = txt_size,
+          cell_size = cell_size,
+          heat_low = colors$heat_low,
+          heat_high = colors$heat_high
+        )
+      }
       dev.off()
     }
   )
@@ -3415,7 +3802,8 @@ server <- function(input, output, session) {
     dend_elem = NULL,
     dend_const = NULL,
     focus = NULL,
-    stats = NULL
+    stats = NULL,
+    foci = NULL
   )
 
   # Helper to render chat response UI
@@ -4352,6 +4740,552 @@ server <- function(input, output, session) {
         lines <- c(lines, paste0("E", i - 1, "\t", g$elements[i], "\t", scores_str))
       }
       # Write metadata
+      lines <- c(lines, paste0("_UID\t", g$id))
+      lines <- c(lines, paste0("_Date\t", format(Sys.time(), "%Y-%m-%d")))
+      lines <- c(lines, paste0("_Time\t", format(Sys.time(), "%H:%M:%S")))
+
+      writeLines(lines, file)
+    }
+  )
+
+  # ===== NAVIGATION LINKS FOR NEW ANALYSES =====
+
+  observeEvent(input$goto_minus, {
+    updateTabsetPanel(session, "main_tabs", selected = "MINUS")
+  })
+
+  observeEvent(input$goto_core, {
+    updateTabsetPanel(session, "main_tabs", selected = "CORE")
+  })
+
+  observeEvent(input$goto_trajectories, {
+    updateTabsetPanel(session, "main_tabs", selected = "PrinGrid Trajectories")
+  })
+
+  observeEvent(input$goto_exchange, {
+    updateTabsetPanel(session, "main_tabs", selected = "Exchange Grids")
+  })
+
+  observeEvent(input$goto_metagrids, {
+    updateTabsetPanel(session, "main_tabs", selected = "Class Metagrids")
+  })
+
+  # ===== FOCI: Interpretive FOCUS =====
+
+  output$foci_response <- renderUI({
+    render_chat_response(chat_responses$foci)
+  })
+
+  observeEvent(input$run_foci, {
+    req(focus_result())
+    chat_responses$foci <- list(loading = TRUE, success = FALSE)
+
+    construct_labels <- paste(rv$constructs$left, "-", rv$constructs$right)
+    extra <- generate_focus_interpretation_context(
+      focus_result(), rv$elements, construct_labels,
+      cutoff = if (!is.null(input$focus_cutoff)) input$focus_cutoff else 80
+    )
+
+    question <- "Please provide a comprehensive interpretation of this FOCUS cluster analysis. Identify the main element clusters and construct clusters, explain what they mean in terms of how this person construes these elements, and note any constructs that may be redundant or closely related."
+
+    result <- ask_claude_about_grid("Focus Cluster", question,
+                                    generate_grid_summary(), repplus_docs, extra)
+    chat_responses$foci <- list(loading = FALSE, success = result$success,
+                                 response = result$response, error = result$error)
+  })
+
+  observeEvent(input$copy_foci, {
+    req(focus_result())
+
+    construct_labels <- paste(rv$constructs$left, "-", rv$constructs$right)
+    extra <- generate_focus_interpretation_context(
+      focus_result(), rv$elements, construct_labels,
+      cutoff = if (!is.null(input$focus_cutoff)) input$focus_cutoff else 80
+    )
+
+    question <- "Please provide a comprehensive interpretation of this FOCUS cluster analysis. Identify the main element clusters and construct clusters, explain what they mean, and note any constructs that may be redundant."
+    context <- generate_claude_context("Focus Cluster", question,
+                                       generate_grid_summary(), extra)
+    session$sendCustomMessage("copyToClipboard", context)
+  })
+
+  # ===== MINUS ANALYSIS =====
+
+  # Populate grid dropdowns for MINUS
+  observe({
+    req(nrow(rv$grid_metadata) > 0)
+    choices <- setNames(rv$grid_metadata$grid_id, rv$grid_metadata$name)
+    updateSelectInput(session, "minus_grid_a", choices = choices)
+    updateSelectInput(session, "minus_grid_b", choices = choices)
+  })
+
+  observeEvent(input$compute_minus, {
+    req(input$minus_grid_a, input$minus_grid_b)
+    req(input$minus_grid_a != input$minus_grid_b)
+
+    grid_a <- rv$grid_collection[[input$minus_grid_a]]
+    grid_b <- rv$grid_collection[[input$minus_grid_b]]
+
+    # Compute common elements AND constructs
+    common_elem <- intersect(grid_a$elements, grid_b$elements)
+    labels_a <- paste(grid_a$constructs$left, "-", grid_a$constructs$right)
+    labels_b <- paste(grid_b$constructs$left, "-", grid_b$constructs$right)
+    common_const <- intersect(labels_a, labels_b)
+
+    if (length(common_elem) < 2) {
+      showNotification("Grids need at least 2 common elements", type = "error")
+      return()
+    }
+    if (length(common_const) < 1) {
+      showNotification("Grids need at least 1 common construct", type = "error")
+      return()
+    }
+
+    tryCatch({
+      rv$minus_result <- compute_minus_grid(grid_a, grid_b, common_elem, common_const)
+      showNotification("MINUS analysis complete", type = "message")
+    }, error = function(e) {
+      showNotification(paste("Error:", e$message), type = "error")
+    })
+  })
+
+  output$minus_plot <- renderPlot({
+    req(rv$minus_result)
+    plot_minus_grid(rv$minus_result,
+                    show_values = input$minus_show_values,
+                    show_pct = input$minus_show_pct,
+                    text_size = input$minus_text_size)
+  })
+
+  output$minus_summary <- renderPrint({
+    req(rv$minus_result)
+    r <- rv$minus_result
+    cat("MINUS Analysis:", r$grid_a_name, "-", r$grid_b_name, "\n\n")
+    cat("Common elements:", length(r$elements), "\n")
+    cat("Common constructs:", length(r$construct_labels), "\n\n")
+    cat("Mean absolute difference:", round(r$mean_abs_diff, 2), "\n")
+    cat("Maximum absolute difference:", round(r$max_diff, 2), "\n\n")
+
+    # Find location of max difference
+    max_idx <- which(abs(r$diff_mat) == r$max_diff, arr.ind = TRUE)[1, ]
+    cat("Largest difference at:\n")
+    cat("  Element:", r$elements[max_idx[1]], "\n")
+    cat("  Construct:", r$construct_labels[max_idx[2]], "\n")
+    cat("  Difference:", round(r$diff_mat[max_idx[1], max_idx[2]], 1), "\n")
+  })
+
+  output$download_minus_plot <- downloadHandler(
+    filename = function() paste0("minus-analysis-", Sys.Date(), ".png"),
+    content = function(file) {
+      req(rv$minus_result)
+      png(file, width = 1000, height = 700, res = 120)
+      plot_minus_grid(rv$minus_result,
+                      show_values = input$minus_show_values,
+                      show_pct = input$minus_show_pct,
+                      text_size = input$minus_text_size)
+      dev.off()
+    }
+  )
+
+  output$download_minus_csv <- downloadHandler(
+    filename = function() paste0("minus-differences-", Sys.Date(), ".csv"),
+    content = function(file) {
+      req(rv$minus_result)
+      write.csv(rv$minus_result$diff_mat, file)
+    }
+  )
+
+  # ===== CORE ANALYSIS =====
+
+  # Populate grid dropdowns for CORE
+  observe({
+    req(nrow(rv$grid_metadata) > 0)
+    choices <- setNames(rv$grid_metadata$grid_id, rv$grid_metadata$name)
+    updateSelectInput(session, "core_grid_a", choices = choices)
+    updateSelectInput(session, "core_grid_b", choices = choices)
+  })
+
+  observeEvent(input$compute_core, {
+    req(input$core_grid_a, input$core_grid_b)
+    req(input$core_grid_a != input$core_grid_b)
+
+    grid_a <- rv$grid_collection[[input$core_grid_a]]
+    grid_b <- rv$grid_collection[[input$core_grid_b]]
+
+    common_elem <- intersect(grid_a$elements, grid_b$elements)
+    labels_a <- paste(grid_a$constructs$left, "-", grid_a$constructs$right)
+    labels_b <- paste(grid_b$constructs$left, "-", grid_b$constructs$right)
+    common_const <- intersect(labels_a, labels_b)
+
+    if (length(common_elem) < 2) {
+      showNotification("Grids need at least 2 common elements", type = "error")
+      return()
+    }
+    if (length(common_const) < 1) {
+      showNotification("Grids need at least 1 common construct", type = "error")
+      return()
+    }
+
+    tryCatch({
+      rv$core_result <- compute_core_analysis(grid_a, grid_b, common_elem, common_const,
+                                               min_elements = input$core_min_elements,
+                                               min_constructs = input$core_min_constructs)
+      showNotification("CORE analysis complete", type = "message")
+    }, error = function(e) {
+      showNotification(paste("Error:", e$message), type = "error")
+    })
+  })
+
+  output$core_plot <- renderPlot({
+    req(rv$core_result)
+    plot_core_analysis(rv$core_result, text_size = input$core_text_size)
+  })
+
+  output$core_steps_table <- renderDT({
+    req(rv$core_result)
+    if (nrow(rv$core_result$steps) == 0) {
+      return(datatable(data.frame(Message = "No removals needed - grids already maximally similar"),
+                       options = list(dom = "t")))
+    }
+    datatable(rv$core_result$steps,
+              options = list(pageLength = 20, dom = "t", scrollX = TRUE),
+              colnames = c("Step", "Type", "Removed", "Similarity Before (%)", "Similarity After (%)"))
+  })
+
+  output$core_summary <- renderPrint({
+    req(rv$core_result)
+    r <- rv$core_result
+    cat("CORE Analysis:", r$grid_a_name, "vs", r$grid_b_name, "\n\n")
+    cat("Initial similarity:", round(r$initial_similarity, 1), "%\n")
+    cat("Core similarity:", round(r$core_similarity, 1), "%\n\n")
+    cat("Elements removed:", r$n_elements_removed, "\n")
+    cat("Constructs removed:", r$n_constructs_removed, "\n\n")
+    cat("Core elements (", length(r$core_elements), "):", paste(r$core_elements, collapse = ", "), "\n")
+    cat("Core constructs (", length(r$core_constructs), "):", paste(r$core_constructs, collapse = ", "), "\n")
+  })
+
+  # Load core grid into editor and switch to Focus
+  observeEvent(input$core_to_focus, {
+    req(rv$core_result)
+    r <- rv$core_result
+
+    # Build grid from core (average of A and B)
+    core_avg <- (r$core_mat_a + r$core_mat_b) / 2
+    constructs_df <- data.frame(
+      left = sapply(strsplit(r$core_constructs, " - "), `[`, 1),
+      right = sapply(strsplit(r$core_constructs, " - "), function(x) if (length(x) > 1) x[2] else ""),
+      stringsAsFactors = FALSE
+    )
+
+    rv$elements <- r$core_elements
+    rv$constructs <- constructs_df
+    rv$scores_mat_last <- core_avg
+    rv$repgrid_last <- NULL
+
+    # Build ratings data frame
+    construct_labels <- paste(constructs_df$left, "-", constructs_df$right)
+    ratings_list <- list()
+    for (i in seq_along(r$core_elements)) {
+      for (j in seq_along(construct_labels)) {
+        ratings_list[[length(ratings_list) + 1]] <- data.frame(
+          element = r$core_elements[i],
+          construct = construct_labels[j],
+          rating = round(core_avg[i, j], 1),
+          stringsAsFactors = FALSE
+        )
+      }
+    }
+    rv$ratings <- do.call(rbind, ratings_list)
+
+    showNotification("Core grid loaded - running Focus analysis", type = "message")
+    updateTabsetPanel(session, "main_tabs", selected = "Focus Cluster")
+  })
+
+  output$download_core_plot <- downloadHandler(
+    filename = function() paste0("core-analysis-", Sys.Date(), ".png"),
+    content = function(file) {
+      req(rv$core_result)
+      png(file, width = 1200, height = 700, res = 120)
+      plot_core_analysis(rv$core_result, text_size = input$core_text_size)
+      dev.off()
+    }
+  )
+
+  output$download_core_csv <- downloadHandler(
+    filename = function() paste0("core-removal-log-", Sys.Date(), ".csv"),
+    content = function(file) {
+      req(rv$core_result)
+      write.csv(rv$core_result$steps, file, row.names = FALSE)
+    }
+  )
+
+  # ===== PRINGRID TRAJECTORIES =====
+
+  observeEvent(input$compute_trajectories, {
+    req(length(rv$selected_grids) >= 2)
+    req(length(rv$common_elements) >= 2)
+
+    selected_grids <- rv$grid_collection[rv$selected_grids]
+    names(selected_grids) <- sapply(selected_grids, function(g) g$name)
+
+    tryCatch({
+      rv$traj_result <- compute_pringrid_trajectories(selected_grids, rv$common_elements)
+      showNotification("Trajectories computed", type = "message")
+    }, error = function(e) {
+      showNotification(paste("Error:", e$message), type = "error")
+    })
+  })
+
+  output$pringrid_traj_plot <- renderPlot({
+    req(rv$traj_result)
+    plot_pringrid_trajectories(rv$traj_result,
+      show_arrows = input$traj_show_arrows,
+      show_labels = input$traj_show_labels,
+      show_constructs = input$traj_show_constructs,
+      text_size = input$traj_text_size)
+  })
+
+  output$traj_variance <- renderPrint({
+    req(rv$traj_result)
+    cat("Variance explained by principal components:\n")
+    ve <- rv$traj_result$variance_explained
+    for (i in seq_along(ve)) {
+      cat(sprintf("  PC%d: %.1f%%\n", i, ve[i]))
+    }
+    cat(sprintf("\nTotal (PC1+PC2): %.1f%%\n", sum(ve[1:min(2, length(ve))])))
+  })
+
+  output$download_traj_plot <- downloadHandler(
+    filename = function() paste0("pringrid-trajectories-", Sys.Date(), ".png"),
+    content = function(file) {
+      req(rv$traj_result)
+      png(file, width = 1200, height = 900, res = 120)
+      plot_pringrid_trajectories(rv$traj_result,
+        show_arrows = input$traj_show_arrows,
+        show_labels = input$traj_show_labels,
+        show_constructs = input$traj_show_constructs,
+        text_size = input$traj_text_size)
+      dev.off()
+    }
+  )
+
+  output$download_traj_csv <- downloadHandler(
+    filename = function() paste0("pringrid-positions-", Sys.Date(), ".csv"),
+    content = function(file) {
+      req(rv$traj_result)
+      all_positions <- do.call(rbind, rv$traj_result$element_positions)
+      write.csv(all_positions, file, row.names = FALSE)
+    }
+  )
+
+  # ===== EXCHANGE GRIDS =====
+
+  # Populate exchange grid dropdowns
+  observe({
+    req(nrow(rv$grid_metadata) > 0)
+    choices <- setNames(rv$grid_metadata$grid_id, rv$grid_metadata$name)
+    updateSelectInput(session, "exchange_1", choices = choices)
+    updateSelectInput(session, "exchange_2", choices = choices)
+    updateSelectInput(session, "exchange_3", choices = choices)
+    updateSelectInput(session, "exchange_4", choices = choices)
+    updateSelectInput(session, "exchange_5", choices = choices)
+    updateSelectInput(session, "exchange_6", choices = choices)
+  })
+
+  observeEvent(input$compute_exchange, {
+    req(input$exchange_1, input$exchange_2, input$exchange_3,
+        input$exchange_4, input$exchange_5, input$exchange_6)
+
+    # Collect the 6 grids in protocol order
+    grid_ids <- c(input$exchange_1, input$exchange_2, input$exchange_3,
+                  input$exchange_4, input$exchange_5, input$exchange_6)
+
+    grids <- lapply(grid_ids, function(id) rv$grid_collection[[id]])
+
+    tryCatch({
+      rv$exchange_result <- compute_exchange_analysis(grids)
+      showNotification("Exchange analysis complete", type = "message")
+    }, error = function(e) {
+      showNotification(paste("Error:", e$message), type = "error")
+    })
+  })
+
+  output$exchange_plot <- renderPlot({
+    req(rv$exchange_result)
+    s <- rv$exchange_result$summary
+
+    par(mar = c(8, 5, 4, 2), family = "sans")
+
+    # Bar chart: initial vs core similarity for each pair
+    bar_data <- rbind(s$Initial, s$Core)
+    colnames(bar_data) <- s$Pair
+
+    barplot(bar_data, beside = TRUE, col = c("#0072B2", "#D55E00"),
+            main = "Exchange Grid Analysis: Agreement & Understanding",
+            ylab = "Similarity (%)", ylim = c(0, 100),
+            las = 2, cex.names = 0.8, cex.main = 1.2)
+
+    legend("topright", legend = c("Initial", "Core"),
+           fill = c("#0072B2", "#D55E00"), cex = 0.9)
+
+    abline(h = 50, lty = 2, col = "gray60")
+  })
+
+  output$exchange_results_table <- renderDT({
+    req(rv$exchange_result)
+    s <- rv$exchange_result$summary
+    s$Initial <- round(s$Initial, 1)
+    s$Core <- round(s$Core, 1)
+    datatable(s, options = list(dom = "t", scrollX = TRUE),
+              colnames = c("Pair", "Description", "Initial Similarity (%)", "Core Similarity (%)"))
+  })
+
+  output$exchange_summary <- renderPrint({
+    req(rv$exchange_result)
+    s <- rv$exchange_result$summary
+    cat("Exchange Grid Analysis Summary\n")
+    cat("==============================\n\n")
+    cat("Agreement:\n")
+    cat(sprintf("  A's construing: %.1f%% -> %.1f%% (core)\n", s$Initial[1], s$Core[1]))
+    cat(sprintf("  B's construing: %.1f%% -> %.1f%% (core)\n", s$Initial[2], s$Core[2]))
+    cat("\nUnderstanding:\n")
+    cat(sprintf("  B understands A: %.1f%% -> %.1f%% (core)\n", s$Initial[3], s$Core[3]))
+    cat(sprintf("  A understands B: %.1f%% -> %.1f%% (core)\n", s$Initial[4], s$Core[4]))
+  })
+
+  output$download_exchange_plot <- downloadHandler(
+    filename = function() paste0("exchange-analysis-", Sys.Date(), ".png"),
+    content = function(file) {
+      req(rv$exchange_result)
+      s <- rv$exchange_result$summary
+      png(file, width = 1000, height = 600, res = 120)
+      par(mar = c(8, 5, 4, 2), family = "sans")
+      bar_data <- rbind(s$Initial, s$Core)
+      colnames(bar_data) <- s$Pair
+      barplot(bar_data, beside = TRUE, col = c("#0072B2", "#D55E00"),
+              main = "Exchange Grid Analysis: Agreement & Understanding",
+              ylab = "Similarity (%)", ylim = c(0, 100),
+              las = 2, cex.names = 0.8, cex.main = 1.2)
+      legend("topright", legend = c("Initial", "Core"),
+             fill = c("#0072B2", "#D55E00"), cex = 0.9)
+      dev.off()
+    }
+  )
+
+  output$download_exchange_csv <- downloadHandler(
+    filename = function() paste0("exchange-results-", Sys.Date(), ".csv"),
+    content = function(file) {
+      req(rv$exchange_result)
+      write.csv(rv$exchange_result$summary, file, row.names = FALSE)
+    }
+  )
+
+  # ===== CLASS METAGRIDS =====
+
+  output$metagrid_grids_table <- renderDT({
+    req(nrow(rv$grid_metadata) > 0)
+    df <- rv$grid_metadata[, c("name", "n_elements", "n_constructs")]
+    colnames(df) <- c("Grid Name", "Elements", "Constructs")
+    datatable(df, options = list(pageLength = 20, dom = "t"), selection = "none")
+  })
+
+  observeEvent(input$add_meta_construct, {
+    req(input$meta_left_pole != "", input$meta_right_pole != "")
+    rv$meta_constructs <- rbind(rv$meta_constructs, data.frame(
+      left = trimws(input$meta_left_pole),
+      right = trimws(input$meta_right_pole),
+      stringsAsFactors = FALSE
+    ))
+    updateTextInput(session, "meta_left_pole", value = "")
+    updateTextInput(session, "meta_right_pole", value = "")
+  })
+
+  output$meta_constructs_table <- renderDT({
+    req(nrow(rv$meta_constructs) > 0)
+    datatable(rv$meta_constructs,
+              colnames = c("Left Pole", "Right Pole"),
+              options = list(dom = "t"), selection = "none")
+  })
+
+  # Dynamic rating UI: sliders for each grid x construct
+  output$meta_ratings_ui <- renderUI({
+    req(nrow(rv$grid_metadata) > 0, nrow(rv$meta_constructs) > 0)
+    grid_names <- rv$grid_metadata$name
+    construct_labels <- paste(rv$meta_constructs$left, "-", rv$meta_constructs$right)
+
+    tagList(
+      lapply(seq_along(construct_labels), function(j) {
+        tagList(
+          h5(construct_labels[j]),
+          lapply(seq_along(grid_names), function(i) {
+            input_id <- paste0("meta_rate_", i, "_", j)
+            sliderInput(input_id, grid_names[i],
+                        min = 1, max = 7, value = 4, step = 1)
+          })
+        )
+      })
+    )
+  })
+
+  observeEvent(input$build_metagrid, {
+    req(nrow(rv$grid_metadata) > 0, nrow(rv$meta_constructs) > 0)
+
+    grid_names <- rv$grid_metadata$name
+    construct_labels <- paste(rv$meta_constructs$left, "-", rv$meta_constructs$right)
+
+    # Collect ratings from dynamic inputs
+    scores_mat <- matrix(NA_real_, nrow = length(grid_names), ncol = length(construct_labels))
+
+    for (i in seq_along(grid_names)) {
+      for (j in seq_along(construct_labels)) {
+        input_id <- paste0("meta_rate_", i, "_", j)
+        val <- input[[input_id]]
+        if (!is.null(val)) scores_mat[i, j] <- val
+      }
+    }
+
+    tryCatch({
+      rv$metagrid <- create_metagrid(grid_names, rv$meta_constructs, scores_mat)
+      showNotification("Metagrid built", type = "message")
+    }, error = function(e) {
+      showNotification(paste("Error:", e$message), type = "error")
+    })
+  })
+
+  output$metagrid_preview <- renderDT({
+    req(rv$metagrid)
+    df <- as.data.frame(rv$metagrid$scores_mat)
+    df <- cbind(Grid = rv$metagrid$elements, df)
+    datatable(df, options = list(dom = "t", scrollX = TRUE))
+  })
+
+  # Load metagrid as current grid for full analysis
+  observeEvent(input$use_metagrid_as_current, {
+    req(rv$metagrid)
+    g <- rv$metagrid
+    rv$elements <- g$elements
+    rv$constructs <- g$constructs[, c("left", "right")]
+    rv$ratings <- g$ratings
+    rv$scores_mat_last <- g$scores_mat
+    rv$repgrid_last <- NULL
+    showNotification("Metagrid loaded as current grid - use analysis tabs to explore", type = "message")
+    updateTabsetPanel(session, "main_tabs", selected = "Focus Cluster")
+  })
+
+  output$download_metagrid <- downloadHandler(
+    filename = function() paste0("class-metagrid-", Sys.Date(), ".rgrid"),
+    content = function(file) {
+      req(rv$metagrid)
+      g <- rv$metagrid
+
+      lines <- character()
+      for (i in seq_len(nrow(g$constructs))) {
+        lines <- c(lines, paste0("C", i - 1, "\t", g$constructs$left[i], "\t", g$constructs$right[i]))
+      }
+      for (i in seq_along(g$elements)) {
+        scores_str <- paste(round(g$scores_mat[i, ], 1), collapse = "\t")
+        lines <- c(lines, paste0("E", i - 1, "\t", g$elements[i], "\t", scores_str))
+      }
       lines <- c(lines, paste0("_UID\t", g$id))
       lines <- c(lines, paste0("_Date\t", format(Sys.time(), "%Y-%m-%d")))
       lines <- c(lines, paste0("_Time\t", format(Sys.time(), "%H:%M:%S")))

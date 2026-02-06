@@ -177,3 +177,69 @@ ask_claude_about_grid <- function(viz_type, question, grid_summary, docs = NULL,
 
   call_claude_api(user_prompt, system_prompt)
 }
+
+#' Generate structured FOCUS data for FOCI interpretation
+#' @param focus_result Output from focus_cluster()
+#' @param element_names Original element names
+#' @param construct_labels Original construct labels ("left - right")
+#' @param cutoff Similarity cutoff for reporting matches
+#' @return Character string with structured data for Claude prompt
+generate_focus_interpretation_context <- function(focus_result, element_names, construct_labels,
+                                                    cutoff = 80) {
+  elem_sim <- focus_result$element_similarities
+  const_sim <- focus_result$construct_similarities
+
+  lines <- character()
+  lines <- c(lines, "=== FOCUS CLUSTER ANALYSIS DATA ===\n")
+
+  # Element clusters
+  lines <- c(lines, "ELEMENT SIMILARITY PAIRS (above cutoff):")
+  for (i in 1:(nrow(elem_sim) - 1)) {
+    for (j in (i + 1):ncol(elem_sim)) {
+      if (elem_sim[i, j] >= cutoff) {
+        lines <- c(lines, sprintf("  %s <-> %s: %.1f%% match",
+                                  element_names[i], element_names[j], elem_sim[i, j]))
+      }
+    }
+  }
+
+  # Construct clusters
+  lines <- c(lines, "\nCONSTRUCT SIMILARITY PAIRS (above cutoff):")
+  for (i in 1:(nrow(const_sim) - 1)) {
+    for (j in (i + 1):ncol(const_sim)) {
+      if (const_sim[i, j] >= cutoff) {
+        lines <- c(lines, sprintf("  %s <-> %s: %.1f%% match",
+                                  construct_labels[i], construct_labels[j], const_sim[i, j]))
+      }
+    }
+  }
+
+  # Dendrogram structure
+  lines <- c(lines, "\nELEMENT CLUSTER ORDER (from Focus sorting):")
+  lines <- c(lines, paste("  ", paste(focus_result$sorted_elements, collapse = " | ")))
+
+  lines <- c(lines, "\nCONSTRUCT CLUSTER ORDER (from Focus sorting):")
+  lines <- c(lines, paste("  ", paste(focus_result$sorted_constructs, collapse = " | ")))
+
+  # Merge heights indicate cluster tightness
+  lines <- c(lines, "\nELEMENT DENDROGRAM MERGE HEIGHTS (lower = more similar):")
+  eh <- focus_result$element_hclust$height
+  lines <- c(lines, paste("  ", paste(round(eh, 1), collapse = ", ")))
+
+  lines <- c(lines, "\nCONSTRUCT DENDROGRAM MERGE HEIGHTS:")
+  ch <- focus_result$construct_hclust$height
+  lines <- c(lines, paste("  ", paste(round(ch, 1), collapse = ", ")))
+
+  # Sorted matrix
+  lines <- c(lines, "\nSORTED RATING MATRIX:")
+  mat <- focus_result$sorted_matrix
+  header <- paste("", paste(focus_result$sorted_constructs, collapse = "\t"))
+  lines <- c(lines, header)
+  for (i in seq_len(nrow(mat))) {
+    row_str <- paste(focus_result$sorted_elements[i], "\t",
+                     paste(round(mat[i, ], 0), collapse = "\t"))
+    lines <- c(lines, row_str)
+  }
+
+  paste(lines, collapse = "\n")
+}

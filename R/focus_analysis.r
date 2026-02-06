@@ -217,3 +217,159 @@ plot_focus_cluster <- function(focus_result, title = "Focus Cluster Analysis",
   # Reset layout
   layout(1)
 }
+
+#' Plot Focus cluster with SPACED proportional spacing
+#' Spaces rows/columns proportionally to their similarity distances
+plot_focus_spaced <- function(focus_result, title = "SPACED: Focus Cluster Analysis",
+                              show_values = TRUE, show_shading = TRUE, use_color = FALSE,
+                              text_size = 1.0, cell_size = 1.0,
+                              heat_low = "#0072B2", heat_high = "#D55E00") {
+  n_elem <- nrow(focus_result$sorted_matrix)
+  n_const <- ncol(focus_result$sorted_matrix)
+  sorted_matrix <- focus_result$sorted_matrix
+
+  # Compute spacing from cophenetic distances
+  elem_coph <- as.matrix(cophenetic(focus_result$element_hclust))
+  const_coph <- as.matrix(cophenetic(focus_result$construct_hclust))
+
+  # Get ordered cophenetic distances between adjacent items
+  elem_order <- focus_result$element_order
+  const_order <- focus_result$construct_order
+
+  # Element positions: cumulative distances between adjacent sorted items
+  elem_pos <- numeric(n_elem)
+  elem_pos[1] <- 1
+  if (n_elem > 1) {
+    for (i in 2:n_elem) {
+      dist <- elem_coph[elem_order[i-1], elem_order[i]]
+      # Scale: small distance = close together, large = far apart
+      # Normalize to reasonable spacing (min 0.5, max 2.0 units)
+      spacing <- 0.5 + (dist / max(elem_coph)) * 1.5
+      elem_pos[i] <- elem_pos[i-1] + spacing
+    }
+  }
+
+  # Construct positions: same approach
+  const_pos <- numeric(n_const)
+  const_pos[1] <- 1
+  if (n_const > 1) {
+    for (j in 2:n_const) {
+      dist <- const_coph[const_order[j-1], const_order[j]]
+      spacing <- 0.5 + (dist / max(const_coph)) * 1.5
+      const_pos[j] <- const_pos[j-1] + spacing
+    }
+  }
+
+  # Calculate adaptive margins
+  max_elem_chars <- max(nchar(focus_result$sorted_elements))
+  max_const_chars <- max(nchar(focus_result$sorted_constructs))
+  left_mar <- min(12 * text_size, max(4, max_elem_chars * 0.4 * text_size))
+  bottom_mar <- min(10 * text_size, max(4, max_const_chars * 0.25 * text_size))
+
+  # Set up layout: dendrograms + main plot
+  layout_matrix <- matrix(c(0, 1, 0,
+                           2, 3, 4),
+                         nrow = 2, byrow = TRUE)
+
+  dendro_height <- max(0.15, min(0.22, 0.18))
+  main_height <- 1 - dendro_height
+  side_width <- max(0.14, min(0.20, 0.17))
+  main_width <- 1 - 2 * side_width
+
+  layout(layout_matrix,
+         widths = c(side_width, main_width, side_width),
+         heights = c(dendro_height, main_height))
+
+  # Top dendrogram (constructs)
+  par(mar = c(0, left_mar, 2, 0.5), cex = text_size, cex.main = text_size * 1.2)
+  plot(as.dendrogram(focus_result$construct_hclust),
+       horiz = FALSE, leaflab = "none",
+       main = title, axes = FALSE)
+
+  # Left dendrogram (elements)
+  par(mar = c(bottom_mar, 0, 0.5, 0), cex = text_size)
+  plot(as.dendrogram(focus_result$element_hclust),
+       horiz = TRUE, leaflab = "none", axes = FALSE)
+
+  # Main grid plot with proportional spacing
+  par(mar = c(bottom_mar, left_mar, 0.5, 0.5), cex = text_size)
+
+  # Cell half-widths for rect drawing
+  elem_hw <- min(diff(elem_pos), 0.5) / 2 * 0.9
+  const_hw <- min(diff(const_pos), 0.5) / 2 * 0.9
+  if (n_elem == 1) elem_hw <- 0.4
+  if (n_const == 1) const_hw <- 0.4
+
+  # Set up colors
+  if (show_shading) {
+    if (use_color) {
+      color_ramp <- colorRampPalette(c(heat_low, "#FFFFFF", heat_high))(100)
+    } else {
+      color_ramp <- gray.colors(100, start = 0.95, end = 0.2)
+    }
+    val_range <- range(sorted_matrix, na.rm = TRUE)
+    if (diff(val_range) == 0) val_range <- c(val_range[1] - 0.5, val_range[2] + 0.5)
+  }
+
+  # Plot area
+  plot(1, type = "n",
+       xlim = c(const_pos[1] - const_hw * 1.5, const_pos[n_const] + const_hw * 1.5),
+       ylim = c(elem_pos[1] - elem_hw * 1.5, elem_pos[n_elem] + elem_hw * 1.5),
+       xlab = "", ylab = "", axes = FALSE)
+
+  # Draw cells as rectangles at non-uniform positions
+  for (i in 1:n_elem) {
+    for (j in 1:n_const) {
+      val <- sorted_matrix[i, j]
+      y <- elem_pos[n_elem - i + 1]  # Flip for top-first display
+      x <- const_pos[j]
+
+      if (show_shading && !is.na(val)) {
+        color_idx <- max(1, min(100, round((val - val_range[1]) / diff(val_range) * 99) + 1))
+        bg_col <- color_ramp[color_idx]
+      } else {
+        bg_col <- "white"
+      }
+
+      rect(x - const_hw, y - elem_hw, x + const_hw, y + elem_hw,
+           col = bg_col, border = "gray80")
+
+      if (show_values && !is.na(val)) {
+        base_cex <- max(1.0, min(1.4, 18 / max(n_elem, n_const)))
+        value_cex <- base_cex * cell_size * text_size
+        text(x, y, sprintf("%.0f", val), cex = value_cex)
+      }
+    }
+  }
+
+  # Axis labels at non-uniform positions
+  const_cex <- min(0.9, max(0.55, 12 / n_const)) * text_size
+  elem_cex <- min(0.9, max(0.55, 12 / n_elem)) * text_size
+
+  axis(1, at = const_pos, labels = focus_result$sorted_constructs,
+       las = 2, cex.axis = const_cex, tck = -0.02)
+  axis(2, at = rev(elem_pos), labels = rev(focus_result$sorted_elements),
+       las = 2, cex.axis = elem_cex, tck = -0.02)
+
+  # Right panel - similarity info
+  par(mar = c(4, 1, 0, 2))
+  elem_sim <- focus_result$element_similarities[focus_result$element_order, focus_result$element_order]
+  plot(1, type = "n", xlim = c(0, 1), ylim = c(0, 1), axes = FALSE, xlab = "", ylab = "")
+
+  text(0.5, 0.9, "Element Matches", font = 2, cex = 0.8 * text_size)
+
+  if (n_elem > 1) {
+    elem_sim_no_diag <- elem_sim
+    diag(elem_sim_no_diag) <- 0
+    top_matches <- which(elem_sim_no_diag == max(elem_sim_no_diag, na.rm = TRUE), arr.ind = TRUE)[1, ]
+    match_val <- elem_sim_no_diag[top_matches[1], top_matches[2]]
+    match_text <- paste0(focus_result$sorted_elements[top_matches[1]], " - ",
+                        focus_result$sorted_elements[top_matches[2]], "\n",
+                        round(match_val, 1), "%")
+    text(0.5, 0.7, match_text, cex = 0.6 * text_size)
+  }
+
+  text(0.5, 0.4, "Spacing shows\nsimilarity distance", cex = 0.5 * text_size, col = "gray50")
+
+  layout(1)
+}
