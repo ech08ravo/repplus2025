@@ -1,0 +1,10 @@
+Element,Career does not require personal interaction - Career requires personal interaction,Use formal taxonomy - Use multiple theories,Essential - Inessential
+Scientist,1,1,1
+Sociologist,1,4,5
+Doctor,5,3,1
+Librarian,4,1,2
+Artist,1,3,1
+
+Scale: 1-5
+Left poles: Career does not require personal interaction, Use formal taxonomy, Essential
+Right poles: Career requires personal interaction, Use multiple theories, Inessential

@@ -293,6 +293,9 @@ ui <- fluidPage(
     sidebarPanel(
       width = 2,
       class = "sidebar",
+      actionButton("goto_simple_start", "Simple Start",
+                   class = "btn-success btn-sm btn-block",
+                   style = "margin-bottom: 16px; width: 100%;"),
       h4("File Operations"),
       fileInput("import_file", "Select Grid File", accept = c(".rgrid", ".json")),
       uiOutput("load_grid_prompt"),
@@ -411,7 +414,8 @@ ui <- fluidPage(
                             "Accessible (Wong)" = "wong",
                             "Classic (Blue/Red)" = "classic",
                             "Earth Tones" = "earth",
-                            "High Contrast" = "contrast"
+                            "High Contrast" = "contrast",
+                            "Greyscale" = "greyscale"
                           ),
                           selected = "wong")
             )
@@ -1544,6 +1548,14 @@ server <- function(input, output, session) {
         accent = "#F0E442",       # Yellow
         heat_low = "#FFFFFF",
         heat_high = "#000000"
+      ),
+      "greyscale" = list(
+        element = "#000000",      # Black (0%)
+        construct = "#333333",    # Dark grey (20%)
+        highlight = "#666666",    # Mid grey (40%)
+        accent = "#999999",       # Light grey (60%)
+        heat_low = "#FFFFFF",     # White
+        heat_high = "#000000"     # Black
       )
     )
   }
@@ -1864,27 +1876,51 @@ server <- function(input, output, session) {
     if (is.null(dim(ex))) return()
     load <- cor(sm, pc$x)[, 1:min(2, ncol(pc$x))]
     if (is.null(dim(load))) return()
-    par(mar = c(4, 4, 2, 2))
+    par(mar = c(4, 6, 3, 6))
     all_pts <- rbind(ex, load, -load)
-    xr <- range(all_pts[, 1]) * 1.3
-    yr <- range(all_pts[, 2]) * 1.3
+    xr <- range(all_pts[, 1]) * 1.5
+    yr <- range(all_pts[, 2]) * 1.5
+    title_text <- if (is.data.frame(rv$ratings) && nrow(rv$ratings) > 0)
+      "Your Repertory Grid" else "Preview (ratings not yet entered)"
     plot(ex, type = "n", xlab = "PC1", ylab = "PC2",
-         xlim = xr, ylim = yr,
-         main = "Preview (ratings not yet entered)")
+         xlim = xr, ylim = yr, main = title_text)
     points(ex, pch = 19, col = "#0072B2", cex = 1.3)
-    text(ex, labels = rv$elements, pos = 3,
-         col = "#0072B2", font = 2)
+    # Offset overlapping element labels
+    el_pos <- rep(3, nrow(ex))  # default: above
+    pos_cycle <- c(3, 4, 1, 2)  # above, right, below, left
+    for (i in seq_len(nrow(ex))) {
+      for (j in seq_len(i - 1)) {
+        d <- sqrt(sum((ex[i, ] - ex[j, ])^2))
+        if (d < diff(xr) * 0.08) {
+          el_pos[i] <- pos_cycle[((i - 1) %% 4) + 1]
+        }
+      }
+    }
+    text(ex, labels = rv$elements, pos = el_pos,
+         col = "#0072B2", font = 2, cex = 0.9)
     for (i in seq_len(nrow(load))) {
       lines(c(-load[i, 1], load[i, 1]),
             c(-load[i, 2], load[i, 2]),
             col = "#D55E00", lwd = 2)
     }
+    # Offset overlapping construct labels
+    c_pos_r <- rep(4, nrow(load))
+    c_pos_l <- rep(2, nrow(load))
+    for (i in seq_len(nrow(load))) {
+      for (j in seq_len(i - 1)) {
+        d <- sqrt(sum((load[i, ] - load[j, ])^2))
+        if (d < diff(xr) * 0.08) {
+          c_pos_r[i] <- pos_cycle[((i - 1) %% 4) + 1]
+          c_pos_l[i] <- pos_cycle[((i + 1) %% 4) + 1]
+        }
+      }
+    }
     text(load[, 1], load[, 2],
          labels = rv$constructs$right,
-         pos = 4, col = "#D55E00", font = 2)
+         pos = c_pos_r, col = "#D55E00", font = 2, cex = 0.85, xpd = TRUE)
     text(-load[, 1], -load[, 2],
          labels = rv$constructs$left,
-         pos = 2, col = "#D55E00", font = 3)
+         pos = c_pos_l, col = "#D55E00", font = 3, cex = 0.85, xpd = TRUE)
     abline(h = 0, v = 0, lty = 3, col = "gray50")
   })
 
@@ -1922,7 +1958,7 @@ server <- function(input, output, session) {
     )
     tags$button(
       class = "btn btn-outline-primary btn-lg",
-      onclick = paste0("window.location.href='", mailto_url, "'; return false;"),
+      onclick = paste0("window.open('", mailto_url, "','_blank'); return false;"),
       "Email My Constructs"
     )
   })
@@ -1931,19 +1967,28 @@ server <- function(input, output, session) {
   output$wizard_mailto_ratings <- renderUI({
     req(length(rv$elements) > 0, is.data.frame(rv$constructs), nrow(rv$constructs) > 0,
         is.data.frame(rv$ratings), nrow(rv$ratings) > 0)
+    # Build CSV format for import compatibility
+    construct_labels <- paste(rv$constructs$left, "-", rv$constructs$right)
     body_lines <- c(
-      "My Repertory Grid Ratings",
+      "My Repertory Grid Ratings - WebGrid.Online",
       "",
-      paste0("Elements: ", paste(rv$elements, collapse = ", ")),
+      "Save the data below as a .csv file to import into WebGrid or other tools.",
       "",
-      "Ratings (Element | Construct | Rating):"
-    )
-    for (i in seq_len(nrow(rv$ratings))) {
-      body_lines <- c(body_lines,
-        paste0("  ", rv$ratings$element[i], " | ",
-               rv$ratings$construct[i], " | ", rv$ratings$rating[i])
-      )
+      paste0("Element,", paste(construct_labels, collapse = ",")))
+    for (el in rv$elements) {
+      row_vals <- c()
+      for (cl in construct_labels) {
+        idx <- rv$ratings$element == el & rv$ratings$construct == cl
+        val <- if (any(idx)) rv$ratings$rating[idx][1] else ""
+        row_vals <- c(row_vals, val)
+      }
+      body_lines <- c(body_lines, paste0(el, ",", paste(row_vals, collapse = ",")))
     }
+    body_lines <- c(body_lines, "",
+      paste0("Scale: 1-", rv$scale %||% 5),
+      paste0("Left poles: ", paste(rv$constructs$left, collapse = ", ")),
+      paste0("Right poles: ", paste(rv$constructs$right, collapse = ", "))
+    )
     body_text <- paste(body_lines, collapse = "\n")
     mailto_url <- paste0(
       "mailto:?subject=",
@@ -1954,8 +1999,8 @@ server <- function(input, output, session) {
     tagList(
       tags$button(
         class = "btn btn-outline-primary btn-lg",
-        onclick = paste0("window.location.href='", mailto_url, "'; return false;"),
-        "Email My Chart"
+        onclick = paste0("window.open('", mailto_url, "','_blank'); return false;"),
+        "Email My Ratings"
       ),
       downloadButton("download_preview_chart", "Download Chart",
                      class = "btn btn-outline-secondary btn-lg",
@@ -2009,6 +2054,11 @@ server <- function(input, output, session) {
   )
 
   # Post-rating page: continue to full app and auto-analyze
+  # Simple Start tab: return to wizard landing
+  observeEvent(input$goto_simple_start, {
+    landing$step <- "landing"
+  })
+
   observeEvent(input$post_rating_continue, {
     landing$step <- "done"
     # Enable imputation for any missing ratings, then auto-analyze
@@ -2017,6 +2067,8 @@ server <- function(input, output, session) {
         is.data.frame(rv$ratings) && nrow(rv$ratings) > 0) {
       updateCheckboxInput(session, "impute_missing", value = TRUE)
       session$sendCustomMessage("click_analyze", list())
+      # Switch to Biplot tab after analysis
+      updateTabsetPanel(session, "main_tabs", selected = "Biplot")
     }
   })
 

@@ -317,7 +317,45 @@ Standard JSON with arrays:
 - Adaptive margins ensure proper dendrogram-to-grid alignment
 - Palette: `focus_palette`, toggle: `focus_use_color`
 
-## Analysis Flow
+## Preset Grid System
+
+Pre-configured element sets can be loaded via the wizard landing page.
+
+### Preset Files
+Stored as JSON in `dataExamples/presets/`:
+```json
+{
+  "name": "Careers Study",
+  "elements": ["Scientist", "Sociologist", "Doctor", "Librarian", "Artist"]
+}
+```
+
+### Preset Picker
+- "Use an Existing Grid" button on the landing page
+- Shows cards for each preset in `dataExamples/presets/`
+- Selecting a preset loads elements and starts triadic elicitation
+
+### Adding a New Preset
+1. Create a JSON file in `dataExamples/presets/` with `name` and `elements` array
+2. The preset will automatically appear in the picker
+
+## Wizard Flow (Simple Interface)
+
+The app has a guided wizard for new users and student exercises:
+
+1. **Landing Page** — Enter 5 elements manually OR pick a preset grid
+2. **Triadic Elicitation** — Triads of 3 elements presented; pick 2 similar, 1 different; enter bipolar construct poles. Progress bar shows completion.
+3. **Constructs Summary** — Numbered table of generated constructs (red = Pole 1, blue = Pole 2). Preview biplot not shown here. **"Email My Constructs"** mailto button.
+4. **Rating** (one construct at a time) — 1-5 linear scale with circular buttons per element. Construct poles shown in color at top. Back/Next navigation between constructs.
+5. **Post-Rating Summary** — Preview biplot visualisation. **"Email My Chart"** mailto button + **"Download Chart"** PNG download. Instruction to explore other visualisations.
+6. **Full App** — Auto-triggers analysis with imputation enabled. All visualisation tabs available.
+
+### Email Touchpoints
+- After constructs: "Email My Constructs" (elements + construct list)
+- After ratings: "Email My Chart" (elements + all ratings)
+- In full app: per-visualisation email (planned)
+
+## Analysis Flow (Full App)
 
 1. **Enter Elements** (Build Grid tab)
    - Manual entry or paste multiple
@@ -328,12 +366,12 @@ Standard JSON with arrays:
    - All unique triads presented systematically
    - Select 2 similar, 1 different
    - Enter construct poles
-   - Rate elements on 1-7 scale
+   - Rate elements on 1-5 scale
 
 3. **Run Analysis** (Analyze button)
    - Validates minimum 2 elements, 2 constructs
    - Creates score matrix
-   - Optional: impute missing ratings with midpoint (4)
+   - Optional: impute missing ratings with midpoint
    - Generates all visualizations
 
 4. **Explore Results** (Analysis tabs)
