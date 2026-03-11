@@ -934,9 +934,11 @@ ui <- fluidPage(
                      uiOutput("stats_response")
                    )
                  )
-        ),
+        )
+      ),  # end single-grid tabsetPanel
 
-        # ===== MULTI-GRID TABS =====
+      # ===== MULTI-GRID TABS =====
+      tabsetPanel(id = "multi_tabs",
         tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), "Grid Collection"),
                  value = "Grid Collection",
                  h4("Manage Grid Collection"),
@@ -1517,7 +1519,7 @@ ui <- fluidPage(
                    )
                  )
         )
-      )
+      )  # end multi-grid tabsetPanel
     )
   )
   )  # end conditionalPanel for main app
@@ -1987,27 +1989,26 @@ server <- function(input, output, session) {
   output$wizard_mailto_ratings <- renderUI({
     req(length(rv$elements) > 0, is.data.frame(rv$constructs), nrow(rv$constructs) > 0,
         is.data.frame(rv$ratings), nrow(rv$ratings) > 0)
-    # Build CSV format for import compatibility
-    construct_labels <- paste(rv$constructs$left, "-", rv$constructs$right)
+    # Build JSON format for import compatibility
+    grid_json <- jsonlite::toJSON(list(
+      name = "My Repertory Grid",
+      elements = rv$elements,
+      constructs = lapply(seq_len(nrow(rv$constructs)), function(i) {
+        list(left = rv$constructs$left[i], right = rv$constructs$right[i])
+      }),
+      ratings = lapply(seq_len(nrow(rv$ratings)), function(i) {
+        list(element = rv$ratings$element[i],
+             construct = rv$ratings$construct[i],
+             rating = rv$ratings$rating[i])
+      }),
+      scale = c(1, rv$scale %||% 5)
+    ), auto_unbox = TRUE, pretty = TRUE)
     body_lines <- c(
       "My Repertory Grid Ratings - WebGrid.Online",
       "",
-      "Save the data below as a .csv file to import into WebGrid or other tools.",
+      "Save the JSON below as a .json file to import into WebGrid.",
       "",
-      paste0("Element,", paste(construct_labels, collapse = ",")))
-    for (el in rv$elements) {
-      row_vals <- c()
-      for (cl in construct_labels) {
-        idx <- rv$ratings$element == el & rv$ratings$construct == cl
-        val <- if (any(idx)) rv$ratings$rating[idx][1] else ""
-        row_vals <- c(row_vals, val)
-      }
-      body_lines <- c(body_lines, paste0(el, ",", paste(row_vals, collapse = ",")))
-    }
-    body_lines <- c(body_lines, "",
-      paste0("Scale: 1-", rv$scale %||% 5),
-      paste0("Left poles: ", paste(rv$constructs$left, collapse = ", ")),
-      paste0("Right poles: ", paste(rv$constructs$right, collapse = ", "))
+      grid_json
     )
     body_text <- paste(body_lines, collapse = "\n")
     mailto_url <- paste0(
@@ -4611,6 +4612,7 @@ server <- function(input, output, session) {
       if (length(all_ratings) > 0) {
         grid_data$scale <- c(min(all_ratings), max(all_ratings))
       }
+
     }
 
     # Build scores_mat if not already done
