@@ -12,6 +12,14 @@ source("R/multigrid_analysis.r")
 
 ui <- fluidPage(
   tags$head(
+        tags$script(HTML('
+      Shiny.addCustomMessageHandler("click_analyze", function(msg) {
+        setTimeout(function() {
+          var btn = document.getElementById("analyze");
+          if (btn) btn.click();
+        }, 500);
+      });
+    ')),
         tags$style(HTML('
       .container-fluid { max-width: 1400px; }
       body { font-size: 13px; }
@@ -113,6 +121,24 @@ ui <- fluidPage(
       .landing-page .item-input .form-control { font-size: 15px; padding: 8px 12px; height: auto; }
       .landing-page .continue-btn { margin-top: 24px; text-align: center; }
       .landing-page .continue-btn .btn { font-size: 16px; padding: 10px 40px; }
+      /* Rating page styles */
+      .rating-page { max-width: 650px; }
+      .rating-construct { font-size: 16px; font-weight: 600; color: #333; margin-bottom: 24px; text-align: center; padding: 12px; background: #f8f9fa; border-radius: 8px; }
+      .rating-element { margin-bottom: 20px; }
+      .rating-element-name { font-size: 15px; font-weight: 600; margin-bottom: 8px; color: #333; }
+      .rating-scale { display: flex; align-items: center; gap: 0; }
+      .rating-scale-track { flex: 1; display: flex; justify-content: space-between; align-items: center; position: relative; }
+      .rating-scale-track::before { content: ""; position: absolute; top: 50%; left: 16px; right: 16px; height: 3px; background: #ddd; transform: translateY(-50%); z-index: 0; }
+      .rating-btn { width: 36px; height: 36px; border: 2px solid #ddd; border-radius: 50%; background: #fff; cursor: pointer; font-size: 14px; font-weight: 600; color: #999; transition: all 0.15s; padding: 0; z-index: 1; position: relative; }
+      .rating-btn:hover { border-color: #0072B2; color: #0072B2; transform: scale(1.1); }
+      .rating-btn.selected { background: #0072B2; color: #fff; border-color: #0072B2; transform: scale(1.15); }
+      .rating-scale-labels { display: flex; justify-content: space-between; font-size: 11px; color: #888; margin-top: 2px; padding: 0 6px; }
+      .rating-progress-bar { height: 6px; background: #e9ecef; border-radius: 3px; margin-bottom: 20px; overflow: hidden; }
+      .rating-progress-fill { height: 100%; background: #0072B2; border-radius: 3px; transition: width 0.3s; }
+      .preset-card { border: 2px solid #ddd; border-radius: 10px; padding: 16px 20px; margin-bottom: 12px; cursor: pointer; transition: all 0.15s; background: #fff; }
+      .preset-card:hover { border-color: #0072B2; background: #f0f8ff; }
+      .preset-card h4 { margin: 0 0 6px 0; color: #333; }
+      .preset-card .preset-detail { color: #666; font-size: 12px; margin: 0; }
       /* Triads wizard page */
       .triad-wizard .progress-text { color: #666; font-size: 13px; margin-bottom: 16px; }
       .triad-wizard .triad-cards { display: flex; gap: 16px; margin: 20px 0; justify-content: center; flex-wrap: wrap; }
@@ -172,7 +198,22 @@ ui <- fluidPage(
       div(class = "item-row", span(class = "item-number", "4."), div(class = "item-input", textInput("landing_item4", NULL, placeholder = "e.g. Pasta"))),
       div(class = "item-row", span(class = "item-number", "5."), div(class = "item-input", textInput("landing_item5", NULL, placeholder = "e.g. Curry"))),
       div(class = "continue-btn",
-        actionButton("landing_continue", "Continue", class = "btn-success btn-lg")
+        actionButton("landing_continue", "Continue", class = "btn-success btn-lg"),
+        div(style = "margin-top: 12px;",
+          actionButton("landing_existing", "Use an Existing Grid", class = "btn-outline-primary")
+        )
+      )
+    )
+  ),
+  # Preset picker page
+  conditionalPanel(
+    condition = "output.landing_step == 'presets'",
+    div(class = "landing-page",
+      h2("Choose a Grid"),
+      p(class = "subtitle", "Select a pre-built grid with elements and constructs ready to rate."),
+      uiOutput("preset_list"),
+      div(class = "continue-btn", style = "margin-top: 16px;",
+        actionButton("landing_back", "Back", class = "btn-outline-secondary")
       )
     )
   ),
@@ -198,20 +239,50 @@ ui <- fluidPage(
       )
     )
   ),
-  # Results page - simple analysis view
+  # Constructs summary page - after elicitation
   conditionalPanel(
     condition = "output.landing_step == 'results'",
-    div(class = "landing-page",
-      h2("Your Grid So Far"),
+    div(class = "landing-page", style = "max-width: 700px;",
+      uiOutput("wizard_results_heading"),
       uiOutput("wizard_results_summary"),
-      plotOutput("wizard_biplot", height = "400px"),
-      uiOutput("wizard_results_message"),
-      div(class = "continue-btn", style = "margin-top: 20px;",
-        actionButton("results_to_app", "Explore in Full App",
-                     class = "btn-success btn-lg"),
-        actionButton("results_back", "Add More Constructs",
-                     class = "btn-outline-secondary",
-                     style = "margin-left: 10px;")
+      div(class = "continue-btn", style = "margin-top: 24px;",
+        uiOutput("wizard_mailto_constructs"),
+        div(style = "margin-top: 12px;",
+          actionButton("results_to_app", "Continue to Rating",
+                       class = "btn-success btn-lg")
+        )
+      )
+    )
+  ),
+  # Rating page - one construct at a time
+  conditionalPanel(
+    condition = "output.landing_step == 'rating'",
+    div(class = "landing-page rating-page",
+      uiOutput("rating_overall_progress"),
+      uiOutput("rating_construct_label"),
+      uiOutput("rating_elements_ui"),
+      div(class = "continue-btn", style = "margin-top: 24px;",
+        actionButton("rating_prev", "Back", class = "btn-outline-secondary",
+                     style = "margin-right: 10px;"),
+        actionButton("rating_next", "Next Construct", class = "btn-success btn-lg")
+      )
+    )
+  ),
+  # Post-rating summary - visualization + email
+  conditionalPanel(
+    condition = "output.landing_step == 'post_rating'",
+    div(class = "landing-page", style = "max-width: 700px;",
+      h2("Your Grid"),
+      p(class = "subtitle", "Here's a preview of your repertory grid analysis."),
+      plotOutput("wizard_preview_plot", height = "400px"),
+      div(class = "continue-btn", style = "margin-top: 24px;",
+        uiOutput("wizard_mailto_ratings"),
+        div(style = "margin-top: 16px;",
+          p(style = "color: #666; font-size: 13px;",
+            "Want to explore more? The full app includes heatmaps, dendrograms, Focus clusters, and more."),
+          actionButton("post_rating_continue", "Explore Other Visualisations",
+                       class = "btn-success btn-lg")
+        )
       )
     )
   ),
@@ -1546,45 +1617,64 @@ server <- function(input, output, session) {
     meta_constructs = data.frame(left = character(), right = character(), stringsAsFactors = FALSE)
   )
 
-  # Load preset from URL query parameter (?preset=name)
+  # "Use an Existing Grid" button -> show presets
+  observeEvent(input$landing_existing, {
+    landing$step <- "presets"
+  })
+
+  # Back button from presets page
+  observeEvent(input$landing_back, {
+    landing$step <- "elements"
+  })
+
+  # Render preset list from JSON files in dataExamples/presets/
+  output$preset_list <- renderUI({
+    preset_dir <- "dataExamples/presets"
+    files <- list.files(preset_dir, pattern = "\\.json$", full.names = TRUE)
+    if (length(files) == 0) {
+      return(p("No presets available.", style = "color: #999;"))
+    }
+    preset_cards <- lapply(files, function(f) {
+      preset <- jsonlite::fromJSON(f)
+      preset_id <- tools::file_path_sans_ext(basename(f))
+      n_elem <- length(preset$elements)
+      elements_preview <- paste(preset$elements, collapse = ", ")
+      actionButton(
+        paste0("preset_", preset_id),
+        div(class = "preset-card",
+          h4(preset$name %||% preset_id),
+          p(class = "preset-detail", paste0(n_elem, " elements: ", elements_preview))
+        ),
+        style = "all: unset; display: block; width: 100%; text-align: left;"
+      )
+    })
+    tagList(preset_cards)
+  })
+
+  # Observe clicks on any preset button
   observe({
-    query <- parseQueryString(session$clientData$url_search)
-    if (!is.null(query$preset)) {
-      preset_file <- file.path("dataExamples", "presets",
-                               paste0(query$preset, ".json"))
-      if (file.exists(preset_file)) {
+    preset_dir <- "dataExamples/presets"
+    files <- list.files(preset_dir, pattern = "\\.json$", full.names = FALSE)
+    preset_ids <- tools::file_path_sans_ext(files)
+    lapply(preset_ids, function(pid) {
+      observeEvent(input[[paste0("preset_", pid)]], {
+        preset_file <- file.path(preset_dir, paste0(pid, ".json"))
         preset <- jsonlite::fromJSON(preset_file)
         rv$elements <- preset$elements
-        if (!is.null(preset$constructs)) {
-          rv$constructs <- data.frame(
-            left = preset$constructs$left,
-            right = preset$constructs$right,
-            stringsAsFactors = FALSE
-          )
-        }
-        # If preset includes ratings, load them too
-        if (!is.null(preset$ratings)) {
-          rv$ratings <- data.frame(
-            element = preset$ratings$element,
-            construct = preset$ratings$construct,
-            rating = preset$ratings$rating,
-            stringsAsFactors = FALSE
-          )
-        }
-        # Skip to results step (elements + constructs ready)
-        landing$step <- "results"
+        # Set up triadic elicitation with the loaded elements
+        triads <- combn(preset$elements, 3, simplify = FALSE)
+        rv$all_triads <- triads
+        rv$current_triad_idx <- 1
+        rv$triad_similar <- character()
+        rv$triad_different <- NULL
+        landing$step <- "triads"
         showNotification(
-          paste0("Loaded preset: ", preset$name %||% query$preset),
+          paste0("Loaded: ", preset$name %||% pid),
           type = "message"
         )
-      } else {
-        showNotification(
-          paste0("Preset '", query$preset, "' not found."),
-          type = "warning"
-        )
-      }
-    }
-  }) |> bindEvent(session$clientData$url_search, once = TRUE)
+      }, ignoreInit = TRUE)
+    })
+  })
 
   # Handle landing page continue button
   observeEvent(input$landing_continue, {
@@ -1648,24 +1738,22 @@ server <- function(input, output, session) {
   })
 
   # Wizard: card click handlers (toggle similar/different)
-  observe({
-    req(rv$current_triad_idx > 0)
-    req(length(rv$all_triads) >= rv$current_triad_idx)
-    triad <- rv$all_triads[[rv$current_triad_idx]]
-    lapply(1:3, function(i) {
-      observeEvent(input[[paste0("wiz_card_", i)]], {
-        elem <- triad[i]
-        if (elem %in% rv$triad_similar) {
-          rv$triad_similar <- setdiff(rv$triad_similar, elem)
-        } else if (identical(rv$triad_different, elem)) {
-          rv$triad_different <- NULL
-        } else if (length(rv$triad_similar) < 2) {
-          rv$triad_similar <- c(rv$triad_similar, elem)
-        } else {
-          rv$triad_different <- elem
-        }
-      }, ignoreInit = TRUE)
-    })
+  lapply(1:3, function(i) {
+    observeEvent(input[[paste0("wiz_card_", i)]], {
+      req(rv$current_triad_idx > 0)
+      req(length(rv$all_triads) >= rv$current_triad_idx)
+      triad <- rv$all_triads[[rv$current_triad_idx]]
+      elem <- triad[i]
+      if (elem %in% rv$triad_similar) {
+        rv$triad_similar <- setdiff(rv$triad_similar, elem)
+      } else if (identical(rv$triad_different, elem)) {
+        rv$triad_different <- NULL
+      } else if (length(rv$triad_similar) < 2) {
+        rv$triad_similar <- c(rv$triad_similar, elem)
+      } else {
+        rv$triad_different <- elem
+      }
+    }, ignoreInit = TRUE)
   })
 
   # Wizard: Next button - save construct and advance
@@ -1714,24 +1802,42 @@ server <- function(input, output, session) {
     landing$step <- "results"
   })
 
-  # Results page: summary of what was built
-  output$wizard_results_summary <- renderUI({
-    n_elem <- length(rv$elements)
+  # Results page: heading
+  output$wizard_results_heading <- renderUI({
     n_const <- if (is.data.frame(rv$constructs)) nrow(rv$constructs) else 0
     tagList(
-      p(paste0("You created ", n_elem, " elements and ",
-               n_const, " constructs.")),
-      if (n_const > 0) {
-        tags$ul(lapply(seq_len(n_const), function(i) {
-          tags$li(paste0(rv$constructs$left[i], " vs ",
-                         rv$constructs$right[i]))
-        }))
-      }
+      h2("Your Constructs"),
+      p(class = "subtitle", paste0(
+        "You generated ", n_const, " construct", if (n_const != 1) "s",
+        " from ", length(rv$elements), " elements. Here's a preview of your grid."
+      ))
     )
   })
 
-  # Results page: simple biplot with imputed midpoint ratings
-  output$wizard_biplot <- renderPlot({
+  # Results page: construct summary table
+  output$wizard_results_summary <- renderUI({
+    n_const <- if (is.data.frame(rv$constructs)) nrow(rv$constructs) else 0
+    if (n_const == 0) return(p(tags$em("No constructs generated."), style = "color: #888;"))
+
+    tags$table(
+      style = "width: 100%; border-collapse: collapse; margin-top: 8px; margin-bottom: 16px;",
+      tags$thead(tags$tr(
+        tags$th("#", style = "text-align: center; padding: 4px 8px; border-bottom: 2px solid #ddd; font-size: 12px; color: #666; width: 30px;"),
+        tags$th("Pole 1 (left)", style = "text-align: left; padding: 4px 8px; border-bottom: 2px solid #ddd; font-size: 12px; color: #B2182B;"),
+        tags$th("Pole 2 (right)", style = "text-align: right; padding: 4px 8px; border-bottom: 2px solid #ddd; font-size: 12px; color: #2166AC;")
+      )),
+      tags$tbody(lapply(seq_len(n_const), function(i) {
+        tags$tr(
+          tags$td(i, style = "text-align: center; padding: 4px 8px; border-bottom: 1px solid #eee; color: #999; font-size: 12px;"),
+          tags$td(rv$constructs$left[i], style = "padding: 4px 8px; border-bottom: 1px solid #eee;"),
+          tags$td(rv$constructs$right[i], style = "text-align: right; padding: 4px 8px; border-bottom: 1px solid #eee;")
+        )
+      }))
+    )
+  })
+
+  # Results page: preview biplot with midpoint ratings
+  output$wizard_preview_plot <- renderPlot({
     req(is.data.frame(rv$constructs), nrow(rv$constructs) >= 2)
     req(length(rv$elements) >= 2)
     n_e <- length(rv$elements)
@@ -1782,27 +1888,238 @@ server <- function(input, output, session) {
     abline(h = 0, v = 0, lty = 3, col = "gray50")
   })
 
-  # Results page: message about next steps
-  output$wizard_results_message <- renderUI({
-    n_const <- if (is.data.frame(rv$constructs)) nrow(rv$constructs) else 0
-    if (n_const < 2) {
-      p(tags$em("Add at least 2 constructs to see a preview plot."),
-        style = "color: #888;")
-    } else {
-      p(tags$em("This is a preview. Enter ratings in the full app ",
-                "for a meaningful analysis."),
-        style = "color: #888; font-size: 12px;")
-    }
-  })
-
-  # Results page: go to full app
+  # Results page: go to rating step
   observeEvent(input$results_to_app, {
-    landing$step <- "done"
+    landing$step <- "rating"
   })
 
   # Results page: go back to add more constructs
   observeEvent(input$results_back, {
     landing$step <- "triads"
+  })
+
+  # Constructs page: email constructs
+  output$wizard_mailto_constructs <- renderUI({
+    req(length(rv$elements) > 0, is.data.frame(rv$constructs), nrow(rv$constructs) > 0)
+    body_lines <- c(
+      "My Repertory Grid Constructs",
+      "",
+      paste0("Elements: ", paste(rv$elements, collapse = ", ")),
+      "",
+      "Constructs:"
+    )
+    for (i in seq_len(nrow(rv$constructs))) {
+      body_lines <- c(body_lines,
+        paste0("  ", i, ". ", rv$constructs$left[i], " vs ", rv$constructs$right[i])
+      )
+    }
+    body_text <- paste(body_lines, collapse = "\n")
+    mailto_url <- paste0(
+      "mailto:?subject=",
+      utils::URLencode("My Repertory Grid Constructs - WebGrid.Online", reserved = TRUE),
+      "&body=",
+      utils::URLencode(body_text, reserved = TRUE)
+    )
+    tags$button(
+      class = "btn btn-outline-primary btn-lg",
+      onclick = paste0("window.location.href='", mailto_url, "'; return false;"),
+      "Email My Constructs"
+    )
+  })
+
+  # Post-rating page: email chart + download
+  output$wizard_mailto_ratings <- renderUI({
+    req(length(rv$elements) > 0, is.data.frame(rv$constructs), nrow(rv$constructs) > 0,
+        is.data.frame(rv$ratings), nrow(rv$ratings) > 0)
+    body_lines <- c(
+      "My Repertory Grid Ratings",
+      "",
+      paste0("Elements: ", paste(rv$elements, collapse = ", ")),
+      "",
+      "Ratings (Element | Construct | Rating):"
+    )
+    for (i in seq_len(nrow(rv$ratings))) {
+      body_lines <- c(body_lines,
+        paste0("  ", rv$ratings$element[i], " | ",
+               rv$ratings$construct[i], " | ", rv$ratings$rating[i])
+      )
+    }
+    body_text <- paste(body_lines, collapse = "\n")
+    mailto_url <- paste0(
+      "mailto:?subject=",
+      utils::URLencode("My Repertory Grid Ratings - WebGrid.Online", reserved = TRUE),
+      "&body=",
+      utils::URLencode(body_text, reserved = TRUE)
+    )
+    tagList(
+      tags$button(
+        class = "btn btn-outline-primary btn-lg",
+        onclick = paste0("window.location.href='", mailto_url, "'; return false;"),
+        "Email My Chart"
+      ),
+      downloadButton("download_preview_chart", "Download Chart",
+                     class = "btn btn-outline-secondary btn-lg",
+                     style = "margin-left: 10px;")
+    )
+  })
+
+  # Post-rating page: download chart as PNG
+  output$download_preview_chart <- downloadHandler(
+    filename = function() paste0("my-grid-", Sys.Date(), ".png"),
+    content = function(file) {
+      png(file, width = 800, height = 600, res = 120)
+      req(is.data.frame(rv$constructs), nrow(rv$constructs) >= 2)
+      req(length(rv$elements) >= 2)
+      n_e <- length(rv$elements)
+      n_c <- nrow(rv$constructs)
+      sm <- matrix(3, nrow = n_e, ncol = n_c)
+      if (is.data.frame(rv$ratings) && nrow(rv$ratings) > 0) {
+        construct_labels <- paste(rv$constructs$left, "-", rv$constructs$right)
+        for (i in seq_len(n_e)) {
+          for (j in seq_len(n_c)) {
+            idx <- rv$ratings$element == rv$elements[i] &
+              rv$ratings$construct == construct_labels[j]
+            if (any(idx)) sm[i, j] <- rv$ratings$rating[idx][1]
+          }
+        }
+      }
+      if (sd(sm) == 0) sm <- sm + matrix(rnorm(n_e * n_c, 0, 0.1), nrow = n_e)
+      pc <- prcomp(sm, scale. = TRUE)
+      ex <- pc$x[, 1:min(2, ncol(pc$x))]
+      load <- cor(sm, pc$x)[, 1:min(2, ncol(pc$x))]
+      par(mar = c(4, 4, 2, 2))
+      all_pts <- rbind(ex, load, -load)
+      xr <- range(all_pts[, 1]) * 1.3
+      yr <- range(all_pts[, 2]) * 1.3
+      plot(ex, type = "n", xlab = "PC1", ylab = "PC2",
+           xlim = xr, ylim = yr, main = "My Repertory Grid")
+      points(ex, pch = 19, col = "#0072B2", cex = 1.3)
+      text(ex, labels = rv$elements, pos = 3, col = "#0072B2", font = 2)
+      for (i in seq_len(nrow(load))) {
+        lines(c(-load[i, 1], load[i, 1]), c(-load[i, 2], load[i, 2]),
+              col = "#D55E00", lwd = 2)
+      }
+      text(load[, 1], load[, 2], labels = rv$constructs$right,
+           pos = 4, col = "#D55E00", font = 2)
+      text(-load[, 1], -load[, 2], labels = rv$constructs$left,
+           pos = 2, col = "#D55E00", font = 3)
+      abline(h = 0, v = 0, lty = 3, col = "gray50")
+      dev.off()
+    }
+  )
+
+  # Post-rating page: continue to full app and auto-analyze
+  observeEvent(input$post_rating_continue, {
+    landing$step <- "done"
+    # Enable imputation for any missing ratings, then auto-analyze
+    if (length(rv$elements) >= 2 &&
+        is.data.frame(rv$constructs) && nrow(rv$constructs) >= 2 &&
+        is.data.frame(rv$ratings) && nrow(rv$ratings) > 0) {
+      updateCheckboxInput(session, "impute_missing", value = TRUE)
+      session$sendCustomMessage("click_analyze", list())
+    }
+  })
+
+  # Rating page: track current construct index
+  rv_rating <- reactiveValues(construct_idx = 1)
+
+  # Rating page: overall progress bar
+  output$rating_overall_progress <- renderUI({
+    req(is.data.frame(rv$constructs), nrow(rv$constructs) > 0)
+    n_c <- nrow(rv$constructs)
+    ci <- rv_rating$construct_idx
+    pct <- round(100 * (ci - 1) / n_c)
+    tagList(
+      p(class = "subtitle", paste0("Construct ", ci, " of ", n_c)),
+      div(class = "rating-progress-bar",
+        div(class = "rating-progress-fill", style = paste0("width: ", pct, "%;"))
+      )
+    )
+  })
+
+  # Rating page: show current construct
+  output$rating_construct_label <- renderUI({
+    req(is.data.frame(rv$constructs), nrow(rv$constructs) > 0)
+    ci <- rv_rating$construct_idx
+    constructs <- rv$constructs
+    div(class = "rating-construct",
+      div(style = "display: flex; justify-content: space-between; align-items: center;",
+        span(style = "color: #B2182B; font-weight: 700;",
+          paste0("1 = ", constructs$left[ci])),
+        span(style = "color: #2166AC; font-weight: 700;",
+          paste0(constructs$right[ci], " = 5"))
+      )
+    )
+  })
+
+  # Rating page: render element rating scales for current construct
+  output$rating_elements_ui <- renderUI({
+    req(length(rv$elements) > 0, is.data.frame(rv$constructs), nrow(rv$constructs) > 0)
+    ci <- rv_rating$construct_idx
+    elements <- rv$elements
+
+    element_rows <- lapply(seq_along(elements), function(ei) {
+      input_id <- paste0("rate_", ci, "_", ei)
+      btns <- lapply(1:5, function(v) {
+        tags$button(
+          as.character(v),
+          class = "rating-btn",
+          id = paste0(input_id, "_", v),
+          onclick = sprintf(
+            "Shiny.setInputValue('%s', %d, {priority: 'event'}); document.querySelectorAll('[id^=\"%s_\"].rating-btn').forEach(b => b.classList.remove('selected')); this.classList.add('selected');",
+            input_id, v, input_id
+          )
+        )
+      })
+      div(class = "rating-element",
+        div(class = "rating-element-name", elements[ei]),
+        div(class = "rating-scale",
+          div(class = "rating-scale-track", btns)
+        )
+      )
+    })
+    tagList(element_rows)
+  })
+
+  # Rating page: Next construct
+  observeEvent(input$rating_next, {
+    req(is.data.frame(rv$constructs), nrow(rv$constructs) > 0)
+    n_c <- nrow(rv$constructs)
+    if (rv_rating$construct_idx < n_c) {
+      rv_rating$construct_idx <- rv_rating$construct_idx + 1
+    } else {
+      # Last construct — collect all ratings and proceed
+      elements <- rv$elements
+      constructs <- rv$constructs
+      ratings_list <- list()
+      for (ci in seq_len(nrow(constructs))) {
+        construct_label <- paste(constructs$left[ci], "-", constructs$right[ci])
+        for (ei in seq_along(elements)) {
+          val <- input[[paste0("rate_", ci, "_", ei)]]
+          if (!is.null(val)) {
+            ratings_list <- c(ratings_list, list(data.frame(
+              element = elements[ei],
+              construct = construct_label,
+              rating = as.numeric(val),
+              stringsAsFactors = FALSE
+            )))
+          }
+        }
+      }
+      if (length(ratings_list) > 0) {
+        rv$ratings <- do.call(rbind, ratings_list)
+      }
+      landing$step <- "post_rating"
+    }
+  })
+
+  # Rating page: Previous construct
+  observeEvent(input$rating_prev, {
+    if (rv_rating$construct_idx > 1) {
+      rv_rating$construct_idx <- rv_rating$construct_idx - 1
+    } else {
+      landing$step <- "results"
+    }
   })
 
   # Clear all data
