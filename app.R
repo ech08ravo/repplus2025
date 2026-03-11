@@ -497,7 +497,8 @@ ui <- fluidPage(
                                         "Accessible (Wong)" = "wong",
                                         "Classic (Blue/Red)" = "classic",
                                         "Earth Tones" = "earth",
-                                        "High Contrast" = "contrast"
+                                        "High Contrast" = "contrast",
+                                        "Greyscale" = "greyscale"
                                       ),
                                       selected = "wong"),
                           downloadButton("download_crossplot", "Download Crossplot")
@@ -622,7 +623,8 @@ ui <- fluidPage(
                                    "Accessible (Wong)" = "wong",
                                    "Classic (Blue/Red)" = "classic",
                                    "Earth Tones" = "earth",
-                                   "High Contrast" = "contrast"
+                                   "High Contrast" = "contrast",
+                                   "Greyscale" = "greyscale"
                                  ),
                                  selected = "wong")
                    )
@@ -796,7 +798,8 @@ ui <- fluidPage(
                                         "Accessible (Wong)" = "wong",
                                         "Classic (Blue/Red)" = "classic",
                                         "Earth Tones" = "earth",
-                                        "High Contrast" = "contrast"
+                                        "High Contrast" = "contrast",
+                                        "Greyscale" = "greyscale"
                                       ),
                                       selected = "wong")
                    ),
@@ -1142,6 +1145,15 @@ ui <- fluidPage(
                                       choices = c("Average" = "average", "Median" = "median")),
                           selectInput("mode_construct_handling", "Construct Handling:",
                                       choices = c("Fold Identical" = "fold", "Collect All" = "collect")),
+                          selectInput("mode_palette", "Color Palette",
+                                      choices = c(
+                                        "Accessible (Wong)" = "wong",
+                                        "Classic (Blue/Red)" = "classic",
+                                        "Earth Tones" = "earth",
+                                        "High Contrast" = "contrast",
+                                        "Greyscale" = "greyscale"
+                                      ),
+                                      selected = "wong"),
                           checkboxInput("mode_show_values", "Show Rating Values", value = TRUE),
                           sliderInput("mode_text_size", "Text Size",
                                       min = 0.8, max = 2.0, value = 1.2, step = 0.1),
@@ -1568,6 +1580,14 @@ server <- function(input, output, session) {
 
   # Landing page state
   landing <- reactiveValues(step = "elements")
+
+  # Check URL query parameters on startup
+  observe({
+    query <- parseQueryString(session$clientData$url_search)
+    if (!is.null(query$mode) && query$mode == "full") {
+      landing$step <- "done"
+    }
+  }) |> bindEvent(session$clientData$url_search, once = TRUE)
 
   # Output flag for conditionalPanel
   output$landing_step <- reactive({ landing$step })
@@ -3334,29 +3354,55 @@ server <- function(input, output, session) {
     ylim <- c(y_range[1] - y_expand, y_range[2] + y_expand)
 
     # Set margins for better label display
-    par(mar = c(4, 4, 2, 2), cex.axis = txt_size, cex.lab = txt_size * 1.1)
+    par(mar = c(4, 6, 2, 6), cex.axis = txt_size, cex.lab = txt_size * 1.1)
 
     plot(ex, type = "n", xlab = "PC1", ylab = "PC2", xlim = xlim, ylim = ylim)
     points(ex, pch = 19, col = colors$element, cex = txt_size * 1.3)
-    text(ex, labels = rv$elements, pos = 3, col = colors$element, cex = txt_size, font = 2)
+
+    # Offset overlapping element labels
+    el_pos <- rep(3, nrow(ex))
+    pos_cycle <- c(3, 4, 1, 2)
+    thresh <- diff(range(xlim)) * 0.08
+    for (i in seq_len(nrow(ex))) {
+      for (j in seq_len(i - 1)) {
+        d <- sqrt(sum((ex[i, ] - ex[j, ])^2))
+        if (d < thresh) {
+          el_pos[i] <- pos_cycle[((i - 1) %% 4) + 1]
+        }
+      }
+    }
+    # Scale text down when many elements/constructs overlap
+    n_items <- nrow(ex) + nrow(load)
+    label_scale <- if (n_items > 10) 0.8 else if (n_items > 7) 0.9 else 1.0
+    text(ex, labels = rv$elements, pos = el_pos,
+         col = colors$element, cex = txt_size * label_scale, font = 2)
 
     # PrinGrid format: draw lines through origin with both poles labeled
-    # Line extends from negative to positive direction
     for (i in 1:nrow(load)) {
-      # Draw full line through origin
       lines(c(-load[i, 1], load[i, 1]), c(-load[i, 2], load[i, 2]),
             col = colors$construct, lwd = 2)
-      # Add small tick marks at the ends
       points(load[i, 1], load[i, 2], pch = 4, col = colors$construct, cex = 0.8)
       points(-load[i, 1], -load[i, 2], pch = 4, col = colors$construct, cex = 0.8)
     }
 
-    # Label RIGHT pole at positive direction (high rating = 7)
+    # Offset overlapping construct labels
+    c_pos_r <- rep(4, nrow(load))
+    c_pos_l <- rep(2, nrow(load))
+    for (i in seq_len(nrow(load))) {
+      for (j in seq_len(i - 1)) {
+        d <- sqrt(sum((load[i, ] - load[j, ])^2))
+        if (d < thresh) {
+          c_pos_r[i] <- pos_cycle[((i - 1) %% 4) + 1]
+          c_pos_l[i] <- pos_cycle[((i + 1) %% 4) + 1]
+        }
+      }
+    }
+    # Label RIGHT pole at positive direction
     text(load[, 1], load[, 2], labels = rv$constructs$right,
-         pos = 4, col = colors$construct, cex = txt_size, font = 2)
-    # Label LEFT pole at negative direction (low rating = 1)
+         pos = c_pos_r, col = colors$construct, cex = txt_size * label_scale, font = 2, xpd = TRUE)
+    # Label LEFT pole at negative direction
     text(-load[, 1], -load[, 2], labels = rv$constructs$left,
-         pos = 2, col = colors$construct, cex = txt_size, font = 3)
+         pos = c_pos_l, col = colors$construct, cex = txt_size * label_scale, font = 3, xpd = TRUE)
 
     abline(h = 0, v = 0, lty = 3, col = "gray50")
   })
@@ -3471,9 +3517,11 @@ server <- function(input, output, session) {
 
     hc <- hclust(d)
     labs <- paste(rv$constructs$left, "-", rv$constructs$right)
-    par(mar = c(2, 14 * txt_size, 2, 2), cex = txt_size)
+    max_lab_len <- max(nchar(labs), na.rm = TRUE)
+    left_mar <- max(14, max_lab_len * 0.5) * txt_size
+    par(mar = c(2, left_mar, 2, 2), cex = txt_size)
     plot(hc, labels = labs, main = "Constructs", xlab = "", sub = "",
-         ylab = "Distance (Euclidean)", hang = -1, cex = txt_size)
+         ylab = "Distance (Euclidean)", hang = -1, cex = txt_size * 0.9)
   })
 
   # Statistics outputs
@@ -4984,7 +5032,8 @@ server <- function(input, output, session) {
 
     # Main heatmap
     par(mar = c(10, 12, 5, 1), family = "sans")
-    colors <- colorRampPalette(c("#0072B2", "#FFFFFF", "#D55E00"))(100)
+    mode_colors <- get_palette_colors(input$mode_palette)
+    colors <- colorRampPalette(c(mode_colors$heat_low, "#FFFFFF", mode_colors$heat_high))(100)
 
     image(1:n_const, 1:n_elem,
           t(g$scores_mat[n_elem:1, , drop = FALSE]),
@@ -5000,7 +5049,7 @@ server <- function(input, output, session) {
         for (j in 1:n_const) {
           val <- g$scores_mat[i, j]
           if (!is.na(val)) {
-            text(j, n_elem - i + 1, sprintf("%.1f", val),
+            text(j, n_elem - i + 1, round(val),
                  cex = 0.8 * text_size, family = "sans")
           }
         }
