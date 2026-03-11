@@ -1546,6 +1546,46 @@ server <- function(input, output, session) {
     meta_constructs = data.frame(left = character(), right = character(), stringsAsFactors = FALSE)
   )
 
+  # Load preset from URL query parameter (?preset=name)
+  observe({
+    query <- parseQueryString(session$clientData$url_search)
+    if (!is.null(query$preset)) {
+      preset_file <- file.path("dataExamples", "presets",
+                               paste0(query$preset, ".json"))
+      if (file.exists(preset_file)) {
+        preset <- jsonlite::fromJSON(preset_file)
+        rv$elements <- preset$elements
+        if (!is.null(preset$constructs)) {
+          rv$constructs <- data.frame(
+            left = preset$constructs$left,
+            right = preset$constructs$right,
+            stringsAsFactors = FALSE
+          )
+        }
+        # If preset includes ratings, load them too
+        if (!is.null(preset$ratings)) {
+          rv$ratings <- data.frame(
+            element = preset$ratings$element,
+            construct = preset$ratings$construct,
+            rating = preset$ratings$rating,
+            stringsAsFactors = FALSE
+          )
+        }
+        # Skip to results step (elements + constructs ready)
+        landing$step <- "results"
+        showNotification(
+          paste0("Loaded preset: ", preset$name %||% query$preset),
+          type = "message"
+        )
+      } else {
+        showNotification(
+          paste0("Preset '", query$preset, "' not found."),
+          type = "warning"
+        )
+      }
+    }
+  }) |> bindEvent(session$clientData$url_search, once = TRUE)
+
   # Handle landing page continue button
   observeEvent(input$landing_continue, {
     items <- c(input$landing_item1, input$landing_item2,

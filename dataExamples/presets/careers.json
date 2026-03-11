@@ -1,0 +1,13 @@
+{
+  "name": "Careers Study",
+  "elements": ["Scientist", "Sociologist", "Doctor", "Librarian", "Artist"],
+  "constructs": [
+    {"left": "Relates to creative skill", "right": "Does not relate to creative skill"},
+    {"left": "Relates to caring about people", "right": "Does not relate to caring about people"},
+    {"left": "Relates to practical knowledge", "right": "Does not relate to practical knowledge"},
+    {"left": "Relates to boys/men more than others", "right": "Does not relate to boys/men more than others"},
+    {"left": "Relates to good career choice", "right": "Does not relate to good career choice"},
+    {"left": "Relates to benefiting mankind", "right": "Does not relate to benefiting mankind"},
+    {"left": "Relates to epistemic knowledge", "right": "Does not relate to epistemic knowledge"}
+  ]
+}
