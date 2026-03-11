@@ -25,21 +25,29 @@
 WebGrid.Online (formerly RepPlusApp) is a Shiny application for Repertory Grid analysis, a psychological research method developed by George Kelly. The app allows users to elicit personal constructs through triadic comparison of elements, rate elements on bipolar construct scales, and analyze the resulting grid using various statistical and visual methods.
 
 **Key Features**:
-- Single grid elicitation and analysis
-- Multi-grid analysis (Shaw's SOCIOGRIDS methodology)
-- Socionets, Mode Grid, and Composite Grid visualizations
+- Single grid elicitation and analysis (10 tabs)
+- Multi-grid analysis with Shaw's SOCIOGRIDS methodology (9 tabs)
+- Socionets, Mode Grid, Composite Grid, MINUS, CORE, PrinGrid Trajectories, Exchange Grids, and Metagrid visualizations
+- Claude AI integration for interpretation assistance
 
 ## Project Structure
 
 ```
 RepPlusApp/
-├── app.R                    # Main Shiny application (UI + Server)
+├── app.R                        # Main Shiny application (~5000 lines, UI + Server)
 ├── R/
-│   ├── focus_analysis.r     # Focus clustering algorithm (Shaw 1980)
-│   └── multigrid_analysis.r # Multi-grid analysis (SOCIOGRIDS)
-├── CLAUDE_PROJECT_DOCS.md   # This documentation
-├── Dockerfile               # Docker deployment config
-└── .gitignore
+│   ├── focus_analysis.r         # Focus clustering algorithm (Shaw 1980)
+│   ├── multigrid_analysis.r     # Multi-grid analysis (SOCIOGRIDS)
+│   ├── claude_api.R             # Claude API integration for chat features
+│   └── triadic_elicitation.r    # Triadic elicitation helper functions
+├── dataExamples/                # Sample grid data files
+├── RepPlusDocs/                 # Documentation directory
+├── CLAUDE_PROJECT_DOCS.md       # This documentation
+├── Dockerfile                   # Docker deployment config
+├── docker-compose.yml           # Docker compose config
+├── deploy.sh                    # Deployment script
+├── renv/                        # R environment management
+└── rsconnect/                   # Shiny deployment config
 ```
 
 ## Key Concepts
@@ -62,7 +70,7 @@ The app uses triadic elicitation to help users generate constructs:
 
 The UI uses `fluidPage` with a sidebar layout:
 
-**Sidebar (width=3)**:
+**Sidebar (width=2)**:
 - File import (.rgrid, .json)
 - Sample data loader
 - Analysis button
@@ -70,23 +78,37 @@ The UI uses `fluidPage` with a sidebar layout:
 - Display options (text size, cell size)
 - Export buttons (CSV, .rgrid)
 
-**Main Panel (width=9)** - Tabset with:
+**Main Panel (width=10)** - Tabset with:
+
+*Single-Grid Tabs:*
 1. **Build Grid** - Element entry, triadic elicitation, construct management
-2. **Analyze** - Grid summary, elements list, constructs list, missing ratings
+2. **Grid Summary** - Elements list, analysis summary, missing ratings
 3. **Biplot** - PCA visualization with element points and construct arrows
-4. **Heatmap** - Color-coded rating matrix
-5. **Element Dendrogram** - Hierarchical clustering of elements
-6. **Construct Dendrogram** - Hierarchical clustering of constructs
-7. **Crossplot** - 2D scatter plot on two selected constructs
-8. **Synopsis** - Grid overview visualization
+4. **Crossplot** - 2D scatter plot on two selected constructs
+5. **Synopsis** - Grid overview visualization
+6. **Heatmap** - Color-coded rating matrix with dendrograms
+7. **Element Dendrogram** - Hierarchical clustering of elements
+8. **Construct Dendrogram** - Hierarchical clustering of constructs
 9. **Focus Cluster** - Shaw's FOCUS algorithm with dendrograms
 10. **Statistics** - Detailed element and construct statistics
+
+*Multi-Grid Tabs (styled with gradient CSS icons):*
+1. **Grid Collection** - Import, manage, and organize grid collection
+2. **Socionets** - Network visualization of grid relationships
+3. **Mode Grid** - Consensus grid (average/median ratings)
+4. **Composite Grid** - Merged grid combining elements/constructs
+5. **MINUS** - Grid difference analysis (comparing two grids)
+6. **CORE** - Shared construing analysis (iterative comparison)
+7. **PrinGrid Trajectories** - PCA trajectory visualization over time/sequence
+8. **Exchange Grids** - 6-grid exchange protocol analysis
+9. **Class Metagrids** - Metagrid classification across multiple grids
 
 ### Server Components (app.R)
 
 **Reactive Values (rv)**:
 ```r
 rv <- reactiveValues(
+  # Single-grid data
   elements = character(),           # Vector of element names
   constructs = data.frame(          # Constructs with left/right poles
     left = character(),
@@ -101,12 +123,39 @@ rv <- reactiveValues(
   repgrid_last = NULL,              # OpenRepGrid object
   imputed_last = FALSE,             # Whether imputation was used
   elicitation_active = FALSE,       # Triadic elicitation in progress
+  show_constructs = FALSE,          # UI state for construct display
+  manual_mode = FALSE,              # Manual construct entry mode
+
+  # Triadic elicitation tracking
   all_triads = list(),              # All unique triads for elicitation
   current_triad_idx = 0,            # Current triad being shown
   triad_similar = character(),      # Selected similar elements
-  triad_different = NULL            # Selected different element
+  triad_different = NULL,           # Selected different element
+
+  # Multi-grid storage
+  grid_collection = list(),         # Named list of grids by UUID
+  grid_metadata = data.frame(),     # Grid metadata (id, name, n_elements, n_constructs, scale)
+  selected_grids = character(),     # Vector of selected grid_ids
+  common_elements = character(),    # Elements shared across selected grids
+  common_constructs = character(),  # Construct labels shared across grids
+
+  # Multi-grid analysis results
+  match_matrix = NULL,              # Grid-to-grid similarity matrix
+  socionet_data = NULL,             # Network graph data
+  mode_grid = NULL,                 # Consensus grid result
+  composite_grid = NULL,            # Merged grid result
+  minus_result = NULL,              # MINUS grid difference result
+  core_result = NULL,               # CORE shared construing result
+  traj_result = NULL,               # PrinGrid trajectory result
+  exchange_result = NULL,           # Exchange analysis result
+  metagrid = NULL,                  # Metagrid result
+  meta_constructs = data.frame()    # Metagrid construct definitions
 )
 ```
+
+**Other Reactive Values**:
+- `landing` - Landing page state: `step = "elements"` | `"triads"` | `"rating"` | `"done"`
+- `chat_responses` - Chat response storage with keys per tab (biplot, crossplot, synopsis, etc.)
 
 **Key Functions**:
 - `get_palette_colors(palette)` - Returns color list for a named palette
@@ -159,12 +208,44 @@ Implements Shaw's (1980) FOCUS algorithm for clustering and sorting repertory gr
 
 **`plot_focus_cluster(focus_result, ...)`**
 - Creates 4-panel plot: top dendrogram, left dendrogram, main grid, stats panel
+- Adaptive margins calculated before layout to ensure dendrogram alignment
 - Parameters:
   - `show_values`: Display rating numbers in cells
   - `show_shading`: Use color/grey shading
   - `use_color`: Use color palette (vs greyscale)
   - `text_size`, `cell_size`: Scaling factors
   - `heat_low`, `heat_high`: Gradient colors
+
+**`plot_focus_spaced(focus_result, ...)`**
+- SPACED variant of Focus cluster plot
+- Uses proportional spacing based on cophenetic distances between clusters
+- Same parameters as `plot_focus_cluster`
+
+## Triadic Elicitation (R/triadic_elicitation.r)
+
+Helper functions for the triadic elicitation process.
+
+### Functions
+
+- **`generate_triads(elements)`** - Generate all unique triadic combinations
+- **`get_next_triad(triads, current_idx)`** - Get next uncompleted triad
+- **`get_elicitation_progress(current_idx, total)`** - Calculate progress percentage
+- **`validate_construct(left, right)`** - Validate left/right pole input
+- **`all_elements_rated(ratings, construct, elements)`** - Check if construct is fully rated
+
+## Claude API Integration (R/claude_api.R)
+
+Handles Claude AI chat features across visualization tabs.
+
+### Functions
+
+- **`load_repplus_docs()`** - Load RepPlus documentation for context
+- **`get_relevant_docs(viz_type)`** - Get docs relevant to visualization type
+- **`has_api_key()`** - Check if Claude API key is configured
+- **`generate_claude_context(grid, viz_type)`** - Generate context for API calls
+- **`call_claude_api(prompt, context)`** - Make API calls to Claude
+- **`ask_claude_about_grid(question, grid, viz_type)`** - Ask Claude questions about grid analysis
+- **`generate_focus_interpretation_context(focus_result)`** - Generate context for Focus interpretation
 
 ## File Formats
 
@@ -233,6 +314,7 @@ Standard JSON with arrays:
 - Constructs dendrogram at top, elements dendrogram at left
 - Main grid shows sorted ratings with optional shading
 - Right panel shows top element matches
+- Adaptive margins ensure proper dendrogram-to-grid alignment
 - Palette: `focus_palette`, toggle: `focus_use_color`
 
 ## Analysis Flow
@@ -277,9 +359,12 @@ Context generation includes:
 ## Dependencies
 
 ```r
-library(shiny)
-library(OpenRepGrid)   # For makeRepgrid(), statsElements(), statsConstructs()
-library(jsonlite)      # For JSON import/export
+library(shiny)           # Web application framework
+library(OpenRepGrid)     # For makeRepgrid(), statsElements(), statsConstructs()
+library(DT)              # Interactive data tables
+library(uuid)            # UUID generation for grid IDs
+library(jsonlite)        # JSON serialization
+library(igraph)          # Network graph analysis and visualization (socionets)
 ```
 
 ## Common Patterns
@@ -307,37 +392,61 @@ output$newviz_plot <- renderPlot({
 })
 ```
 
+### Multi-Grid Tab Layout Pattern
+Multi-grid tabs use an 8/4 column split:
+```r
+fluidRow(
+  column(8, plotOutput("viz_plot")),    # Plot left (66.67%)
+  column(4, # Controls right (33.33%)
+    selectInput(...),
+    actionButton(...)
+  )
+)
+```
+
 ### Reactive Plot Updates
 Plots defined outside `observeEvent(input$analyze, ...)` will automatically update when:
 - Data changes (`rv$scores_mat_last`)
 - Palette changes (`input$*_palette`)
 - Display settings change (`input$text_size`, etc.)
 
-## Known Issues / Future Enhancements
-
-- **Focus cluster dendrogram alignment** - The dendrograms are currently out of alignment with the main grid; needs fixing
-- Focus cluster dendrograms generate harmless `horiz` warnings (cosmetic only)
-- Consider adding: export to PDF, more clustering methods, statistical tests
-- Grid completion tracking could be more prominent
-
 ## Multi-Grid Analysis (R/multigrid_analysis.r)
 
 Implements Shaw's (1980) SOCIOGRIDS methodology for comparing multiple repertory grids.
+All multi-grid operations normalize to c(1,7) scale before comparison.
 
 ### Key Functions
 
-- `compute_match_matrix()` - Pairwise grid similarity using Minkowski distance
-- `prepare_socionet_data()` - Prepares network data for visualization
-- `plot_socionets()` - Network graph showing grid relationships
-- `generate_mode_grid()` - Creates consensus grid from multiple grids
-- `generate_composite_grid()` - Merges grids by elements or constructs
+**Grid Comparison:**
+- `normalize_scale(ratings, from_min, from_max)` - Normalize ratings between scales
+- `compute_grid_match(grid1, grid2)` - Calculate match percentage between two grids
+- `compute_directional_match(grid1, grid2)` - Compute directional match scores
+- `compute_match_matrix(grids)` - Pairwise grid similarity using Minkowski distance
+- `find_similar_constructs(grid1, grid2)` - Find matching constructs across grids
 
-### Multi-Grid Tabs
+**Grid Synthesis:**
+- `generate_mode_grid(grids)` - Creates consensus grid from multiple grids
+- `generate_composite_grid(grids)` - Merges grids by elements or constructs
 
-- **Grid Collection** - Upload and manage multiple .rgrid files
-- **Socionets** - Network visualization of grid similarities
-- **Mode Grid** - Consensus/average grid heatmap
-- **Composite Grid** - Merged grid combining all constructs/elements
+**Network Visualization:**
+- `prepare_socionet_data(match_matrix)` - Prepares network data for visualization
+- `plot_socionets(socionet_data)` - Network graph showing grid relationships
+
+**Advanced Multi-Grid:**
+- `compute_minus_grid(grid1, grid2)` - Grid difference analysis
+- `plot_minus_grid(minus_result)` - Plot MINUS heatmap with dendrograms
+- `compute_core_analysis(grids)` - Shared construing analysis (iterative)
+- `plot_core_analysis(core_result)` - Plot CORE visualization
+- `compute_pringrid_trajectories(grids)` - PCA trajectories over sequence
+- `plot_pringrid_trajectories(traj_result)` - Plot trajectory visualization
+- `compute_exchange_analysis(grids)` - 6-grid exchange protocol analysis
+- `create_metagrid(grids, meta_constructs)` - Create metagrid from collection
+
+## Known Issues / Future Enhancements
+
+- Focus cluster dendrograms generate harmless `horiz` warnings (cosmetic only)
+- Consider adding: export to PDF, more clustering methods, statistical tests
+- Grid completion tracking could be more prominent
 
 ## References
 
