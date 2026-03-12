@@ -1,0 +1,67 @@
+{
+  "name": "My Repertory Grid",
+  "elements": ["Scientist", "Sociologist", "Doctor", "Librarian", "Artist"],
+  "constructs": [
+    {
+      "left": "White coats",
+      "right": "Sports coats"
+    },
+    {
+      "left": "Formal taxonomies",
+      "right": "Sociocultural methods"
+    }
+  ],
+  "ratings": [
+    {
+      "element": "Scientist",
+      "construct": "White coats - Sports coats",
+      "rating": 1
+    },
+    {
+      "element": "Sociologist",
+      "construct": "White coats - Sports coats",
+      "rating": 5
+    },
+    {
+      "element": "Doctor",
+      "construct": "White coats - Sports coats",
+      "rating": 1
+    },
+    {
+      "element": "Librarian",
+      "construct": "White coats - Sports coats",
+      "rating": 5
+    },
+    {
+      "element": "Artist",
+      "construct": "White coats - Sports coats",
+      "rating": 3
+    },
+    {
+      "element": "Scientist",
+      "construct": "Formal taxonomies - Sociocultural methods",
+      "rating": 1
+    },
+    {
+      "element": "Sociologist",
+      "construct": "Formal taxonomies - Sociocultural methods",
+      "rating": 4
+    },
+    {
+      "element": "Doctor",
+      "construct": "Formal taxonomies - Sociocultural methods",
+      "rating": 2
+    },
+    {
+      "element": "Librarian",
+      "construct": "Formal taxonomies - Sociocultural methods",
+      "rating": 1
+    },
+    {
+      "element": "Artist",
+      "construct": "Formal taxonomies - Sociocultural methods",
+      "rating": 3
+    }
+  ],
+  "scale": [1, 5]
+}
