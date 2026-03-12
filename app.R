@@ -12,34 +12,34 @@ source("R/multigrid_analysis.r")
 
 ui <- fluidPage(
   tags$head(
-        tags$script(HTML('
-      Shiny.addCustomMessageHandler("click_analyze", function(msg) {
+        tags$script(HTML("
+      Shiny.addCustomMessageHandler('click_analyze', function(msg) {
         setTimeout(function() {
-          var btn = document.getElementById("analyze");
+          var btn = document.getElementById('analyze');
           if (btn) btn.click();
         }, 500);
       });
       // Pop out a plot into a new window
       function popoutPlot(plotId, title) {
-        var img = document.querySelector("#" + plotId + " img");
-        if (!img) { alert("No plot to pop out. Generate the visualization first."); return; }
-        var w = window.open("", "_blank", "width=1200,height=900,scrollbars=yes,resizable=yes");
-        w.document.write("<html><head><title>" + title + "</title>");
-        w.document.write("<style>body{margin:20px;background:#fff;text-align:center;} img{max-width:100%;height:auto;}</style>");
-        w.document.write("</head><body>");
-        w.document.write("<h2>" + title + "</h2>");
-        w.document.write("<img src=\'" + img.src + "\'/>");
-        w.document.write("</body></html>");
+        var img = document.querySelector('#' + plotId + ' img');
+        if (!img) { alert('No plot to pop out. Generate the visualization first.'); return; }
+        var w = window.open('', '_blank', 'width=1200,height=900,scrollbars=yes,resizable=yes');
+        w.document.write('<html><head><title>' + title + '</title>');
+        w.document.write('<style>body{margin:20px;background:#fff;text-align:center;} img{max-width:100%;height:auto;}</style>');
+        w.document.write('</head><body>');
+        w.document.write('<h2>' + title + '</h2>');
+        w.document.write('<img src=' + JSON.stringify(img.src) + '/>');
+        w.document.write('</body></html>');
         w.document.close();
       }
       // Insert line break before multi-grid tabs
       $(document).ready(function() {
-        var gc = $("#main_tabs > li > a[data-value=\'Grid Collection\']");
+        var gc = $('#main_tabs > li > a[data-value=\"Grid Collection\"]');
         if (gc.length) {
-          gc.parent().before("<li class=\'tab-row-break\'></li>");
+          gc.parent().before('<li class=\"tab-row-break\"></li>');
         }
       });
-    ')),
+    ")),
         tags$style(HTML('
       .container-fluid { max-width: 1400px; }
       body { font-size: 13px; }
