@@ -19,6 +19,26 @@ ui <- fluidPage(
           if (btn) btn.click();
         }, 500);
       });
+      // Pop out a plot into a new window
+      function popoutPlot(plotId, title) {
+        var img = document.querySelector("#" + plotId + " img");
+        if (!img) { alert("No plot to pop out. Generate the visualization first."); return; }
+        var w = window.open("", "_blank", "width=1200,height=900,scrollbars=yes,resizable=yes");
+        w.document.write("<html><head><title>" + title + "</title>");
+        w.document.write("<style>body{margin:20px;background:#fff;text-align:center;} img{max-width:100%;height:auto;}</style>");
+        w.document.write("</head><body>");
+        w.document.write("<h2>" + title + "</h2>");
+        w.document.write("<img src=\'" + img.src + "\'/>");
+        w.document.write("</body></html>");
+        w.document.close();
+      }
+      // Insert line break before multi-grid tabs
+      $(document).ready(function() {
+        var gc = $("#main_tabs > li > a[data-value=\'Grid Collection\']");
+        if (gc.length) {
+          gc.parent().before("<li class=\'tab-row-break\'></li>");
+        }
+      });
     ')),
         tags$style(HTML('
       .container-fluid { max-width: 1400px; }
@@ -111,6 +131,9 @@ ui <- fluidPage(
         border-bottom-color: #fff;
       }
       .multigrid-icon { margin-right: 4px; font-size: 10px; }
+      /* Force multi-grid tabs onto second row */
+      .nav-tabs#main_tabs { display: flex; flex-wrap: wrap; }
+      .nav-tabs#main_tabs > .tab-row-break { flex-basis: 100%; height: 0; padding: 0; margin: 0; border: none; }
       /* Landing page styles */
       .landing-page { max-width: 600px; margin: 60px auto; padding: 40px; background: #fff; border-radius: 12px; box-shadow: 0 2px 20px rgba(0,0,0,0.08); }
       .landing-page h2 { margin-bottom: 8px; color: #333; }
@@ -422,6 +445,10 @@ ui <- fluidPage(
           ),
           plotOutput("pca_biplot", height = 600),
           tags$hr(),
+          tags$button(type = "button", class = "btn btn-outline-info btn-sm",
+                      onclick = "popoutPlot('pca_biplot', 'PCA Biplot')",
+                      "\U0001F5D7 Pop Out"),
+          downloadButton("download_biplot_png", "Download PNG", class = "btn-outline-secondary btn-sm"),
           actionButton("help_biplot", "Help me understand this visualisation", class = "btn-info help-btn"),
           actionButton("chat_biplot", "Chat about this data", class = "btn-success chat-btn"),
           conditionalPanel(
@@ -507,6 +534,10 @@ ui <- fluidPage(
                  tags$hr(),
                  plotOutput("crossplot_plot", height = 600),
                  tags$hr(),
+                 tags$button(type = "button", class = "btn btn-outline-info btn-sm",
+                             onclick = "popoutPlot('crossplot_plot', 'Crossplot')",
+                             "\U0001F5D7 Pop Out"),
+                 downloadButton("download_crossplot_png", "Download PNG", class = "btn-outline-secondary btn-sm"),
                  actionButton("help_crossplot", "Help me understand this visualisation", class = "btn-info help-btn"),
                  actionButton("chat_crossplot", "Chat about this data", class = "btn-success chat-btn"),
                  conditionalPanel(
@@ -575,6 +606,10 @@ ui <- fluidPage(
                  tags$hr(),
                  plotOutput("synopsis_plot", height = 600),
                  tags$hr(),
+                 tags$button(type = "button", class = "btn btn-outline-info btn-sm",
+                             onclick = "popoutPlot('synopsis_plot', 'Synopsis')",
+                             "\U0001F5D7 Pop Out"),
+                 downloadButton("download_synopsis_png", "Download PNG", class = "btn-outline-secondary btn-sm"),
                  actionButton("help_synopsis", "Help me understand this visualisation", class = "btn-info help-btn"),
                  actionButton("chat_synopsis", "Chat about this data", class = "btn-success chat-btn"),
                  conditionalPanel(
@@ -631,6 +666,10 @@ ui <- fluidPage(
                  ),
                  plotOutput("heatmap_plot", height = 500),
                  tags$hr(),
+                 tags$button(type = "button", class = "btn btn-outline-info btn-sm",
+                             onclick = "popoutPlot('heatmap_plot', 'Heatmap')",
+                             "\U0001F5D7 Pop Out"),
+                 downloadButton("download_heatmap_png", "Download PNG", class = "btn-outline-secondary btn-sm"),
                  actionButton("help_heatmap", "Help me understand this visualisation", class = "btn-info help-btn"),
                  actionButton("chat_heatmap", "Chat about this data", class = "btn-success chat-btn"),
                  conditionalPanel(
@@ -671,6 +710,10 @@ ui <- fluidPage(
         tabPanel("Element Dendrogram",
                  plotOutput("dend_elements"),
                  tags$hr(),
+                 tags$button(type = "button", class = "btn btn-outline-info btn-sm",
+                             onclick = "popoutPlot('dend_elements', 'Element Dendrogram')",
+                             "\U0001F5D7 Pop Out"),
+                 downloadButton("download_dend_elem_png", "Download PNG", class = "btn-outline-secondary btn-sm"),
                  actionButton("help_dend_elem", "Help me understand this visualisation", class = "btn-info help-btn"),
                  actionButton("chat_dend_elem", "Chat about this data", class = "btn-success chat-btn"),
                  conditionalPanel(
@@ -706,6 +749,10 @@ ui <- fluidPage(
         tabPanel("Construct Dendrogram",
                  plotOutput("dend_constructs"),
                  tags$hr(),
+                 tags$button(type = "button", class = "btn btn-outline-info btn-sm",
+                             onclick = "popoutPlot('dend_constructs', 'Construct Dendrogram')",
+                             "\U0001F5D7 Pop Out"),
+                 downloadButton("download_dend_const_png", "Download PNG", class = "btn-outline-secondary btn-sm"),
                  actionButton("help_dend_const", "Help me understand this visualisation", class = "btn-info help-btn"),
                  actionButton("chat_dend_const", "Chat about this data", class = "btn-success chat-btn"),
                  conditionalPanel(
@@ -812,6 +859,10 @@ ui <- fluidPage(
                  tags$hr(),
                  plotOutput("focus_plot", height = 700),
                  tags$hr(),
+                 tags$button(type = "button", class = "btn btn-outline-info btn-sm",
+                             onclick = "popoutPlot('focus_plot', 'Focus Cluster')",
+                             "\U0001F5D7 Pop Out"),
+                 downloadButton("download_focus_png", "Download PNG", class = "btn-outline-secondary btn-sm"),
                  h4("Match Data"),
                  fluidRow(
                    column(6,
@@ -934,11 +985,9 @@ ui <- fluidPage(
                      uiOutput("stats_response")
                    )
                  )
-        )
-      ),  # end single-grid tabsetPanel
+        ),
 
-      # ===== MULTI-GRID TABS =====
-      tabsetPanel(id = "multi_tabs",
+        # ===== MULTI-GRID TABS =====
         tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), "Grid Collection"),
                  value = "Grid Collection",
                  h4("Manage Grid Collection"),
@@ -1100,7 +1149,11 @@ ui <- fluidPage(
                           actionButton("compute_socionets", "Compute Matches", class = "btn-primary"),
                           tags$hr(),
                           downloadButton("download_match_matrix", "Download Match Matrix (CSV)"),
-                          downloadButton("download_socionets_plot", "Download Plot")
+                          downloadButton("download_socionets_plot", "Download Plot"),
+                          tags$button(type = "button", class = "btn btn-outline-info btn-sm",
+                                      style = "margin-top: 8px; width: 100%;",
+                                      onclick = "popoutPlot('socionet_plot', 'Socionets')",
+                                      "\U0001F5D7 Pop Out")
                    )
                  ),
                  tags$hr(),
@@ -1140,7 +1193,7 @@ ui <- fluidPage(
                  p("Generate a consensus grid representing commonality across multiple participants."),
                  fluidRow(
                    column(8,
-                          plotOutput("mode_grid_heatmap", height = "450px")
+                          plotOutput("mode_grid_heatmap", height = "600px")
                    ),
                    column(4,
                           selectInput("mode_method", "Consensus Method:",
@@ -1161,6 +1214,10 @@ ui <- fluidPage(
                                       min = 0.8, max = 2.0, value = 1.2, step = 0.1),
                           actionButton("generate_mode_grid", "Generate Mode Grid", class = "btn-primary"),
                           tags$hr(),
+                          tags$button(type = "button", class = "btn btn-outline-info btn-sm",
+                                      style = "margin-bottom: 8px; width: 100%;",
+                                      onclick = "popoutPlot('mode_grid_heatmap', 'Mode Grid')",
+                                      "\U0001F5D7 Pop Out"),
                           actionButton("use_mode_as_current", "Use as Current Grid", class = "btn-success btn-sm"),
                           downloadButton("download_mode_grid", "Download Mode Grid (.rgrid)")
                    )
@@ -1519,9 +1576,9 @@ ui <- fluidPage(
                    )
                  )
         )
-      )  # end multi-grid tabsetPanel
-    )
-  )
+      )  # end tabsetPanel
+    )  # end mainPanel
+  )  # end sidebarLayout
   )  # end conditionalPanel for main app
 )
 
@@ -3525,6 +3582,198 @@ server <- function(input, output, session) {
          ylab = "Distance (Euclidean)", hang = -1, cex = txt_size * 0.9)
   })
 
+  # ---- PNG download handlers for plots ----
+
+  output$download_biplot_png <- downloadHandler(
+    filename = function() paste0("biplot-", Sys.Date(), ".png"),
+    content = function(file) {
+      req(rv$scores_mat_last)
+      sm <- rv$scores_mat_last
+      pc <- prcomp(sm, scale. = TRUE)
+      ex <- pc$x[, 1:2]
+      load <- cor(sm, pc$x)[, 1:2]
+      colors <- get_palette_colors(input$biplot_palette)
+      txt_size <- input$text_size
+      all_points <- rbind(ex, load, -load)
+      x_range <- range(all_points[, 1]); y_range <- range(all_points[, 2])
+      x_expand <- diff(x_range) * 0.25; y_expand <- diff(y_range) * 0.25
+      xlim <- c(x_range[1] - x_expand, x_range[2] + x_expand)
+      ylim <- c(y_range[1] - y_expand, y_range[2] + y_expand)
+      n_items <- nrow(ex) + nrow(load)
+      label_scale <- if (n_items > 10) 0.8 else if (n_items > 7) 0.9 else 1.0
+      png(file, width = 1200, height = 900, res = 120)
+      par(mar = c(4, 6, 2, 6), cex.axis = txt_size, cex.lab = txt_size * 1.1)
+      plot(ex, type = "n", xlab = "PC1", ylab = "PC2", xlim = xlim, ylim = ylim)
+      points(ex, pch = 19, col = colors$element, cex = txt_size * 1.3)
+      el_pos <- rep(3, nrow(ex)); pos_cycle <- c(3, 4, 1, 2)
+      thresh <- diff(range(xlim)) * 0.08
+      for (i in seq_len(nrow(ex))) for (j in seq_len(i - 1)) {
+        if (sqrt(sum((ex[i, ] - ex[j, ])^2)) < thresh) el_pos[i] <- pos_cycle[((i - 1) %% 4) + 1]
+      }
+      text(ex, labels = rv$elements, pos = el_pos, col = colors$element, cex = txt_size * label_scale, font = 2)
+      for (i in 1:nrow(load)) {
+        lines(c(-load[i, 1], load[i, 1]), c(-load[i, 2], load[i, 2]), col = colors$construct, lwd = 2)
+        points(load[i, 1], load[i, 2], pch = 4, col = colors$construct, cex = 0.8)
+        points(-load[i, 1], -load[i, 2], pch = 4, col = colors$construct, cex = 0.8)
+      }
+      c_pos_r <- rep(4, nrow(load)); c_pos_l <- rep(2, nrow(load))
+      for (i in seq_len(nrow(load))) for (j in seq_len(i - 1)) {
+        if (sqrt(sum((load[i, ] - load[j, ])^2)) < thresh) {
+          c_pos_r[i] <- pos_cycle[((i - 1) %% 4) + 1]; c_pos_l[i] <- pos_cycle[((i + 1) %% 4) + 1]
+        }
+      }
+      text(load[, 1], load[, 2], labels = rv$constructs$right, pos = c_pos_r, col = colors$construct, cex = txt_size * label_scale, font = 2, xpd = TRUE)
+      text(-load[, 1], -load[, 2], labels = rv$constructs$left, pos = c_pos_l, col = colors$construct, cex = txt_size * label_scale, font = 3, xpd = TRUE)
+      abline(h = 0, v = 0, lty = 3, col = "gray50")
+      dev.off()
+    }
+  )
+
+  output$download_crossplot_png <- downloadHandler(
+    filename = function() paste0("crossplot-", Sys.Date(), ".png"),
+    content = function(file) {
+      req(rv$scores_mat_last, input$crossplot_x, input$crossplot_y)
+      sm <- rv$scores_mat_last
+      construct_labels <- paste(rv$constructs$left, "-", rv$constructs$right)
+      x_idx <- which(construct_labels == input$crossplot_x)
+      y_idx <- which(construct_labels == input$crossplot_y)
+      if (length(x_idx) == 0 || length(y_idx) == 0) return()
+      x_ratings <- sm[, x_idx]; y_ratings <- sm[, y_idx]
+      colors <- get_palette_colors(input$crossplot_palette)
+      txt_size <- input$text_size
+      png(file, width = 1200, height = 900, res = 120)
+      par(mar = c(5, 5, 3, 2))
+      plot(x_ratings, y_ratings, type = "n",
+           xlab = input$crossplot_x, ylab = input$crossplot_y, main = "Crossplot",
+           cex.axis = txt_size, cex.lab = txt_size * 1.1)
+      points(x_ratings, y_ratings, pch = 19, col = colors$element, cex = txt_size * 1.3)
+      text(x_ratings, y_ratings, labels = rv$elements, pos = 3, col = colors$element, cex = txt_size, font = 2)
+      dev.off()
+    }
+  )
+
+  output$download_synopsis_png <- downloadHandler(
+    filename = function() paste0("synopsis-", Sys.Date(), ".png"),
+    content = function(file) {
+      req(rv$scores_mat_last)
+      sm <- rv$scores_mat_last
+      png(file, width = 1200, height = 900, res = 120)
+      bar_color <- if (input$synopsis_color) "#2166AC" else "gray50"
+      if (input$synopsis_type == "overall") {
+        all_ratings <- as.vector(sm); all_ratings <- all_ratings[!is.na(all_ratings)]
+        hist(all_ratings, breaks = input$synopsis_bins, main = "Overall Rating Distribution",
+             xlab = "Rating", ylab = "Frequency", col = bar_color, border = "white")
+        abline(v = mean(all_ratings), col = "red", lwd = 2, lty = 2)
+        abline(v = median(all_ratings), col = "blue", lwd = 2, lty = 2)
+      } else {
+        par(mar = c(10, 4, 3, 2))
+        means <- colMeans(sm, na.rm = TRUE)
+        barplot(means, names.arg = paste(rv$constructs$left, "-", rv$constructs$right),
+                las = 2, col = bar_color, main = "Mean Ratings by Construct", cex.names = 0.8)
+      }
+      dev.off()
+    }
+  )
+
+  output$download_heatmap_png <- downloadHandler(
+    filename = function() paste0("heatmap-", Sys.Date(), ".png"),
+    content = function(file) {
+      req(rv$scores_mat_last)
+      sm <- rv$scores_mat_last
+      colors <- get_palette_colors(input$heatmap_palette)
+      txt_size <- input$text_size
+      cell_size <- input$grid_cell_size
+      if (isTRUE(input$heatmap_use_color)) {
+        pal <- colorRampPalette(c(colors$heat_low, "#FFFFFF", colors$heat_high))(100)
+      } else {
+        pal <- gray.colors(100, start = 0.95, end = 0.2)
+      }
+      n_elem <- nrow(sm); n_cons <- ncol(sm)
+      z <- sm[n_elem:1, ]
+      png(file, width = 1200, height = 900, res = 120)
+      par(mar = c(8 * txt_size, 14 * txt_size, 2, 2))
+      image(x = 1:n_elem, y = 1:n_cons, z = z, col = pal, axes = FALSE, xlab = "", ylab = "")
+      for (i in 1:n_elem) for (j in 1:n_cons) {
+        val <- z[i, j]
+        if (!is.na(val)) {
+          text_col <- if (val > 4) "white" else "black"
+          text(i, j, sprintf("%.0f", val), col = text_col, cex = cell_size * 1.2, font = 2)
+        }
+      }
+      axis(1, at = 1:n_elem, labels = rev(rv$elements), las = 2, cex.axis = txt_size)
+      labs <- paste(rv$constructs$left, "-", rv$constructs$right)
+      axis(2, at = 1:n_cons, labels = labs, las = 1, cex.axis = txt_size)
+      box()
+      dev.off()
+    }
+  )
+
+  output$download_dend_elem_png <- downloadHandler(
+    filename = function() paste0("element-dendrogram-", Sys.Date(), ".png"),
+    content = function(file) {
+      req(rv$scores_mat_last)
+      sm <- rv$scores_mat_last
+      if (nrow(sm) < 2) return()
+      d <- dist(sm)
+      if (any(is.na(d)) || length(d) == 0) return()
+      colors <- get_colors()
+      txt_size <- input$text_size
+      hc <- hclust(d)
+      png(file, width = 1200, height = 900, res = 120)
+      par(mar = c(2, 10 * txt_size, 2, 2), cex = txt_size)
+      plot(hc, labels = rv$elements, main = "Elements", xlab = "", sub = "",
+           ylab = "Distance (Euclidean)", hang = -1, cex = txt_size)
+      dev.off()
+    }
+  )
+
+  output$download_dend_const_png <- downloadHandler(
+    filename = function() paste0("construct-dendrogram-", Sys.Date(), ".png"),
+    content = function(file) {
+      req(rv$scores_mat_last)
+      sm <- rv$scores_mat_last
+      if (ncol(sm) < 2) return()
+      d <- dist(t(sm))
+      if (any(is.na(d)) || length(d) == 0) return()
+      colors <- get_colors()
+      txt_size <- input$text_size
+      hc <- hclust(d)
+      labs <- paste(rv$constructs$left, "-", rv$constructs$right)
+      max_lab_len <- max(nchar(labs), na.rm = TRUE)
+      left_mar <- max(14, max_lab_len * 0.5) * txt_size
+      png(file, width = 1200, height = 900, res = 120)
+      par(mar = c(2, left_mar, 2, 2), cex = txt_size)
+      plot(hc, labels = labs, main = "Constructs", xlab = "", sub = "",
+           ylab = "Distance (Euclidean)", hang = -1, cex = txt_size * 0.9)
+      dev.off()
+    }
+  )
+
+  output$download_focus_png <- downloadHandler(
+    filename = function() paste0("focus-cluster-", Sys.Date(), ".png"),
+    content = function(file) {
+      req(focus_result())
+      result <- focus_result()
+      colors <- get_palette_colors(input$focus_palette)
+      txt_size <- input$text_size
+      cell_size <- input$grid_cell_size
+      use_spaced <- isTRUE(input$focus_spaced)
+      png(file, width = 1200, height = 900, res = 120)
+      if (use_spaced) {
+        plot_focus_spaced(focus_result = result, title = "SPACED: Focus Cluster Analysis",
+          show_values = input$focus_show_values, show_shading = input$focus_show_shading,
+          use_color = input$focus_use_color, text_size = txt_size, cell_size = cell_size,
+          heat_low = colors$heat_low, heat_high = colors$heat_high)
+      } else {
+        plot_focus_cluster(focus_result = result, title = "Focus Cluster Analysis",
+          show_values = input$focus_show_values, show_shading = input$focus_show_shading,
+          use_color = input$focus_use_color, text_size = txt_size, cell_size = cell_size,
+          heat_low = colors$heat_low, heat_high = colors$heat_high)
+      }
+      dev.off()
+    }
+  )
+
   # Statistics outputs
   output$stats_elements <- renderPrint({
     repgrid_obj <- rv$repgrid_last
@@ -5032,8 +5281,12 @@ server <- function(input, output, session) {
     # Set up layout: main heatmap + color legend
     layout(matrix(c(1, 2), nrow = 1), widths = c(5, 1))
 
-    # Main heatmap
-    par(mar = c(10, 12, 5, 1), family = "sans")
+    # Main heatmap - dynamic margins based on label length
+    max_left_len <- max(nchar(as.character(g$constructs$left)), na.rm = TRUE)
+    max_elem_len <- max(nchar(as.character(g$elements)), na.rm = TRUE)
+    bottom_mar <- max(10, max_left_len * 0.55)
+    left_mar <- max(12, max_elem_len * 0.7)
+    par(mar = c(bottom_mar, left_mar, 5, 1), family = "sans")
     mode_colors <- get_palette_colors(input$mode_palette)
     colors <- colorRampPalette(c(mode_colors$heat_low, "#FFFFFF", mode_colors$heat_high))(100)
 
@@ -5047,12 +5300,16 @@ server <- function(input, output, session) {
 
     # Add rating values if requested
     if (show_values) {
+      scale_range <- scale_max - scale_min
       for (i in 1:n_elem) {
         for (j in 1:n_const) {
           val <- g$scores_mat[i, j]
           if (!is.na(val)) {
+            # White text on dark backgrounds (high or low extremes)
+            pct <- (val - scale_min) / scale_range
+            txt_col <- if (pct > 0.75 || pct < 0.15) "white" else "black"
             text(j, n_elem - i + 1, round(val),
-                 cex = 0.8 * text_size, family = "sans")
+                 cex = 0.8 * text_size, family = "sans", col = txt_col)
           }
         }
       }
@@ -5074,7 +5331,7 @@ server <- function(input, output, session) {
           side = 1, line = 8, cex = 0.8 * text_size, family = "sans")
 
     # Color legend
-    par(mar = c(10, 0.5, 5, 3), family = "sans")
+    par(mar = c(bottom_mar, 0.5, 5, 3), family = "sans")
     legend_vals <- seq(scale_min, scale_max, length.out = 100)
     image(1, legend_vals, t(as.matrix(legend_vals)), col = colors,
           axes = FALSE, xlab = "", ylab = "")

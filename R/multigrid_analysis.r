@@ -262,12 +262,15 @@ generate_mode_grid <- function(grids, common_elements = NULL, method = "average"
     stop("Need at least 2 common elements to generate mode grid")
   }
 
-  # Normalize all grids to same scale
-  target_scale <- c(1, 7)
+  # Check if all grids share the same scale — if so, keep it; otherwise normalize to 1-7
+  all_scales <- lapply(grids, function(g) if (!is.null(g$scale)) g$scale else c(1, 7))
+  scales_same <- all(sapply(all_scales, function(s) identical(s, all_scales[[1]])))
+  target_scale <- if (scales_same) all_scales[[1]] else c(1, 7)
+
   normalized_grids <- lapply(grids, function(g) {
     idx <- match(common_elements, g$elements)
     mat <- g$scores_mat[idx, , drop = FALSE]
-    if (!is.null(g$scale)) {
+    if (!is.null(g$scale) && !identical(g$scale, target_scale)) {
       mat <- normalize_scale(mat, g$scale, target_scale)
     }
     list(
