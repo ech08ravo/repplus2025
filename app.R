@@ -81,7 +81,7 @@ ui <- fluidPage(
       .sidebar .shiny-input-container { margin-bottom: 10px; }
       .sidebar .form-group { margin-bottom: 10px; }
       label { margin-bottom: 2px; font-size: 12px; }
-      h4 { font-size: 16px; margin: 8px 0; }
+      h4 { font-size: 18px; font-weight: 600; margin: 10px 0; }
       h5 { font-size: 14px; margin: 6px 0; }
       p { margin-bottom: 6px; font-size: 13px; }
       hr { margin: 8px 0; }
@@ -167,6 +167,24 @@ ui <- fluidPage(
       /* Force multi-grid tabs onto second row */
       .nav-tabs#main_tabs { display: flex; flex-wrap: wrap; }
       .nav-tabs#main_tabs > .tab-row-break { flex-basis: 100%; height: 0; padding: 0; margin: 0; border: none; }
+      @media (max-width: 992px) {
+        .nav-tabs#main_tabs { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .nav-tabs#main_tabs > li > a { white-space: nowrap; font-size: 11px; padding: 6px 8px; }
+      }
+      @media (max-width: 992px) {
+        .col-sm-2.sidebar { display: none; }
+        .col-sm-10 { width: 100%; }
+        .sidebar-toggle-btn { display: block !important; }
+        .col-sm-2.sidebar.d-block { display: block !important; position: fixed; top: 0; left: 0; width: 280px; height: 100vh; overflow-y: auto; z-index: 999; background: #fff; box-shadow: 2px 0 10px rgba(0,0,0,0.2); padding: 16px; }
+      }
+      @media (min-width: 993px) {
+        .sidebar-toggle-btn { display: none !important; }
+      }
+      .sidebar-toggle-btn { position: fixed; bottom: 16px; right: 16px; z-index: 1000; border-radius: 50%; width: 48px; height: 48px; font-size: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+      .plot-toolbar { background: #f8f9fa; padding: 8px 12px; border-radius: 6px; margin: 8px 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+      .plot-toolbar .btn { margin: 0; }
+      .help-btn.active-help { background: #17a2b8; color: #fff; border-color: #17a2b8; }
+      .chat-btn.active-chat { background: #28a745; color: #fff; border-color: #28a745; }
       /* Landing page styles */
       .landing-page { max-width: 600px; margin: 60px auto; padding: 40px; background: #fff; border-radius: 12px; box-shadow: 0 2px 20px rgba(0,0,0,0.08); }
       .landing-page h2 { margin-bottom: 8px; color: #333; }
@@ -237,6 +255,8 @@ ui <- fluidPage(
           el.scrollIntoView({ behavior: "smooth", block: "start" });
         }
       });
+      $(document).on("click", ".help-btn", function() { $(this).toggleClass("active-help"); });
+      $(document).on("click", ".chat-btn", function() { $(this).toggleClass("active-chat"); });
     '))
   ),
   titlePanel("WebGrid.Online"),
@@ -350,6 +370,18 @@ ui <- fluidPage(
   # Main app - shown after results
   conditionalPanel(
     condition = "output.landing_step == 'done'",
+  tags$button(id = "sidebar_toggle", class = "btn btn-primary sidebar-toggle-btn", onclick = "document.querySelector('.col-sm-2.sidebar').classList.toggle('d-block'); this.classList.toggle('active');", "\u2630"),
+  conditionalPanel(
+    condition = "!output.welcome_dismissed",
+    div(style = "background: #e3f2fd; border: 1px solid #90caf9; border-radius: 8px; padding: 16px 20px; margin-bottom: 16px; position: relative;",
+      tags$button(type = "button", class = "close", style = "position: absolute; top: 8px; right: 12px; font-size: 18px; background: none; border: none; cursor: pointer;",
+        onclick = "Shiny.setInputValue('dismiss_welcome', true, {priority: 'event'}); $(this).parent().parent().hide();",
+        "\u00D7"),
+      h4("Your grid is ready!", style = "margin-top: 0;"),
+      p("Explore your data using the tabs above. Start with the ", tags$strong("Biplot"), " for a visual overview."),
+      p("The second row of tabs (with coloured dots) lets you compare multiple grids together.", style = "margin-bottom: 0; font-size: 12px; color: #666;")
+    )
+  ),
   sidebarLayout(
     sidebarPanel(
       width = 2,
@@ -482,13 +514,14 @@ ui <- fluidPage(
             )
           ),
           plotOutput("pca_biplot", height = 600),
-          tags$hr(),
-          tags$button(type = "button", class = "btn btn-outline-info btn-sm",
-                      onclick = "popoutPlot('pca_biplot', 'PCA Biplot')",
-                      "\U0001F5D7 Pop Out"),
-          downloadButton("download_biplot_png", "Download PNG", class = "btn-outline-secondary btn-sm"),
-          actionButton("help_biplot", "Help me understand this visualisation", class = "btn-info help-btn"),
-          actionButton("chat_biplot", "Chat about this data", class = "btn-success chat-btn"),
+          div(class = "plot-toolbar",
+            tags$button(type = "button", class = "btn btn-outline-info btn-sm",
+                        onclick = "popoutPlot('pca_biplot', 'PCA Biplot')",
+                        "\U0001F5D7 Pop Out"),
+            downloadButton("download_biplot_png", "Download PNG", class = "btn-outline-secondary btn-sm"),
+            actionButton("help_biplot", "Help me understand this visualisation", class = "btn-info help-btn"),
+            actionButton("chat_biplot", "Chat about this data", class = "btn-success chat-btn")
+          ),
           conditionalPanel(
             condition = "input.help_biplot % 2 == 1",
             div(class = "help-content",
@@ -565,19 +598,19 @@ ui <- fluidPage(
                                         "High Contrast" = "contrast",
                                         "Greyscale" = "greyscale"
                                       ),
-                                      selected = "wong"),
-                          downloadButton("download_crossplot", "Download Crossplot")
+                                      selected = "wong")
                    )
                  ),
                  tags$hr(),
                  plotOutput("crossplot_plot", height = 600),
-                 tags$hr(),
-                 tags$button(type = "button", class = "btn btn-outline-info btn-sm",
-                             onclick = "popoutPlot('crossplot_plot', 'Crossplot')",
-                             "\U0001F5D7 Pop Out"),
-                 downloadButton("download_crossplot_png", "Download PNG", class = "btn-outline-secondary btn-sm"),
-                 actionButton("help_crossplot", "Help me understand this visualisation", class = "btn-info help-btn"),
-                 actionButton("chat_crossplot", "Chat about this data", class = "btn-success chat-btn"),
+                 div(class = "plot-toolbar",
+                   tags$button(type = "button", class = "btn btn-outline-info btn-sm",
+                               onclick = "popoutPlot('crossplot_plot', 'Crossplot')",
+                               "\U0001F5D7 Pop Out"),
+                   downloadButton("download_crossplot_png", "Download PNG", class = "btn-outline-secondary btn-sm"),
+                   actionButton("help_crossplot", "Help me understand this visualisation", class = "btn-info help-btn"),
+                   actionButton("chat_crossplot", "Chat about this data", class = "btn-success chat-btn")
+                 ),
                  conditionalPanel(
                    condition = "input.help_crossplot % 2 == 1",
                    div(class = "help-content",
@@ -636,20 +669,19 @@ ui <- fluidPage(
                           helpText("For histograms only")
                    ),
                    column(4,
-                          downloadButton("download_synopsis", "Download Synopsis Plot"),
-                          tags$br(), tags$br(),
                           checkboxInput("synopsis_color", "Use color", value = FALSE)
                    )
                  ),
                  tags$hr(),
                  plotOutput("synopsis_plot", height = 600),
-                 tags$hr(),
-                 tags$button(type = "button", class = "btn btn-outline-info btn-sm",
-                             onclick = "popoutPlot('synopsis_plot', 'Synopsis')",
-                             "\U0001F5D7 Pop Out"),
-                 downloadButton("download_synopsis_png", "Download PNG", class = "btn-outline-secondary btn-sm"),
-                 actionButton("help_synopsis", "Help me understand this visualisation", class = "btn-info help-btn"),
-                 actionButton("chat_synopsis", "Chat about this data", class = "btn-success chat-btn"),
+                 div(class = "plot-toolbar",
+                   tags$button(type = "button", class = "btn btn-outline-info btn-sm",
+                               onclick = "popoutPlot('synopsis_plot', 'Synopsis')",
+                               "\U0001F5D7 Pop Out"),
+                   downloadButton("download_synopsis_png", "Download PNG", class = "btn-outline-secondary btn-sm"),
+                   actionButton("help_synopsis", "Help me understand this visualisation", class = "btn-info help-btn"),
+                   actionButton("chat_synopsis", "Chat about this data", class = "btn-success chat-btn")
+                 ),
                  conditionalPanel(
                    condition = "input.help_synopsis % 2 == 1",
                    div(class = "help-content",
@@ -703,13 +735,14 @@ ui <- fluidPage(
                    )
                  ),
                  plotOutput("heatmap_plot", height = 500),
-                 tags$hr(),
-                 tags$button(type = "button", class = "btn btn-outline-info btn-sm",
-                             onclick = "popoutPlot('heatmap_plot', 'Heatmap')",
-                             "\U0001F5D7 Pop Out"),
-                 downloadButton("download_heatmap_png", "Download PNG", class = "btn-outline-secondary btn-sm"),
-                 actionButton("help_heatmap", "Help me understand this visualisation", class = "btn-info help-btn"),
-                 actionButton("chat_heatmap", "Chat about this data", class = "btn-success chat-btn"),
+                 div(class = "plot-toolbar",
+                   tags$button(type = "button", class = "btn btn-outline-info btn-sm",
+                               onclick = "popoutPlot('heatmap_plot', 'Heatmap')",
+                               "\U0001F5D7 Pop Out"),
+                   downloadButton("download_heatmap_png", "Download PNG", class = "btn-outline-secondary btn-sm"),
+                   actionButton("help_heatmap", "Help me understand this visualisation", class = "btn-info help-btn"),
+                   actionButton("chat_heatmap", "Chat about this data", class = "btn-success chat-btn")
+                 ),
                  conditionalPanel(
                    condition = "input.help_heatmap % 2 == 1",
                    div(class = "help-content",
@@ -745,81 +778,88 @@ ui <- fluidPage(
                    )
                  )
         ),
-        tabPanel("Element Dendrogram",
-                 plotOutput("dend_elements"),
-                 tags$hr(),
-                 tags$button(type = "button", class = "btn btn-outline-info btn-sm",
-                             onclick = "popoutPlot('dend_elements', 'Element Dendrogram')",
-                             "\U0001F5D7 Pop Out"),
-                 downloadButton("download_dend_elem_png", "Download PNG", class = "btn-outline-secondary btn-sm"),
-                 actionButton("help_dend_elem", "Help me understand this visualisation", class = "btn-info help-btn"),
-                 actionButton("chat_dend_elem", "Chat about this data", class = "btn-success chat-btn"),
+        tabPanel("Dendrograms",
+                 radioButtons("dend_type", NULL, choices = c("Elements", "Constructs"), inline = TRUE),
                  conditionalPanel(
-                   condition = "input.help_dend_elem % 2 == 1",
-                   div(class = "help-content",
-                     h5("Element Dendrogram"),
-                     p("A tree diagram showing which elements are most similar to each other based on their rating patterns."),
-                     h5("How to read it"),
-                     tags$ul(
-                       tags$li(tags$strong("Elements that join early"), " (close to the left) are very similar - they were rated similarly across most constructs"),
-                       tags$li(tags$strong("Elements that join late"), " (further right) are more different from each other"),
-                       tags$li(tags$strong("Branch length"), " indicates degree of difference")
-                     ),
-                     h5("Example interpretation"),
-                     p("If elements A and B join together before connecting to C, this means A and B have more similar rating profiles than either has with C.")
+                   condition = "input.dend_type == 'Elements'",
+                   plotOutput("dend_elements"),
+                   div(class = "plot-toolbar",
+                     tags$button(type = "button", class = "btn btn-outline-info btn-sm",
+                                 onclick = "popoutPlot('dend_elements', 'Element Dendrogram')",
+                                 "\U0001F5D7 Pop Out"),
+                     downloadButton("download_dend_elem_png", "Download PNG", class = "btn-outline-secondary btn-sm"),
+                     actionButton("help_dend_elem", "Help me understand this visualisation", class = "btn-info help-btn"),
+                     actionButton("chat_dend_elem", "Chat about this data", class = "btn-success chat-btn")
+                   ),
+                   conditionalPanel(
+                     condition = "input.help_dend_elem % 2 == 1",
+                     div(class = "help-content",
+                       h5("Element Dendrogram"),
+                       p("A tree diagram showing which elements are most similar to each other based on their rating patterns."),
+                       h5("How to read it"),
+                       tags$ul(
+                         tags$li(tags$strong("Elements that join early"), " (close to the left) are very similar - they were rated similarly across most constructs"),
+                         tags$li(tags$strong("Elements that join late"), " (further right) are more different from each other"),
+                         tags$li(tags$strong("Branch length"), " indicates degree of difference")
+                       ),
+                       h5("Example interpretation"),
+                       p("If elements A and B join together before connecting to C, this means A and B have more similar rating profiles than either has with C.")
+                     )
+                   ),
+                   conditionalPanel(
+                     condition = "input.chat_dend_elem % 2 == 1",
+                     div(class = "chat-panel",
+                       h5("Ask Claude about your Element Dendrogram"),
+                       textInput("chat_dend_elem_question", "Your question:", placeholder = "e.g., Why do A and B cluster together?"),
+                       div(class = "btn-group-chat",
+                         actionButton("ask_dend_elem", "Ask Claude (API)", class = "btn-primary"),
+                         actionButton("copy_dend_elem", "Copy to Clipboard", class = "btn-secondary"),
+                         tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary", "Open Claude.ai"),
+                         span(class = "copy-feedback", style = "display:none;")
+                       ),
+                       uiOutput("dend_elem_response")
+                     )
                    )
                  ),
                  conditionalPanel(
-                   condition = "input.chat_dend_elem % 2 == 1",
-                   div(class = "chat-panel",
-                     h5("Ask Claude about your Element Dendrogram"),
-                     textInput("chat_dend_elem_question", "Your question:", placeholder = "e.g., Why do A and B cluster together?"),
-                     div(class = "btn-group-chat",
-                       actionButton("ask_dend_elem", "Ask Claude (API)", class = "btn-primary"),
-                       actionButton("copy_dend_elem", "Copy to Clipboard", class = "btn-secondary"),
-                       tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary", "Open Claude.ai"),
-                       span(class = "copy-feedback", style = "display:none;")
-                     ),
-                     uiOutput("dend_elem_response")
-                   )
-                 )
-        ),
-        tabPanel("Construct Dendrogram",
-                 plotOutput("dend_constructs"),
-                 tags$hr(),
-                 tags$button(type = "button", class = "btn btn-outline-info btn-sm",
-                             onclick = "popoutPlot('dend_constructs', 'Construct Dendrogram')",
-                             "\U0001F5D7 Pop Out"),
-                 downloadButton("download_dend_const_png", "Download PNG", class = "btn-outline-secondary btn-sm"),
-                 actionButton("help_dend_const", "Help me understand this visualisation", class = "btn-info help-btn"),
-                 actionButton("chat_dend_const", "Chat about this data", class = "btn-success chat-btn"),
-                 conditionalPanel(
-                   condition = "input.help_dend_const % 2 == 1",
-                   div(class = "help-content",
-                     h5("Construct Dendrogram"),
-                     p("A tree diagram showing which constructs are most similar based on how elements were rated on them."),
-                     h5("How to read it"),
-                     tags$ul(
-                       tags$li(tags$strong("Constructs that join early"), " (close to the left) essentially measure the same thing - elements received similar ratings on both"),
-                       tags$li(tags$strong("Constructs that join late"), " (further right) measure different dimensions"),
-                       tags$li("Very similar constructs may be redundant - consider if you need both")
-                     ),
-                     h5("Example interpretation"),
-                     p("If 'friendly-unfriendly' and 'warm-cold' join early, you may be using these constructs interchangeably. They represent the same underlying dimension in your thinking.")
-                   )
-                 ),
-                 conditionalPanel(
-                   condition = "input.chat_dend_const % 2 == 1",
-                   div(class = "chat-panel",
-                     h5("Ask Claude about your Construct Dendrogram"),
-                     textInput("chat_dend_const_question", "Your question:", placeholder = "e.g., Are these constructs redundant?"),
-                     div(class = "btn-group-chat",
-                       actionButton("ask_dend_const", "Ask Claude (API)", class = "btn-primary"),
-                       actionButton("copy_dend_const", "Copy to Clipboard", class = "btn-secondary"),
-                       tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary", "Open Claude.ai"),
-                       span(class = "copy-feedback", style = "display:none;")
-                     ),
-                     uiOutput("dend_const_response")
+                   condition = "input.dend_type == 'Constructs'",
+                   plotOutput("dend_constructs"),
+                   div(class = "plot-toolbar",
+                     tags$button(type = "button", class = "btn btn-outline-info btn-sm",
+                                 onclick = "popoutPlot('dend_constructs', 'Construct Dendrogram')",
+                                 "\U0001F5D7 Pop Out"),
+                     downloadButton("download_dend_const_png", "Download PNG", class = "btn-outline-secondary btn-sm"),
+                     actionButton("help_dend_const", "Help me understand this visualisation", class = "btn-info help-btn"),
+                     actionButton("chat_dend_const", "Chat about this data", class = "btn-success chat-btn")
+                   ),
+                   conditionalPanel(
+                     condition = "input.help_dend_const % 2 == 1",
+                     div(class = "help-content",
+                       h5("Construct Dendrogram"),
+                       p("A tree diagram showing which constructs are most similar based on how elements were rated on them."),
+                       h5("How to read it"),
+                       tags$ul(
+                         tags$li(tags$strong("Constructs that join early"), " (close to the left) essentially measure the same thing - elements received similar ratings on both"),
+                         tags$li(tags$strong("Constructs that join late"), " (further right) measure different dimensions"),
+                         tags$li("Very similar constructs may be redundant - consider if you need both")
+                       ),
+                       h5("Example interpretation"),
+                       p("If 'friendly-unfriendly' and 'warm-cold' join early, you may be using these constructs interchangeably. They represent the same underlying dimension in your thinking.")
+                     )
+                   ),
+                   conditionalPanel(
+                     condition = "input.chat_dend_const % 2 == 1",
+                     div(class = "chat-panel",
+                       h5("Ask Claude about your Construct Dendrogram"),
+                       textInput("chat_dend_const_question", "Your question:", placeholder = "e.g., Are these constructs redundant?"),
+                       div(class = "btn-group-chat",
+                         actionButton("ask_dend_const", "Ask Claude (API)", class = "btn-primary"),
+                         actionButton("copy_dend_const", "Copy to Clipboard", class = "btn-secondary"),
+                         tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary", "Open Claude.ai"),
+                         span(class = "copy-feedback", style = "display:none;")
+                       ),
+                       uiOutput("dend_const_response")
+                     )
                    )
                  )
         ),
@@ -832,51 +872,8 @@ ui <- fluidPage(
                  ),
                  fluidRow(
                    column(3,
-                          div(style = "display: flex; align-items: center;",
-                            tags$label("Minkowski Power:", style = "margin-right: 4px;"),
-                            actionButton("info_minkowski", "?", class = "btn-info info-btn")
-                          ),
-                          sliderInput("focus_power", NULL,
-                                    min = 0.5, max = 3.0, value = 1.0, step = 0.1),
-                          conditionalPanel(
-                            condition = "input.info_minkowski % 2 == 1",
-                            div(class = "info-popup", style = "font-size: 11px;",
-                              tags$strong("Minkowski Power"), " controls how differences are measured:",
-                              tags$ul(style = "margin: 4px 0; padding-left: 18px;",
-                                tags$li(tags$strong("1.0 (City block/Manhattan):"), " Treats all rating differences equally. A difference of 2 on one construct = two differences of 1. Good default for most grids."),
-                                tags$li(tags$strong("2.0 (Euclidean):"), " Larger differences count more. A difference of 2 counts as 4, not 2. Use when big differences are more meaningful than small ones."),
-                                tags$li(tags$strong("< 1.0:"), " Reduces impact of large differences. Use when you want to emphasise overall patterns over extreme ratings."),
-                                tags$li(tags$strong("> 2.0:"), " Amplifies large differences further. Clusters become dominated by the biggest rating gaps.")
-                              ),
-                              tags$em("Recommendation: Start with 1.0, try 2.0 if clusters seem too loose.")
-                            )
-                          )
-                   ),
-                   column(3,
-                          div(style = "display: flex; align-items: center;",
-                            tags$label("Match Cutoff (%):", style = "margin-right: 4px;"),
-                            actionButton("info_cutoff", "?", class = "btn-info info-btn")
-                          ),
-                          sliderInput("focus_cutoff", NULL,
-                                    min = 0, max = 100, value = 80, step = 5),
-                          conditionalPanel(
-                            condition = "input.info_cutoff % 2 == 1",
-                            div(class = "info-popup", style = "font-size: 11px;",
-                              tags$strong("Match Cutoff"), " filters which similarity scores are shown:",
-                              tags$ul(style = "margin: 4px 0; padding-left: 18px;",
-                                tags$li(tags$strong("80% (default):"), " Shows only strong matches. Elements/constructs must be 80%+ similar to appear as a match."),
-                                tags$li(tags$strong("90%+:"), " Very strict - only near-identical items shown. Useful for finding redundant constructs."),
-                                tags$li(tags$strong("60-70%:"), " More lenient - shows moderate similarities. Good for exploring broader patterns."),
-                                tags$li(tags$strong("0%:"), " Shows all matches regardless of strength.")
-                              ),
-                              tags$em("Note: This only affects the match statistics below, not the dendrogram structure.")
-                            )
-                          )
-                   ),
-                   column(3,
-                          checkboxInput("focus_show_values", "Show Rating Values", value = TRUE),
-                          checkboxInput("focus_show_shading", "Show Shading", value = TRUE),
-                          checkboxInput("focus_use_color", "Use color shading", value = TRUE),
+                          actionButton("run_focus", "Run Focus Analysis", class = "btn-primary"),
+                          tags$br(), tags$br(),
                           checkboxInput("focus_spaced", "SPACED: Proportional Spacing", value = FALSE),
                           selectInput("focus_palette", "Color Palette",
                                       choices = c(
@@ -889,18 +886,72 @@ ui <- fluidPage(
                                       selected = "wong")
                    ),
                    column(3,
-                          actionButton("run_focus", "Run Focus Analysis", class = "btn-primary"),
-                          tags$br(), tags$br(),
+                          checkboxInput("focus_show_values", "Show Rating Values", value = TRUE),
+                          checkboxInput("focus_show_shading", "Show Shading", value = TRUE),
+                          checkboxInput("focus_use_color", "Use color shading", value = TRUE),
                           downloadButton("download_focus", "Download Focus Plot")
+                   ),
+                   column(6,
+                          actionButton("focus_advanced_toggle", "Advanced Options", class = "btn-outline-secondary btn-sm"),
+                          conditionalPanel(
+                            condition = "input.focus_advanced_toggle % 2 == 1",
+                            div(style = "margin-top: 8px;",
+                              fluidRow(
+                                column(6,
+                                  div(style = "display: flex; align-items: center;",
+                                    tags$label("Minkowski Power:", style = "margin-right: 4px;"),
+                                    actionButton("info_minkowski", "?", class = "btn-info info-btn")
+                                  ),
+                                  sliderInput("focus_power", NULL,
+                                            min = 0.5, max = 3.0, value = 1.0, step = 0.1),
+                                  conditionalPanel(
+                                    condition = "input.info_minkowski % 2 == 1",
+                                    div(class = "info-popup", style = "font-size: 11px;",
+                                      tags$strong("Minkowski Power"), " controls how differences are measured:",
+                                      tags$ul(style = "margin: 4px 0; padding-left: 18px;",
+                                        tags$li(tags$strong("1.0 (City block/Manhattan):"), " Treats all rating differences equally. A difference of 2 on one construct = two differences of 1. Good default for most grids."),
+                                        tags$li(tags$strong("2.0 (Euclidean):"), " Larger differences count more. A difference of 2 counts as 4, not 2. Use when big differences are more meaningful than small ones."),
+                                        tags$li(tags$strong("< 1.0:"), " Reduces impact of large differences. Use when you want to emphasise overall patterns over extreme ratings."),
+                                        tags$li(tags$strong("> 2.0:"), " Amplifies large differences further. Clusters become dominated by the biggest rating gaps.")
+                                      ),
+                                      tags$em("Recommendation: Start with 1.0, try 2.0 if clusters seem too loose.")
+                                    )
+                                  )
+                                ),
+                                column(6,
+                                  div(style = "display: flex; align-items: center;",
+                                    tags$label("Match Cutoff (%):", style = "margin-right: 4px;"),
+                                    actionButton("info_cutoff", "?", class = "btn-info info-btn")
+                                  ),
+                                  sliderInput("focus_cutoff", NULL,
+                                            min = 0, max = 100, value = 80, step = 5),
+                                  conditionalPanel(
+                                    condition = "input.info_cutoff % 2 == 1",
+                                    div(class = "info-popup", style = "font-size: 11px;",
+                                      tags$strong("Match Cutoff"), " filters which similarity scores are shown:",
+                                      tags$ul(style = "margin: 4px 0; padding-left: 18px;",
+                                        tags$li(tags$strong("80% (default):"), " Shows only strong matches. Elements/constructs must be 80%+ similar to appear as a match."),
+                                        tags$li(tags$strong("90%+:"), " Very strict - only near-identical items shown. Useful for finding redundant constructs."),
+                                        tags$li(tags$strong("60-70%:"), " More lenient - shows moderate similarities. Good for exploring broader patterns."),
+                                        tags$li(tags$strong("0%:"), " Shows all matches regardless of strength.")
+                                      ),
+                                      tags$em("Note: This only affects the match statistics below, not the dendrogram structure.")
+                                    )
+                                  )
+                                )
+                              )
+                            )
+                          )
                    )
                  ),
                  tags$hr(),
                  plotOutput("focus_plot", height = 700),
-                 tags$hr(),
-                 tags$button(type = "button", class = "btn btn-outline-info btn-sm",
-                             onclick = "popoutPlot('focus_plot', 'Focus Cluster')",
-                             "\U0001F5D7 Pop Out"),
-                 downloadButton("download_focus_png", "Download PNG", class = "btn-outline-secondary btn-sm"),
+                 div(class = "plot-toolbar",
+                   tags$button(type = "button", class = "btn btn-outline-info btn-sm",
+                               onclick = "popoutPlot('focus_plot', 'Focus Cluster')",
+                               "\U0001F5D7 Pop Out"),
+                   downloadButton("download_focus_png", "Download PNG", class = "btn-outline-secondary btn-sm")
+                 ),
                  h4("Match Data"),
                  fluidRow(
                    column(6,
@@ -1050,86 +1101,11 @@ ui <- fluidPage(
                           uiOutput("common_structure_info"),
                           tags$hr(),
                           h5("Multi-Grid Analysis Options"),
-                          div(style = "margin-bottom: 8px;",
-                            actionLink("goto_socionets", "Socionets", style = "font-weight: bold;"),
-                            actionButton("info_socionets", "i", class = "btn-info btn-xs",
-                                        style = "width: 16px; height: 16px; padding: 0; font-size: 10px; line-height: 16px; border-radius: 50%; margin-left: 4px;"),
-                            conditionalPanel(
-                              condition = "input.info_socionets % 2 == 1",
-                              tags$small(class = "text-muted", style = "display: block; margin-left: 10px;",
-                                        "Shows a network diagram of how similar each participant's grid is to others. Nodes are grids, edges show match percentages.")
-                            )
-                          ),
-                          div(style = "margin-bottom: 8px;",
-                            actionLink("goto_mode", "Mode Grid", style = "font-weight: bold;"),
-                            actionButton("info_mode_link", "i", class = "btn-info btn-xs",
-                                        style = "width: 16px; height: 16px; padding: 0; font-size: 10px; line-height: 16px; border-radius: 50%; margin-left: 4px;"),
-                            conditionalPanel(
-                              condition = "input.info_mode_link % 2 == 1",
-                              tags$small(class = "text-muted", style = "display: block; margin-left: 10px;",
-                                        "Creates a consensus grid representing the 'typical' view across all participants by averaging or taking the median of ratings.")
-                            )
-                          ),
-                          div(style = "margin-bottom: 8px;",
-                            actionLink("goto_composite", "Composite Grid", style = "font-weight: bold;"),
-                            actionButton("info_composite_link", "i", class = "btn-info btn-xs",
-                                        style = "width: 16px; height: 16px; padding: 0; font-size: 10px; line-height: 16px; border-radius: 50%; margin-left: 4px;"),
-                            conditionalPanel(
-                              condition = "input.info_composite_link % 2 == 1",
-                              tags$small(class = "text-muted", style = "display: block; margin-left: 10px;",
-                                        "Merges all grids into one large grid, combining constructs from all participants for unified analysis.")
-                            )
-                          ),
-                          div(style = "margin-bottom: 8px;",
-                            actionLink("goto_minus", "MINUS Analysis", style = "font-weight: bold;"),
-                            actionButton("info_minus_link", "i", class = "btn-info btn-xs",
-                                        style = "width: 16px; height: 16px; padding: 0; font-size: 10px; line-height: 16px; border-radius: 50%; margin-left: 4px;"),
-                            conditionalPanel(
-                              condition = "input.info_minus_link % 2 == 1",
-                              tags$small(class = "text-muted", style = "display: block; margin-left: 10px;",
-                                        "Subtracts one grid from another to show cell-by-cell differences. Requires grids with shared elements AND constructs.")
-                            )
-                          ),
-                          div(style = "margin-bottom: 8px;",
-                            actionLink("goto_core", "CORE Analysis", style = "font-weight: bold;"),
-                            actionButton("info_core_link", "i", class = "btn-info btn-xs",
-                                        style = "width: 16px; height: 16px; padding: 0; font-size: 10px; line-height: 16px; border-radius: 50%; margin-left: 4px;"),
-                            conditionalPanel(
-                              condition = "input.info_core_link % 2 == 1",
-                              tags$small(class = "text-muted", style = "display: block; margin-left: 10px;",
-                                        "Iteratively removes least-agreed items to reveal the core of shared construing between two grids.")
-                            )
-                          ),
-                          div(style = "margin-bottom: 8px;",
-                            actionLink("goto_trajectories", "PrinGrid Trajectories", style = "font-weight: bold;"),
-                            actionButton("info_traj_link", "i", class = "btn-info btn-xs",
-                                        style = "width: 16px; height: 16px; padding: 0; font-size: 10px; line-height: 16px; border-radius: 50%; margin-left: 4px;"),
-                            conditionalPanel(
-                              condition = "input.info_traj_link % 2 == 1",
-                              tags$small(class = "text-muted", style = "display: block; margin-left: 10px;",
-                                        "PCA biplot showing how elements move across grids, with trajectory arrows connecting same elements.")
-                            )
-                          ),
-                          div(style = "margin-bottom: 8px;",
-                            actionLink("goto_exchange", "Exchange Grids", style = "font-weight: bold;"),
-                            actionButton("info_exchange_link", "i", class = "btn-info btn-xs",
-                                        style = "width: 16px; height: 16px; padding: 0; font-size: 10px; line-height: 16px; border-radius: 50%; margin-left: 4px;"),
-                            conditionalPanel(
-                              condition = "input.info_exchange_link % 2 == 1",
-                              tags$small(class = "text-muted", style = "display: block; margin-left: 10px;",
-                                        "6-grid protocol measuring agreement and understanding between two people using CORE analysis.")
-                            )
-                          ),
-                          div(style = "margin-bottom: 8px;",
-                            actionLink("goto_metagrids", "Class Metagrids", style = "font-weight: bold;"),
-                            actionButton("info_metagrid_link", "i", class = "btn-info btn-xs",
-                                        style = "width: 16px; height: 16px; padding: 0; font-size: 10px; line-height: 16px; border-radius: 50%; margin-left: 4px;"),
-                            conditionalPanel(
-                              condition = "input.info_metagrid_link % 2 == 1",
-                              tags$small(class = "text-muted", style = "display: block; margin-left: 10px;",
-                                        "Create a higher-order grid where your grids become elements, rated on custom constructs for classification.")
-                            )
-                          ),
+                          selectInput("goto_analysis", "Jump to Analysis:",
+                                      choices = c("Socionets", "Mode Grid", "Composite Grid",
+                                                  "Comparison", "MINUS", "CORE",
+                                                  "Trajectories", "Exchange", "Class Metagrids")),
+                          actionButton("goto_analysis_btn", "Go", class = "btn-primary btn-sm"),
                           tags$hr(),
                           h5("Open Grid for Editing"),
                           selectInput("preview_grid_select", "Select Grid:", choices = NULL),
@@ -1466,7 +1442,7 @@ ui <- fluidPage(
         ),
 
         # ===== PrinGrid Trajectories Tab =====
-        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), tags$span(class = "mg-any"), "PrinGrid Trajectories"),
+        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), tags$span(class = "mg-any"), "Trajectories"),
                  value = "PrinGrid Trajectories",
                  h4("PrinGrid Trajectories"),
                  p("PCA-based visualisation showing how elements move in construct space across multiple grids (e.g., over time or between people)."),
@@ -1514,7 +1490,7 @@ ui <- fluidPage(
         ),
 
         # ===== Exchange Grids Tab =====
-        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), tags$span(class = "mg-common"), "Exchange Grids"),
+        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), tags$span(class = "mg-common"), "Comparison"),
                  value = "Exchange Grids",
                  h4("Exchange Grid Analysis"),
                  p("Structured protocol for measuring agreement and understanding between two people using Shaw's (1980) exchange procedure."),
@@ -1709,6 +1685,9 @@ server <- function(input, output, session) {
   # Output flag for conditionalPanel
   output$landing_step <- reactive({ landing$step })
   outputOptions(output, "landing_step", suspendWhenHidden = FALSE)
+
+  output$welcome_dismissed <- reactive({ !is.null(input$dismiss_welcome) })
+  outputOptions(output, "welcome_dismissed", suspendWhenHidden = FALSE)
 
   rv <- reactiveValues(
     pseudonym = generate_pseudonym(),
@@ -5534,6 +5513,17 @@ server <- function(input, output, session) {
 
   observeEvent(input$goto_metagrids, {
     updateTabsetPanel(session, "main_tabs", selected = "Class Metagrids")
+  })
+
+  observeEvent(input$goto_analysis_btn, {
+    req(input$goto_analysis)
+    tab_map <- c("Socionets" = "Socionets", "Mode Grid" = "Mode Grid",
+                 "Composite Grid" = "Composite Grid", "Comparison" = "Exchange Grids",
+                 "MINUS" = "MINUS", "CORE" = "CORE",
+                 "Trajectories" = "PrinGrid Trajectories",
+                 "Exchange" = "Exchange Grids",
+                 "Class Metagrids" = "Class Metagrids")
+    updateTabsetPanel(session, "main_tabs", selected = tab_map[input$goto_analysis])
   })
 
   # ===== FOCI: Interpretive FOCUS =====
