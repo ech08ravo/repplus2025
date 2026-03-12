@@ -1165,23 +1165,30 @@ ui <- fluidPage(
                    condition = "input.help_socionets % 2 == 1",
                    div(class = "help-content",
                      h5("Socionets Analysis"),
-                     p("Socionets (Shaw, 1980) shows how similar different grids are based on construct matching."),
+                     p("Socionets (Shaw, 1980) maps how well participants could understand each other's construct systems."),
+                     h5("Reading the Arrows"),
                      tags$ul(
-                       tags$li(tags$strong("Nodes"), " represent individual grids (participants)"),
-                       tags$li(tags$strong("Edges"), " show match percentages - how well one person could understand another's constructs"),
-                       tags$li(tags$strong("Arrow direction"), " indicates asymmetric matching: A->B means A's constructs match B's ratings"),
-                       tags$li(tags$strong("Edge thickness"), " indicates strength of match")
+                       tags$li(tags$strong("A \u2192 B (85%)"), " means: if person A used person B's constructs, A would predict 85% of B's ratings correctly. A is very likely to understand how B sees the world."),
+                       tags$li(tags$strong("B \u2192 A (60%)"), " means: B would only predict 60% of A's ratings \u2014 B is less likely to understand A's perspective."),
+                       tags$li(tags$strong("Asymmetry is key:"), " understanding is not always mutual. A may understand B well, but B may struggle to understand A.")
+                     ),
+                     h5("What the Numbers Mean"),
+                     tags$ul(
+                       tags$li(tags$strong("90%+"), " = near-identical construct systems; these people see the world very similarly"),
+                       tags$li(tags$strong("70\u201389%"), " = substantial overlap; they would largely understand each other"),
+                       tags$li(tags$strong("50\u201369%"), " = moderate overlap; significant differences in perspective"),
+                       tags$li(tags$strong("Below 50%"), " = quite different construing; likely to misunderstand each other")
                      ),
                      h5("Parameters"),
                      tags$ul(
-                       tags$li(tags$strong("Match Cutoff"), " - only show connections above this similarity threshold"),
-                       tags$li(tags$strong("Symmetric Matching"), " - average bidirectional matches (A->B and B->A)")
+                       tags$li(tags$strong("Match Cutoff"), " \u2014 only show connections above this threshold (hide weak links)"),
+                       tags$li(tags$strong("Symmetric Matching"), " \u2014 average both directions (A\u2192B and B\u2192A) into a single undirected edge")
                      ),
                      h5("Interpretation"),
                      tags$ul(
-                       tags$li("High match % = similar way of construing the elements"),
+                       tags$li("Thick arrows = strong match; thin arrows = weaker match"),
                        tags$li("Clusters of connected grids = groups with shared understanding"),
-                       tags$li("Isolated nodes = outliers with different perspective")
+                       tags$li("Isolated nodes = people with a unique perspective that others don't share")
                      )
                    )
                  )
@@ -1218,6 +1225,7 @@ ui <- fluidPage(
                                       style = "margin-bottom: 8px; width: 100%;",
                                       onclick = "popoutPlot('mode_grid_heatmap', 'Mode Grid')",
                                       "\U0001F5D7 Pop Out"),
+                          downloadButton("download_mode_png", "Download PNG", class = "btn-outline-secondary btn-sm"),
                           actionButton("use_mode_as_current", "Use as Current Grid", class = "btn-success btn-sm"),
                           downloadButton("download_mode_grid", "Download Mode Grid (.rgrid)")
                    )
@@ -1233,23 +1241,30 @@ ui <- fluidPage(
                  conditionalPanel(
                    condition = "input.help_mode % 2 == 1",
                    div(class = "help-content",
-                     h5("Mode Grid"),
-                     p("A Mode Grid represents the consensus or 'typical' grid from a group of participants."),
+                     h5("Mode Grid (Consensus Grid)"),
+                     p("The Mode Grid (Shaw, 1980) represents the 'typical' or consensus grid from a group of participants. It answers: what would a representative member of this group's grid look like?"),
+                     h5("Reading the Heatmap"),
+                     tags$ul(
+                       tags$li("Each cell shows the consensus rating for that element-construct combination"),
+                       tags$li("Blue = low rating (towards left pole), White = midpoint, Orange = high rating (towards right pole)"),
+                       tags$li("Constructs with high agreement across participants will show clear, saturated colours"),
+                       tags$li("Constructs where participants disagreed will tend towards the midpoint (white)")
+                     ),
                      h5("Consensus Method"),
                      tags$ul(
-                       tags$li(tags$strong("Average"), " - mean of ratings across all grids"),
-                       tags$li(tags$strong("Median"), " - middle value, more robust to outliers")
+                       tags$li(tags$strong("Average"), " \u2014 mean of ratings across all grids. Best when ratings are normally distributed."),
+                       tags$li(tags$strong("Median"), " \u2014 middle value. More robust when some participants rate very differently from others.")
                      ),
                      h5("Construct Handling"),
                      tags$ul(
-                       tags$li(tags$strong("Fold Identical"), " - combine constructs with same labels, average their ratings"),
-                       tags$li(tags$strong("Collect All"), " - include all constructs from all grids (labeled by source)")
+                       tags$li(tags$strong("Fold Identical"), " \u2014 combine constructs with the same labels and average their ratings. Use when all participants share the same construct set."),
+                       tags$li(tags$strong("Collect All"), " \u2014 include every construct from every grid (labelled by source). Use when participants have different constructs.")
                      ),
-                     h5("Use cases"),
+                     h5("Interpretation"),
                      tags$ul(
-                       tags$li("Identifying shared understanding in a team"),
-                       tags$li("Creating a baseline for comparison"),
-                       tags$li("Reducing multiple perspectives to a single representation")
+                       tags$li("Elements rated similarly across the group appear as clear colour bands \u2014 the group agrees on how to view them"),
+                       tags$li("Elements with mixed colours indicate disagreement \u2014 people construe them differently"),
+                       tags$li("Use 'Use as Current Grid' to load the mode grid and explore it with all single-grid analyses (biplot, focus, etc.)")
                      )
                    )
                  )
@@ -5355,6 +5370,58 @@ server <- function(input, output, session) {
 
     showNotification("Mode grid loaded as current grid", type = "message")
   })
+
+  # Download mode grid PNG
+  output$download_mode_png <- downloadHandler(
+    filename = function() paste0("mode-grid-", Sys.Date(), ".png"),
+    content = function(file) {
+      req(rv$mode_grid)
+      g <- rv$mode_grid
+      text_size <- if (!is.null(input$mode_text_size)) input$mode_text_size else 1.2
+      show_values <- if (!is.null(input$mode_show_values)) input$mode_show_values else TRUE
+      n_elem <- nrow(g$scores_mat); n_const <- ncol(g$scores_mat)
+      scale_min <- g$scale[1]; scale_max <- g$scale[2]
+      max_left_len <- max(nchar(as.character(g$constructs$left)), na.rm = TRUE)
+      max_elem_len <- max(nchar(as.character(g$elements)), na.rm = TRUE)
+      bottom_mar <- max(10, max_left_len * 0.55)
+      left_mar <- max(12, max_elem_len * 0.7)
+      mode_colors <- get_palette_colors(input$mode_palette)
+      colors <- colorRampPalette(c(mode_colors$heat_low, "#FFFFFF", mode_colors$heat_high))(100)
+      png(file, width = 1200, height = 900, res = 120)
+      layout(matrix(c(1, 2), nrow = 1), widths = c(5, 1))
+      par(mar = c(bottom_mar, left_mar, 5, 1), family = "sans")
+      image(1:n_const, 1:n_elem, t(g$scores_mat[n_elem:1, , drop = FALSE]),
+            col = colors, axes = FALSE, xlab = "", ylab = "",
+            main = paste("Mode Grid:", g$name), cex.main = text_size * 1.1,
+            zlim = c(scale_min, scale_max))
+      if (show_values) {
+        scale_range <- scale_max - scale_min
+        for (i in 1:n_elem) for (j in 1:n_const) {
+          val <- g$scores_mat[i, j]
+          if (!is.na(val)) {
+            pct <- (val - scale_min) / scale_range
+            txt_col <- if (pct > 0.75 || pct < 0.15) "white" else "black"
+            text(j, n_elem - i + 1, round(val), cex = 0.8 * text_size, family = "sans", col = txt_col)
+          }
+        }
+      }
+      axis(1, at = 1:n_const, labels = g$constructs$left, las = 2, cex.axis = 0.7 * text_size, family = "sans")
+      axis(3, at = 1:n_const, labels = g$constructs$right, las = 2, cex.axis = 0.7 * text_size, family = "sans", tick = FALSE, line = -0.5)
+      axis(2, at = 1:n_elem, labels = rev(g$elements), las = 2, cex.axis = 0.8 * text_size, family = "sans")
+      box()
+      mtext(paste0("Blue = low (", scale_min, ", left pole)    White = mid    Orange = high (", scale_max, ", right pole)"),
+            side = 1, line = 8, cex = 0.8 * text_size, family = "sans")
+      par(mar = c(bottom_mar, 0.5, 5, 3), family = "sans")
+      legend_vals <- seq(scale_min, scale_max, length.out = 100)
+      image(1, legend_vals, t(as.matrix(legend_vals)), col = colors, axes = FALSE, xlab = "", ylab = "")
+      axis(4, at = c(scale_min, (scale_min + scale_max) / 2, scale_max),
+           labels = c(scale_min, round((scale_min + scale_max) / 2, 1), scale_max),
+           las = 2, cex.axis = 0.8 * text_size, family = "sans")
+      mtext("Rating", side = 3, line = 0.5, cex = 0.8 * text_size, family = "sans")
+      box()
+      dev.off()
+    }
+  )
 
   # Download mode grid
   output$download_mode_grid <- downloadHandler(
