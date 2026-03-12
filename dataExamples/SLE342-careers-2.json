@@ -1,0 +1,96 @@
+{
+  "name": "My Repertory Grid",
+  "elements": ["Scientist", "Sociologist", "Doctor", "Librarian", "Artist"],
+  "constructs": [
+    {
+      "left": "People-focused",
+      "right": "Object-focused"
+    },
+    {
+      "left": "Work in an office environment",
+      "right": "Works in a lab environment"
+    },
+    {
+      "left": "Creative",
+      "right": "Data-driven"
+    }
+  ],
+  "ratings": [
+    {
+      "element": "Scientist",
+      "construct": "People-focused - Object-focused",
+      "rating": 5
+    },
+    {
+      "element": "Sociologist",
+      "construct": "People-focused - Object-focused",
+      "rating": 2
+    },
+    {
+      "element": "Doctor",
+      "construct": "People-focused - Object-focused",
+      "rating": 1
+    },
+    {
+      "element": "Librarian",
+      "construct": "People-focused - Object-focused",
+      "rating": 4
+    },
+    {
+      "element": "Artist",
+      "construct": "People-focused - Object-focused",
+      "rating": 3
+    },
+    {
+      "element": "Scientist",
+      "construct": "Work in an office environment - Works in a lab environment",
+      "rating": 5
+    },
+    {
+      "element": "Sociologist",
+      "construct": "Work in an office environment - Works in a lab environment",
+      "rating": 1
+    },
+    {
+      "element": "Doctor",
+      "construct": "Work in an office environment - Works in a lab environment",
+      "rating": 3
+    },
+    {
+      "element": "Librarian",
+      "construct": "Work in an office environment - Works in a lab environment",
+      "rating": 1
+    },
+    {
+      "element": "Artist",
+      "construct": "Work in an office environment - Works in a lab environment",
+      "rating": 3
+    },
+    {
+      "element": "Scientist",
+      "construct": "Creative - Data-driven",
+      "rating": 3
+    },
+    {
+      "element": "Sociologist",
+      "construct": "Creative - Data-driven",
+      "rating": 4
+    },
+    {
+      "element": "Doctor",
+      "construct": "Creative - Data-driven",
+      "rating": 4
+    },
+    {
+      "element": "Librarian",
+      "construct": "Creative - Data-driven",
+      "rating": 5
+    },
+    {
+      "element": "Artist",
+      "construct": "Creative - Data-driven",
+      "rating": 1
+    }
+  ],
+  "scale": [1, 5]
+}
