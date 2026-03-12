@@ -12,6 +12,17 @@ MAX_CONSTRUCTS <- 100
 MAX_GRIDS <- 50
 MAX_TRIADS <- 30  # Sample triads when elements > threshold
 
+# Random pseudonym generator (adjective + animal)
+generate_pseudonym <- function() {
+  adjectives <- c("Swift", "Bright", "Calm", "Bold", "Keen", "Wise", "Quick",
+    "Gentle", "Vivid", "Noble", "Brave", "Clear", "Deft", "Fair", "Grand",
+    "Happy", "Jolly", "Lucky", "Merry", "Neat", "Proud", "Sharp", "Warm")
+  animals <- c("Falcon", "Otter", "Lynx", "Heron", "Fox", "Owl", "Hawk",
+    "Dolphin", "Wolf", "Raven", "Bear", "Eagle", "Deer", "Badger", "Wren",
+    "Hare", "Robin", "Crane", "Seal", "Finch", "Stoat", "Kite", "Swan")
+  paste0(sample(adjectives, 1), sample(animals, 1), sample(10:99, 1))
+}
+
 # Generate triads safely: sample when combinatorial count is too large
 safe_triads <- function(items, max_triads = MAX_TRIADS) {
   n <- length(items)
@@ -184,17 +195,17 @@ ui <- fluidPage(
       .preset-card:hover { border-color: #0072B2; background: #f0f8ff; }
       .preset-card h4 { margin: 0 0 6px 0; color: #333; }
       .preset-card .preset-detail { color: #666; font-size: 12px; margin: 0; }
-      /* Triads wizard page */
-      .triad-wizard .progress-text { color: #666; font-size: 13px; margin-bottom: 16px; }
-      .triad-wizard .triad-cards { display: flex; gap: 16px; margin: 20px 0; justify-content: center; flex-wrap: wrap; }
-      .triad-wizard .triad-card { border: 2px solid #ddd; border-radius: 10px; padding: 16px 20px; min-width: 120px; text-align: center; cursor: pointer; font-size: 16px; font-weight: 500; transition: all 0.15s; background: #fff; user-select: none; }
-      .triad-wizard .triad-card:hover { border-color: #999; }
-      .triad-wizard .triad-card.is-similar { border-color: #28a745; background: #e8f5e9; color: #1b5e20; }
-      .triad-wizard .triad-card.is-different { border-color: #dc3545; background: #fce4ec; color: #b71c1c; }
-      .triad-wizard .pole-inputs { margin-top: 20px; }
-      .triad-wizard .pole-inputs label { font-size: 13px; font-weight: 600; }
-      .triad-wizard .pole-inputs .form-control { font-size: 15px; padding: 8px 12px; height: auto; }
-      .triad-wizard .wizard-buttons { margin-top: 24px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+      /* Triads: shared styles for wizard and main elicitation */
+      .triad-cards { display: flex; gap: 16px; margin: 20px 0; justify-content: center; flex-wrap: wrap; }
+      .triad-card { border: 2px solid #ddd; border-radius: 10px; padding: 16px 20px; min-width: 120px; text-align: center; cursor: pointer; font-size: 16px; font-weight: 500; transition: all 0.15s; background: #fff; user-select: none; }
+      .triad-card:hover { border-color: #999; }
+      .triad-card.is-similar { border-color: #28a745; background: #e8f5e9; color: #1b5e20; }
+      .triad-card.is-different { border-color: #dc3545; background: #fce4ec; color: #b71c1c; }
+      .pole-inputs { margin-top: 20px; }
+      .pole-inputs label { font-size: 13px; font-weight: 600; }
+      .pole-inputs .form-control { font-size: 15px; padding: 8px 12px; height: auto; }
+      .wizard-buttons { margin-top: 24px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+      .triad-instruction { background: #fff3cd; padding: 10px 14px; border-radius: 6px; border: 1px solid #ffc107; font-size: 13px; margin-bottom: 16px; }
       .triad-wizard .instruction-text { background: #fff3cd; padding: 10px 14px; border-radius: 6px; border: 1px solid #ffc107; font-size: 13px; margin-bottom: 16px; }
     ')),
     tags$script(HTML('
@@ -235,6 +246,11 @@ ui <- fluidPage(
     div(class = "landing-page",
       h2("Welcome to WebGrid.Online"),
       p(class = "subtitle", "A repertory grid helps you explore how you think about things by comparing them."),
+      div(style = "margin-bottom: 16px;",
+        tags$label("Your name or pseudonym", style = "font-size: 13px; font-weight: 600;"),
+        textInput("user_pseudonym", NULL, placeholder = "Leave blank for a random name"),
+        tags$small(class = "text-muted", "This labels your grid when shared or added to a collection.")
+      ),
       p("To get started, list 5 things you'd like to compare. They could be people, places, products, ideas — anything in the same category."),
       p(tags$em("For example: 5 friends, 5 cities you've lived in, 5 programming languages, 5 foods you eat regularly."), style = "color: #888; font-size: 12px;"),
       div(class = "item-row", span(class = "item-number", "1."), div(class = "item-input", textInput("landing_item1", NULL, placeholder = "e.g. Pizza"))),
@@ -1695,6 +1711,7 @@ server <- function(input, output, session) {
   outputOptions(output, "landing_step", suspendWhenHidden = FALSE)
 
   rv <- reactiveValues(
+    pseudonym = generate_pseudonym(),
     elements = character(),
     constructs = data.frame(
       left = character(),
@@ -1817,6 +1834,9 @@ server <- function(input, output, session) {
     items <- trimws(items)
     items <- items[items != ""]
     if (length(items) >= 3) {
+      # Capture pseudonym (use random if blank)
+      user_name <- trimws(input$user_pseudonym %||% "")
+      if (user_name != "") rv$pseudonym <- user_name
       rv$elements <- items
       triads <- safe_triads(items)
       rv$all_triads <- triads
@@ -2093,7 +2113,7 @@ server <- function(input, output, session) {
     req(length(rv$elements) > 0, is.data.frame(rv$constructs), nrow(rv$constructs) > 0,
         is.data.frame(rv$ratings), nrow(rv$ratings) > 0)
     grid_json <- jsonlite::toJSON(list(
-      name = "My Repertory Grid",
+      name = rv$pseudonym,
       elements = rv$elements,
       constructs = lapply(seq_len(nrow(rv$constructs)), function(i) {
         list(left = rv$constructs$left[i], right = rv$constructs$right[i])
@@ -2143,7 +2163,7 @@ server <- function(input, output, session) {
       xr <- range(all_pts[, 1]) * 1.3
       yr <- range(all_pts[, 2]) * 1.3
       plot(ex, type = "n", xlab = "PC1", ylab = "PC2",
-           xlim = xr, ylim = yr, main = "My Repertory Grid")
+           xlim = xr, ylim = yr, main = rv$pseudonym)
       points(ex, pch = 19, col = "#0072B2", cex = 1.3)
       text(ex, labels = rv$elements, pos = 3, col = "#0072B2", font = 2)
       for (i in seq_len(nrow(load))) {
@@ -2428,80 +2448,22 @@ server <- function(input, output, session) {
   })
 
   # Handle clicking on triad elements to assign as similar or different
-  observeEvent(input$triad_elem_1_similar, {
-    req(rv$elicitation_active, rv$current_triad_idx > 0)
-    triad <- rv$all_triads[[rv$current_triad_idx]]
-    elem <- triad[1]
-    # Toggle: if already similar, remove; if different, switch; otherwise add
-    if (elem %in% rv$triad_similar) {
-      rv$triad_similar <- setdiff(rv$triad_similar, elem)
-    } else if (identical(rv$triad_different, elem)) {
-      rv$triad_different <- NULL
-      if (length(rv$triad_similar) < 2) rv$triad_similar <- c(rv$triad_similar, elem)
-    } else if (length(rv$triad_similar) < 2) {
-      rv$triad_similar <- c(rv$triad_similar, elem)
-    }
-  })
-
-  observeEvent(input$triad_elem_2_similar, {
-    req(rv$elicitation_active, rv$current_triad_idx > 0)
-    triad <- rv$all_triads[[rv$current_triad_idx]]
-    elem <- triad[2]
-    if (elem %in% rv$triad_similar) {
-      rv$triad_similar <- setdiff(rv$triad_similar, elem)
-    } else if (identical(rv$triad_different, elem)) {
-      rv$triad_different <- NULL
-      if (length(rv$triad_similar) < 2) rv$triad_similar <- c(rv$triad_similar, elem)
-    } else if (length(rv$triad_similar) < 2) {
-      rv$triad_similar <- c(rv$triad_similar, elem)
-    }
-  })
-
-  observeEvent(input$triad_elem_3_similar, {
-    req(rv$elicitation_active, rv$current_triad_idx > 0)
-    triad <- rv$all_triads[[rv$current_triad_idx]]
-    elem <- triad[3]
-    if (elem %in% rv$triad_similar) {
-      rv$triad_similar <- setdiff(rv$triad_similar, elem)
-    } else if (identical(rv$triad_different, elem)) {
-      rv$triad_different <- NULL
-      if (length(rv$triad_similar) < 2) rv$triad_similar <- c(rv$triad_similar, elem)
-    } else if (length(rv$triad_similar) < 2) {
-      rv$triad_similar <- c(rv$triad_similar, elem)
-    }
-  })
-
-  observeEvent(input$triad_elem_1_different, {
-    req(rv$elicitation_active, rv$current_triad_idx > 0)
-    triad <- rv$all_triads[[rv$current_triad_idx]]
-    elem <- triad[1]
-    if (identical(rv$triad_different, elem)) {
-      rv$triad_different <- NULL
-    } else if (!(elem %in% rv$triad_similar)) {
-      rv$triad_different <- elem
-    }
-  })
-
-  observeEvent(input$triad_elem_2_different, {
-    req(rv$elicitation_active, rv$current_triad_idx > 0)
-    triad <- rv$all_triads[[rv$current_triad_idx]]
-    elem <- triad[2]
-    if (identical(rv$triad_different, elem)) {
-      rv$triad_different <- NULL
-    } else if (!(elem %in% rv$triad_similar)) {
-      rv$triad_different <- elem
-    }
-  })
-
-  observeEvent(input$triad_elem_3_different, {
-    req(rv$elicitation_active, rv$current_triad_idx > 0)
-    triad <- rv$all_triads[[rv$current_triad_idx]]
-    elem <- triad[3]
-    if (identical(rv$triad_different, elem)) {
-      rv$triad_different <- NULL
-    } else if (!(elem %in% rv$triad_similar)) {
-      rv$triad_different <- elem
-    }
+  # Main elicitation: card click handlers (matching wizard pattern)
+  lapply(1:3, function(i) {
+    observeEvent(input[[paste0("main_card_", i)]], {
+      req(rv$elicitation_active, rv$current_triad_idx > 0)
+      triad <- rv$all_triads[[rv$current_triad_idx]]
+      elem <- triad[i]
+      if (elem %in% rv$triad_similar) {
+        rv$triad_similar <- setdiff(rv$triad_similar, elem)
+      } else if (identical(rv$triad_different, elem)) {
+        rv$triad_different <- NULL
+      } else if (length(rv$triad_similar) < 2) {
+        rv$triad_similar <- c(rv$triad_similar, elem)
+      } else {
+        rv$triad_different <- elem
+      }
+    }, ignoreInit = TRUE)
   })
 
   # Handle element clicks using input$last_clicked pattern
@@ -2609,39 +2571,15 @@ server <- function(input, output, session) {
 
     current_triad <- rv$all_triads[[rv$current_triad_idx]]
 
-    # Three element cards side by side
-    fluidRow(
-      lapply(1:3, function(i) {
-        elem <- current_triad[i]
-        is_similar <- elem %in% rv$triad_similar
-        is_different <- identical(rv$triad_different, elem)
-
-        # Determine card style
-        card_style <- if (is_similar) {
-          "background: #d4edda; border: 2px solid #28a745; padding: 10px; border-radius: 8px; text-align: center; min-height: 120px;"
-        } else if (is_different) {
-          "background: #f8d7da; border: 2px solid #dc3545; padding: 10px; border-radius: 8px; text-align: center; min-height: 120px;"
-        } else {
-          "background: #f8f9fa; border: 2px solid #dee2e6; padding: 10px; border-radius: 8px; text-align: center; min-height: 120px;"
-        }
-
-        column(4,
-          div(style = card_style,
-            tags$div(style = "font-size: 14px; font-weight: bold; margin-bottom: 8px;", elem),
-            tags$div(style = "margin-top: 8px;",
-              actionButton(paste0("triad_elem_", i, "_similar"), "Similar",
-                class = if (is_similar) "btn btn-success btn-sm" else "btn btn-outline-success btn-sm",
-                style = "margin: 2px;"),
-              actionButton(paste0("triad_elem_", i, "_different"), "Different",
-                class = if (is_different) "btn btn-danger btn-sm" else "btn btn-outline-danger btn-sm",
-                style = "margin: 2px;")
-            ),
-            if (is_similar) tags$div(style = "color: #28a745; font-size: 11px; margin-top: 4px;", "SIMILAR")
-            else if (is_different) tags$div(style = "color: #dc3545; font-size: 11px; margin-top: 4px;", "DIFFERENT")
-          )
-        )
-      })
-    )
+    # Clickable cards matching wizard style
+    cards <- lapply(1:3, function(i) {
+      elem <- current_triad[i]
+      cls <- "triad-card"
+      if (elem %in% rv$triad_similar) cls <- paste(cls, "is-similar")
+      if (identical(rv$triad_different, elem)) cls <- paste(cls, "is-different")
+      actionButton(paste0("main_card_", i), elem, class = cls)
+    })
+    div(class = "triad-cards", cards)
   })
 
   # Constructs section UI - only shown after user clicks a button
@@ -2684,34 +2622,24 @@ server <- function(input, output, session) {
 
         # Current triad display
         div(class = "triad-instruction",
-          tags$strong("Current Triad: "), "Click to mark 2 as SIMILAR (green) and 1 as DIFFERENT (red)"
+          "Click each card to mark it as ", tags$strong("Similar"), " (green) or ", tags$strong("Different"), " (red). Pick 2 similar and 1 different."
         ),
 
         # Triad cards - separate uiOutput so text inputs don't reset
         uiOutput("triad_cards_ui"),
 
         # Construct poles input - these are OUTSIDE the reactive triad cards
-        fluidRow(style = "margin-top: 12px;",
-          column(6,
-            tags$label(style = "color: #28a745; font-weight: bold; font-size: 12px;",
-              "What makes the 2 SIMILAR? (Left pole)"),
-            textInput("elicit_left", NULL, placeholder = "e.g., friendly, warm, modern...")
-          ),
-          column(6,
-            tags$label(style = "color: #dc3545; font-weight: bold; font-size: 12px;",
-              "What makes the 1 DIFFERENT? (Right pole)"),
-            textInput("elicit_right", NULL, placeholder = "e.g., unfriendly, cold, traditional...")
-          )
+        div(class = "pole-inputs",
+          textInput("elicit_left", "How are the two similar ones alike?", placeholder = "e.g., sweet, friendly, warm..."),
+          textInput("elicit_right", "How is the different one different?", placeholder = "e.g., savoury, unfriendly, cold...")
         ),
 
-        # Action buttons
-        fluidRow(
-          column(12, style = "text-align: center; margin-top: 8px;",
-            actionButton("add_elicited_construct", "Add Construct & Next Triad", class = "btn-warning"),
-            actionButton("skip_triad", "Skip This Triad", class = "btn-outline-secondary btn-sm", style = "margin-left: 8px;"),
-            actionButton("clear_triad", "Clear Selection", class = "btn-outline-secondary btn-sm", style = "margin-left: 8px;"),
-            actionButton("stop_elicitation", "Done with Constructs", class = "btn-outline-danger btn-sm", style = "margin-left: 8px;")
-          )
+        # Action buttons matching wizard style
+        div(class = "wizard-buttons",
+          actionButton("add_elicited_construct", "Next", class = "btn-success btn-lg"),
+          actionButton("skip_triad", "Skip", class = "btn-outline-secondary"),
+          actionButton("clear_triad", "Clear", class = "btn-outline-secondary"),
+          actionButton("stop_elicitation", "Finish & Continue", class = "btn-outline-primary")
         ),
 
         tags$div(style = "margin-top: 8px; font-size: 11px; color: #666;",
@@ -5005,7 +4933,7 @@ server <- function(input, output, session) {
     }
 
     grid_id <- uuid::UUIDgenerate()
-    grid_name <- paste("Current Grid", format(Sys.time(), "%H:%M"))
+    grid_name <- paste0(rv$pseudonym, " (", format(Sys.time(), "%H:%M"), ")")
 
     grid_data <- list(
       id = grid_id,
