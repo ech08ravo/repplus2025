@@ -32,11 +32,14 @@ ui <- fluidPage(
         w.document.write('<\\/body><\\/html>');
         w.document.close();
       }
-      // Insert line break before multi-grid tabs
+      // Insert line break and legend before multi-grid tabs
       $(document).ready(function() {
         var gc = $('#main_tabs > li > a[data-value=\"Grid Collection\"]');
         if (gc.length) {
           gc.parent().before('<li class=\"tab-row-break\"></li>');
+          // Add legend after last multi-grid tab
+          var lastTab = $('#main_tabs > li:last');
+          lastTab.after('<li class=\"mg-legend\"><span class=\"mg-any\"></span> any grids <span class=\"mg-common\" style=\"margin-left:8px;\"></span> requires shared constructs</li>');
         }
       });
     ")),
@@ -133,6 +136,7 @@ ui <- fluidPage(
       .multigrid-icon { margin-right: 4px; font-size: 10px; }
       .mg-any { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #2ca02c; margin-right: 4px; vertical-align: middle; }
       .mg-common { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #d4a017; margin-right: 4px; vertical-align: middle; }
+      .mg-legend { display: inline-block; font-size: 10px; color: #666; padding: 4px 10px; margin-left: auto; white-space: nowrap; align-self: center; }
       /* Force multi-grid tabs onto second row */
       .nav-tabs#main_tabs { display: flex; flex-wrap: wrap; }
       .nav-tabs#main_tabs > .tab-row-break { flex-basis: 100%; height: 0; padding: 0; margin: 0; border: none; }
