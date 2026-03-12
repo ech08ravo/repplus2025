@@ -131,6 +131,8 @@ ui <- fluidPage(
         border-bottom-color: #fff;
       }
       .multigrid-icon { margin-right: 4px; font-size: 10px; }
+      .mg-any { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #2ca02c; margin-right: 4px; vertical-align: middle; }
+      .mg-common { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #d4a017; margin-right: 4px; vertical-align: middle; }
       /* Force multi-grid tabs onto second row */
       .nav-tabs#main_tabs { display: flex; flex-wrap: wrap; }
       .nav-tabs#main_tabs > .tab-row-break { flex-basis: 100%; height: 0; padding: 0; margin: 0; border: none; }
@@ -992,6 +994,11 @@ ui <- fluidPage(
                  value = "Grid Collection",
                  h4("Manage Grid Collection"),
                  p("Upload multiple grids to compare and analyze relationships between them."),
+                 div(style = "margin-bottom: 12px; padding: 8px 12px; background: #f8f9fa; border-radius: 6px; font-size: 12px;",
+                   tags$span(class = "mg-any"), tags$strong("Green"), " = works with any grids (different constructs OK)",
+                   tags$span(style = "margin-left: 16px;"),
+                   tags$span(class = "mg-common"), tags$strong("Amber"), " = requires common constructs across grids"
+                 ),
                  fluidRow(
                    column(6,
                           h5("Loaded Grids"),
@@ -1120,7 +1127,7 @@ ui <- fluidPage(
                  )
         ),
 
-        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), "Socionets"),
+        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), tags$span(class = "mg-any"), "Socionets"),
                  value = "Socionets",
                  h4("Socionets Analysis"),
                  p("Network visualization showing relationships between grids based on construct matching."),
@@ -1194,7 +1201,7 @@ ui <- fluidPage(
                  )
         ),
 
-        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), "Mode Grid"),
+        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), tags$span(class = "mg-any"), "Mode Grid"),
                  value = "Mode Grid",
                  h4("Mode (Consensus) Grid"),
                  p("Generate a consensus grid representing commonality across multiple participants."),
@@ -1270,7 +1277,7 @@ ui <- fluidPage(
                  )
         ),
 
-        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), "Composite Grid"),
+        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), tags$span(class = "mg-common"), "Composite Grid"),
                  value = "Composite Grid",
                  h4("Composite Grid"),
                  p("Merge multiple grids into a single combined grid for unified analysis."),
@@ -1320,7 +1327,7 @@ ui <- fluidPage(
         ),
 
         # ===== MINUS Analysis Tab =====
-        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), "MINUS"),
+        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), tags$span(class = "mg-common"), "MINUS"),
                  value = "MINUS",
                  h4("MINUS Analysis: Grid Differences"),
                  p("Subtract one grid from another to see differences in construing. Requires two grids with shared elements AND constructs."),
@@ -1367,7 +1374,7 @@ ui <- fluidPage(
         ),
 
         # ===== CORE Analysis Tab =====
-        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), "CORE"),
+        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), tags$span(class = "mg-common"), "CORE"),
                  value = "CORE",
                  h4("CORE Analysis: Shared Construing"),
                  p("Iteratively removes the least agreed-upon elements and constructs, revealing the core of shared understanding between two grids."),
@@ -1423,7 +1430,7 @@ ui <- fluidPage(
         ),
 
         # ===== PrinGrid Trajectories Tab =====
-        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), "PrinGrid Trajectories"),
+        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), tags$span(class = "mg-any"), "PrinGrid Trajectories"),
                  value = "PrinGrid Trajectories",
                  h4("PrinGrid Trajectories"),
                  p("PCA-based visualisation showing how elements move in construct space across multiple grids (e.g., over time or between people)."),
@@ -1471,7 +1478,7 @@ ui <- fluidPage(
         ),
 
         # ===== Exchange Grids Tab =====
-        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), "Exchange Grids"),
+        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), tags$span(class = "mg-common"), "Exchange Grids"),
                  value = "Exchange Grids",
                  h4("Exchange Grid Analysis"),
                  p("Structured protocol for measuring agreement and understanding between two people using Shaw's (1980) exchange procedure."),
@@ -1534,7 +1541,7 @@ ui <- fluidPage(
         ),
 
         # ===== Class Metagrids Tab =====
-        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), "Class Metagrids"),
+        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), tags$span(class = "mg-any"), "Class Metagrids"),
                  value = "Class Metagrids",
                  h4("Class Metagrids"),
                  p("Create a higher-order grid where your grids become elements, rated on user-defined constructs for classification and comparison."),
@@ -5296,12 +5303,19 @@ server <- function(input, output, session) {
     # Set up layout: main heatmap + color legend
     layout(matrix(c(1, 2), nrow = 1), widths = c(5, 1))
 
-    # Main heatmap - dynamic margins based on label length
+    # Dynamic margins and label sizing based on content
     max_left_len <- max(nchar(as.character(g$constructs$left)), na.rm = TRUE)
+    max_right_len <- max(nchar(as.character(g$constructs$right)), na.rm = TRUE)
     max_elem_len <- max(nchar(as.character(g$elements)), na.rm = TRUE)
-    bottom_mar <- max(10, max_left_len * 0.55)
-    left_mar <- max(12, max_elem_len * 0.7)
-    par(mar = c(bottom_mar, left_mar, 5, 1), family = "sans")
+
+    # Scale label text down for long labels
+    label_cex <- min(0.7, 12 / max(max_left_len, max_right_len, 12)) * text_size
+
+    # Generous margins: bottom for left poles, top for right poles, left for elements
+    bottom_mar <- max(12, max_left_len * 0.65)
+    top_mar <- max(8, max_right_len * 0.6)
+    left_mar <- max(10, max_elem_len * 0.65)
+    par(mar = c(bottom_mar, left_mar, top_mar, 1), family = "sans")
     mode_colors <- get_palette_colors(input$mode_palette)
     colors <- colorRampPalette(c(mode_colors$heat_low, "#FFFFFF", mode_colors$heat_high))(100)
 
@@ -5320,7 +5334,6 @@ server <- function(input, output, session) {
         for (j in 1:n_const) {
           val <- g$scores_mat[i, j]
           if (!is.na(val)) {
-            # White text on dark backgrounds (high or low extremes)
             pct <- (val - scale_min) / scale_range
             txt_col <- if (pct > 0.75 || pct < 0.15) "white" else "black"
             text(j, n_elem - i + 1, round(val),
@@ -5332,21 +5345,21 @@ server <- function(input, output, session) {
 
     # Bottom axis: left poles (low rating end)
     axis(1, at = 1:n_const, labels = g$constructs$left, las = 2,
-         cex.axis = 0.7 * text_size, family = "sans")
+         cex.axis = label_cex, family = "sans")
     # Top axis: right poles (high rating end)
     axis(3, at = 1:n_const, labels = g$constructs$right, las = 2,
-         cex.axis = 0.7 * text_size, family = "sans", tick = FALSE, line = -0.5)
+         cex.axis = label_cex, family = "sans", tick = FALSE, line = -0.5)
     # Left axis: elements
     axis(2, at = 1:n_elem, labels = rev(g$elements), las = 2,
          cex.axis = 0.8 * text_size, family = "sans")
     box()
 
-    # Add scale indicator
+    # Add scale indicator below bottom labels
     mtext(paste0("Blue = low (", scale_min, ", left pole)    White = mid    Orange = high (", scale_max, ", right pole)"),
-          side = 1, line = 8, cex = 0.8 * text_size, family = "sans")
+          side = 1, line = bottom_mar - 2, cex = 0.7 * text_size, family = "sans")
 
     # Color legend
-    par(mar = c(bottom_mar, 0.5, 5, 3), family = "sans")
+    par(mar = c(bottom_mar, 0.5, top_mar, 3), family = "sans")
     legend_vals <- seq(scale_min, scale_max, length.out = 100)
     image(1, legend_vals, t(as.matrix(legend_vals)), col = colors,
           axes = FALSE, xlab = "", ylab = "")
@@ -5382,14 +5395,17 @@ server <- function(input, output, session) {
       n_elem <- nrow(g$scores_mat); n_const <- ncol(g$scores_mat)
       scale_min <- g$scale[1]; scale_max <- g$scale[2]
       max_left_len <- max(nchar(as.character(g$constructs$left)), na.rm = TRUE)
+      max_right_len <- max(nchar(as.character(g$constructs$right)), na.rm = TRUE)
       max_elem_len <- max(nchar(as.character(g$elements)), na.rm = TRUE)
-      bottom_mar <- max(10, max_left_len * 0.55)
-      left_mar <- max(12, max_elem_len * 0.7)
+      label_cex <- min(0.7, 12 / max(max_left_len, max_right_len, 12)) * text_size
+      bottom_mar <- max(12, max_left_len * 0.65)
+      top_mar <- max(8, max_right_len * 0.6)
+      left_mar <- max(10, max_elem_len * 0.65)
       mode_colors <- get_palette_colors(input$mode_palette)
       colors <- colorRampPalette(c(mode_colors$heat_low, "#FFFFFF", mode_colors$heat_high))(100)
       png(file, width = 1200, height = 900, res = 120)
       layout(matrix(c(1, 2), nrow = 1), widths = c(5, 1))
-      par(mar = c(bottom_mar, left_mar, 5, 1), family = "sans")
+      par(mar = c(bottom_mar, left_mar, top_mar, 1), family = "sans")
       image(1:n_const, 1:n_elem, t(g$scores_mat[n_elem:1, , drop = FALSE]),
             col = colors, axes = FALSE, xlab = "", ylab = "",
             main = paste("Mode Grid:", g$name), cex.main = text_size * 1.1,
@@ -5405,13 +5421,13 @@ server <- function(input, output, session) {
           }
         }
       }
-      axis(1, at = 1:n_const, labels = g$constructs$left, las = 2, cex.axis = 0.7 * text_size, family = "sans")
-      axis(3, at = 1:n_const, labels = g$constructs$right, las = 2, cex.axis = 0.7 * text_size, family = "sans", tick = FALSE, line = -0.5)
+      axis(1, at = 1:n_const, labels = g$constructs$left, las = 2, cex.axis = label_cex, family = "sans")
+      axis(3, at = 1:n_const, labels = g$constructs$right, las = 2, cex.axis = label_cex, family = "sans", tick = FALSE, line = -0.5)
       axis(2, at = 1:n_elem, labels = rev(g$elements), las = 2, cex.axis = 0.8 * text_size, family = "sans")
       box()
       mtext(paste0("Blue = low (", scale_min, ", left pole)    White = mid    Orange = high (", scale_max, ", right pole)"),
-            side = 1, line = 8, cex = 0.8 * text_size, family = "sans")
-      par(mar = c(bottom_mar, 0.5, 5, 3), family = "sans")
+            side = 1, line = bottom_mar - 2, cex = 0.7 * text_size, family = "sans")
+      par(mar = c(bottom_mar, 0.5, top_mar, 3), family = "sans")
       legend_vals <- seq(scale_min, scale_max, length.out = 100)
       image(1, legend_vals, t(as.matrix(legend_vals)), col = colors, axes = FALSE, xlab = "", ylab = "")
       axis(4, at = c(scale_min, (scale_min + scale_max) / 2, scale_max),
