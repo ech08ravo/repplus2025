@@ -1,0 +1,4 @@
+{
+  "name": "School Subjects",
+  "elements": ["Mathematics", "Physics", "Chemistry", "Biology", "Geology", "Geography"]
+}

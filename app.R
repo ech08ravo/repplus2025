@@ -271,13 +271,14 @@ ui <- fluidPage(
         textInput("user_pseudonym", NULL, placeholder = "Leave blank for a random name"),
         tags$small(class = "text-muted", "This labels your grid when shared or added to a collection.")
       ),
-      p("To get started, list 5 things you'd like to compare. They could be people, places, products, ideas — anything in the same category."),
-      p(tags$em("For example: 5 friends, 5 cities you've lived in, 5 programming languages, 5 foods you eat regularly."), style = "color: #888; font-size: 12px;"),
-      div(class = "item-row", span(class = "item-number", "1."), div(class = "item-input", textInput("landing_item1", NULL, placeholder = "e.g. Pizza"))),
-      div(class = "item-row", span(class = "item-number", "2."), div(class = "item-input", textInput("landing_item2", NULL, placeholder = "e.g. Sushi"))),
-      div(class = "item-row", span(class = "item-number", "3."), div(class = "item-input", textInput("landing_item3", NULL, placeholder = "e.g. Tacos"))),
-      div(class = "item-row", span(class = "item-number", "4."), div(class = "item-input", textInput("landing_item4", NULL, placeholder = "e.g. Pasta"))),
-      div(class = "item-row", span(class = "item-number", "5."), div(class = "item-input", textInput("landing_item5", NULL, placeholder = "e.g. Curry"))),
+      p("To get started, list 6 things you'd like to compare. They could be people, places, products, ideas — anything in the same category."),
+      p(tags$em("For example: 6 friends, 6 cities you've lived in, 6 programming languages, 6 school subjects."), style = "color: #888; font-size: 12px;"),
+      div(class = "item-row", span(class = "item-number", "1."), div(class = "item-input", textInput("landing_item1", NULL, placeholder = "e.g. Mathematics"))),
+      div(class = "item-row", span(class = "item-number", "2."), div(class = "item-input", textInput("landing_item2", NULL, placeholder = "e.g. Physics"))),
+      div(class = "item-row", span(class = "item-number", "3."), div(class = "item-input", textInput("landing_item3", NULL, placeholder = "e.g. Chemistry"))),
+      div(class = "item-row", span(class = "item-number", "4."), div(class = "item-input", textInput("landing_item4", NULL, placeholder = "e.g. Biology"))),
+      div(class = "item-row", span(class = "item-number", "5."), div(class = "item-input", textInput("landing_item5", NULL, placeholder = "e.g. Geology"))),
+      div(class = "item-row", span(class = "item-number", "6."), div(class = "item-input", textInput("landing_item6", NULL, placeholder = "e.g. Geography"))),
       div(class = "continue-btn",
         actionButton("landing_continue", "Continue", class = "btn-success btn-lg"),
         div(style = "margin-top: 12px;",
@@ -1809,7 +1810,7 @@ server <- function(input, output, session) {
   observeEvent(input$landing_continue, {
     items <- c(input$landing_item1, input$landing_item2,
                input$landing_item3, input$landing_item4,
-               input$landing_item5)
+               input$landing_item5, input$landing_item6)
     items <- trimws(items)
     items <- items[items != ""]
     if (length(items) >= 3) {
@@ -2366,6 +2367,7 @@ server <- function(input, output, session) {
     )
     rv$elements <- c(rv$elements, sample_fruits)
   })
+
 
   # Begin elicitation - triadic method
   # Show manual constructs mode
