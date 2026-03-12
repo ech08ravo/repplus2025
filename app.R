@@ -5,6 +5,22 @@ library(uuid)
 library(jsonlite)
 library(igraph)
 
+# Security: explicit upload size limit (10MB) and grid limits
+options(shiny.maxRequestSize = 10 * 1024^2)
+MAX_ELEMENTS <- 50
+MAX_CONSTRUCTS <- 100
+MAX_GRIDS <- 50
+MAX_TRIADS <- 30  # Sample triads when elements > threshold
+
+# Generate triads safely: sample when combinatorial count is too large
+safe_triads <- function(items, max_triads = MAX_TRIADS) {
+  n <- length(items)
+  if (n < 3) return(list())
+  all_triads <- combn(items, 3, simplify = FALSE)
+  if (length(all_triads) <= max_triads) return(all_triads)
+  all_triads[sample(length(all_triads), max_triads)]
+}
+
 # Source the focus analysis functions
 source("R/focus_analysis.r")
 source("R/claude_api.R")
@@ -1779,7 +1795,7 @@ server <- function(input, output, session) {
         preset <- jsonlite::fromJSON(preset_file)
         rv$elements <- preset$elements
         # Set up triadic elicitation with the loaded elements
-        triads <- combn(preset$elements, 3, simplify = FALSE)
+        triads <- safe_triads(preset$elements)
         rv$all_triads <- triads
         rv$current_triad_idx <- 1
         rv$triad_similar <- character()
@@ -1802,7 +1818,7 @@ server <- function(input, output, session) {
     items <- items[items != ""]
     if (length(items) >= 3) {
       rv$elements <- items
-      triads <- combn(items, 3, simplify = FALSE)
+      triads <- safe_triads(items)
       rv$all_triads <- triads
       rv$current_triad_idx <- 1
       rv$triad_similar <- character()
@@ -2042,37 +2058,40 @@ server <- function(input, output, session) {
   # Constructs page: email constructs
   output$wizard_mailto_constructs <- renderUI({
     req(length(rv$elements) > 0, is.data.frame(rv$constructs), nrow(rv$constructs) > 0)
-    body_lines <- c(
-      "My Repertory Grid Constructs",
-      "",
-      paste0("Elements: ", paste(rv$elements, collapse = ", ")),
-      "",
-      "Constructs:"
-    )
+    actionButton("email_constructs_btn", "Email My Constructs",
+                 class = "btn btn-outline-primary btn-lg")
+  })
+
+  observeEvent(input$email_constructs_btn, {
+    req(length(rv$elements) > 0, is.data.frame(rv$constructs), nrow(rv$constructs) > 0)
+    body_lines <- c("My Repertory Grid Constructs - WebGrid.Online", "",
+                    paste("Elements:", paste(rv$elements, collapse = ", ")), "")
     for (i in seq_len(nrow(rv$constructs))) {
-      body_lines <- c(body_lines,
-        paste0("  ", i, ". ", rv$constructs$left[i], " vs ", rv$constructs$right[i])
-      )
+      body_lines <- c(body_lines, paste0(i, ". ", rv$constructs$left[i], " - ", rv$constructs$right[i]))
     }
     body_text <- paste(body_lines, collapse = "\n")
-    mailto_url <- paste0(
-      "mailto:?subject=",
+    mailto_url <- paste0("mailto:?subject=",
       utils::URLencode("My Repertory Grid Constructs - WebGrid.Online", reserved = TRUE),
-      "&body=",
-      utils::URLencode(body_text, reserved = TRUE)
-    )
-    tags$button(
-      class = "btn btn-outline-primary btn-lg",
-      onclick = paste0("window.open('", mailto_url, "','_blank'); return false;"),
-      "Email My Constructs"
-    )
+      "&body=", utils::URLencode(body_text, reserved = TRUE))
+    session$sendCustomMessage("openMailto", mailto_url)
   })
 
   # Post-rating page: email chart + download
   output$wizard_mailto_ratings <- renderUI({
     req(length(rv$elements) > 0, is.data.frame(rv$constructs), nrow(rv$constructs) > 0,
         is.data.frame(rv$ratings), nrow(rv$ratings) > 0)
-    # Build JSON format for import compatibility
+    tagList(
+      actionButton("email_ratings_btn", "Email My Ratings",
+                   class = "btn btn-outline-primary btn-lg"),
+      downloadButton("download_preview_chart", "Download Chart",
+                     class = "btn btn-outline-secondary btn-lg",
+                     style = "margin-left: 10px;")
+    )
+  })
+
+  observeEvent(input$email_ratings_btn, {
+    req(length(rv$elements) > 0, is.data.frame(rv$constructs), nrow(rv$constructs) > 0,
+        is.data.frame(rv$ratings), nrow(rv$ratings) > 0)
     grid_json <- jsonlite::toJSON(list(
       name = "My Repertory Grid",
       elements = rv$elements,
@@ -2086,30 +2105,13 @@ server <- function(input, output, session) {
       }),
       scale = c(1, rv$scale %||% 5)
     ), auto_unbox = TRUE, pretty = TRUE)
-    body_lines <- c(
-      "My Repertory Grid Ratings - WebGrid.Online",
-      "",
-      "Save the JSON below as a .json file to import into WebGrid.",
-      "",
-      grid_json
-    )
-    body_text <- paste(body_lines, collapse = "\n")
-    mailto_url <- paste0(
-      "mailto:?subject=",
+    body_text <- paste(c("My Repertory Grid Ratings - WebGrid.Online", "",
+      "Save the JSON below as a .json file to import into WebGrid.", "",
+      grid_json), collapse = "\n")
+    mailto_url <- paste0("mailto:?subject=",
       utils::URLencode("My Repertory Grid Ratings - WebGrid.Online", reserved = TRUE),
-      "&body=",
-      utils::URLencode(body_text, reserved = TRUE)
-    )
-    tagList(
-      tags$button(
-        class = "btn btn-outline-primary btn-lg",
-        onclick = paste0("window.open('", mailto_url, "','_blank'); return false;"),
-        "Email My Ratings"
-      ),
-      downloadButton("download_preview_chart", "Download Chart",
-                     class = "btn btn-outline-secondary btn-lg",
-                     style = "margin-left: 10px;")
-    )
+      "&body=", utils::URLencode(body_text, reserved = TRUE))
+    session$sendCustomMessage("openMailto", mailto_url)
   })
 
   # Post-rating page: download chart as PNG
@@ -2385,7 +2387,7 @@ server <- function(input, output, session) {
 
     # Generate all unique combinations of 3 elements
     n <- length(rv$elements)
-    triads <- combn(rv$elements, 3, simplify = FALSE)
+    triads <- safe_triads(rv$elements)
 
     rv$all_triads <- triads
     rv$current_triad_idx <- 1
@@ -2936,6 +2938,16 @@ server <- function(input, output, session) {
     elements <- trimws(elements)
     elements <- elements[elements != ""]
     if (length(elements) > 0) {
+      total <- length(rv$elements) + length(elements)
+      if (total > MAX_ELEMENTS) {
+        remaining <- MAX_ELEMENTS - length(rv$elements)
+        if (remaining <= 0) {
+          showNotification(paste0("Maximum ", MAX_ELEMENTS, " elements allowed."), type = "warning")
+          return()
+        }
+        elements <- elements[seq_len(remaining)]
+        showNotification(paste0("Trimmed to ", MAX_ELEMENTS, " elements (maximum)."), type = "warning")
+      }
       rv$elements <- c(rv$elements, elements)
       # Clear the textarea using JavaScript
       session$sendCustomMessage("clearTextarea", "elements_bulk")
@@ -3417,8 +3429,20 @@ server <- function(input, output, session) {
   output$pca_biplot <- renderPlot({
     sm <- rv$scores_mat_last
     if (is.null(sm)) return()
+    if (nrow(sm) < 2 || ncol(sm) < 2) {
+      plot.new(); text(0.5, 0.5, "Need at least 2 elements and 2 constructs for biplot.", cex = 1.2); return()
+    }
+    # Check for zero-variance columns (prcomp scale fails)
+    col_vars <- apply(sm, 2, var, na.rm = TRUE)
+    if (any(col_vars == 0, na.rm = TRUE)) {
+      sm <- sm[, col_vars > 0, drop = FALSE]
+      if (ncol(sm) < 2) {
+        plot.new(); text(0.5, 0.5, "Insufficient variance in ratings for PCA.", cex = 1.2); return()
+      }
+    }
     # PCA on elements (rows)
-    pc <- prcomp(sm, scale. = TRUE)
+    pc <- tryCatch(prcomp(sm, scale. = TRUE), error = function(e) NULL)
+    if (is.null(pc)) { plot.new(); text(0.5, 0.5, "PCA failed. Check your data.", cex = 1.2); return() }
     ex <- pc$x[, 1:2]
     # construct loadings (approx via correlations)
     load <- cor(sm, pc$x)[, 1:2]
@@ -4917,6 +4941,11 @@ server <- function(input, output, session) {
   observeEvent(input$add_files_to_collection, {
     req(input$import_multi_grid)
 
+    if (length(rv$grid_collection) >= MAX_GRIDS) {
+      showNotification(paste0("Maximum ", MAX_GRIDS, " grids in collection."), type = "warning")
+      return()
+    }
+
     # Get file info - handle both single and multiple files
     file_info <- input$import_multi_grid
     n_files <- length(file_info$name)
@@ -4964,6 +4993,11 @@ server <- function(input, output, session) {
   # Add current grid to collection
   observeEvent(input$add_current_grid, {
     req(length(rv$elements) >= 2, nrow(rv$constructs) >= 2)
+
+    if (length(rv$grid_collection) >= MAX_GRIDS) {
+      showNotification(paste0("Maximum ", MAX_GRIDS, " grids in collection."), type = "warning")
+      return()
+    }
 
     if (is.null(rv$scores_mat_last)) {
       showNotification("Please run 'Analyse Grid' first before adding to collection", type = "warning")

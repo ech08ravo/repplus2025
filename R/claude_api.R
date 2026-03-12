@@ -141,7 +141,7 @@ call_claude_api <- function(prompt, system_prompt = NULL) {
   }, error = function(e) {
     return(list(
       success = FALSE,
-      error = paste("API Error:", e$message)
+      error = "API request failed. Please check your API key and try again."
     ))
   })
 }
