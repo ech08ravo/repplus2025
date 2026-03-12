@@ -24,12 +24,12 @@ ui <- fluidPage(
         var img = document.querySelector('#' + plotId + ' img');
         if (!img) { alert('No plot to pop out. Generate the visualization first.'); return; }
         var w = window.open('', '_blank', 'width=1200,height=900,scrollbars=yes,resizable=yes');
-        w.document.write('<html><head><title>' + title + '</title>');
-        w.document.write('<style>body{margin:20px;background:#fff;text-align:center;} img{max-width:100%;height:auto;}</style>');
-        w.document.write('</head><body>');
-        w.document.write('<h2>' + title + '</h2>');
+        w.document.write('<html><head><title>' + title + '<\\/title>');
+        w.document.write('<style>body{margin:20px;background:#fff;text-align:center;} img{max-width:100%;height:auto;}<\\/style>');
+        w.document.write('<\\/head><body>');
+        w.document.write('<h2>' + title + '<\\/h2>');
         w.document.write('<img src=' + JSON.stringify(img.src) + '/>');
-        w.document.write('</body></html>');
+        w.document.write('<\\/body><\\/html>');
         w.document.close();
       }
       // Insert line break before multi-grid tabs
