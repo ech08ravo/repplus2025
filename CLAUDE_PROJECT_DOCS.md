@@ -34,14 +34,14 @@ WebGrid.Online (formerly RepPlusApp) is a Shiny application for Repertory Grid a
 
 ```
 RepPlusApp/
-├── app.R                        # Main Shiny application (~5000 lines, UI + Server)
+├── app.R                        # Main Shiny application (~5800 lines, UI + Server)
 ├── R/
 │   ├── focus_analysis.r         # Focus clustering algorithm (Shaw 1980)
 │   ├── multigrid_analysis.r     # Multi-grid analysis (SOCIOGRIDS)
 │   ├── claude_api.R             # Claude API integration for chat features
 │   └── triadic_elicitation.r    # Triadic elicitation helper functions
 ├── dataExamples/                # Sample grid data files
-├── RepPlusDocs/                 # Documentation directory
+├── RepPlusDocs/                 # Documentation directory (includes WebGrid-Online-Manual.md)
 ├── CLAUDE_PROJECT_DOCS.md       # This documentation
 ├── Dockerfile                   # Docker deployment config
 ├── docker-compose.yml           # Docker compose config
@@ -78,9 +78,9 @@ The UI uses `fluidPage` with a sidebar layout:
 - Display options (text size, cell size)
 - Export buttons (CSV, .rgrid)
 
-**Main Panel (width=10)** - Tabset with:
+**Main Panel (width=10)** - Two tabsetPanels on separate rows:
 
-*Single-Grid Tabs:*
+*Single-Grid Tabs (`tabsetPanel(id = "main_tabs")`):*
 1. **Build Grid** - Element entry, triadic elicitation, construct management
 2. **Grid Summary** - Elements list, analysis summary, missing ratings
 3. **Biplot** - PCA visualization with element points and construct arrows
@@ -92,7 +92,7 @@ The UI uses `fluidPage` with a sidebar layout:
 9. **Focus Cluster** - Shaw's FOCUS algorithm with dendrograms
 10. **Statistics** - Detailed element and construct statistics
 
-*Multi-Grid Tabs (styled with gradient CSS icons):*
+*Multi-Grid Tabs (`tabsetPanel(id = "multi_tabs")`, styled with gradient CSS icons):*
 1. **Grid Collection** - Import, manage, and organize grid collection
 2. **Socionets** - Network visualization of grid relationships
 3. **Mode Grid** - Consensus grid (average/median ratings)
@@ -154,7 +154,7 @@ rv <- reactiveValues(
 ```
 
 **Other Reactive Values**:
-- `landing` - Landing page state: `step = "elements"` | `"triads"` | `"rating"` | `"done"`
+- `landing` - Landing page state: `step = "elements"` | `"presets"` | `"triads"` | `"results"` | `"rating"` | `"post_rating"` | `"done"`
 - `chat_responses` - Chat response storage with keys per tab (biplot, crossplot, synopsis, etc.)
 
 **Key Functions**:
@@ -169,6 +169,7 @@ Each visualization has its own palette selector. Available palettes:
 - **classic**: Blue (#2166AC) / Red (#B2182B)
 - **earth**: Wheat (#F5DEB3) / Brown (#8B4513)
 - **contrast**: White (#FFFFFF) / Black (#000000)
+- **greyscale**: Black (#000000) / Dark Grey (#333333)
 
 Palette structure:
 ```r
@@ -351,8 +352,8 @@ The app has a guided wizard for new users and student exercises:
 6. **Full App** — Auto-triggers analysis with imputation enabled. All visualisation tabs available.
 
 ### Email Touchpoints
-- After constructs: "Email My Constructs" (elements + construct list)
-- After ratings: "Email My Chart" (elements + all ratings)
+- After constructs: "Email My Constructs" (elements + construct list in JSON format)
+- After ratings: "Email My Chart" (complete grid data in JSON format, importable via .json file)
 - In full app: per-visualisation email (planned)
 
 ## Analysis Flow (Full App)
@@ -485,6 +486,9 @@ All multi-grid operations normalize to c(1,7) scale before comparison.
 - Focus cluster dendrograms generate harmless `horiz` warnings (cosmetic only)
 - Consider adding: export to PDF, more clustering methods, statistical tests
 - Grid completion tracking could be more prominent
+- Planned: image elements (upload photos or select from mobile photo library)
+- Planned: per-visualisation email in full app
+- Planned: additional preset grids for different course exercises
 
 ## References
 

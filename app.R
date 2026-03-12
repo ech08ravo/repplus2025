@@ -2077,7 +2077,7 @@ server <- function(input, output, session) {
   # Post-rating page: continue to full app and auto-analyze
   # Simple Start tab: return to wizard landing
   observeEvent(input$goto_simple_start, {
-    landing$step <- "landing"
+    landing$step <- "elements"
   })
 
   observeEvent(input$post_rating_continue, {
