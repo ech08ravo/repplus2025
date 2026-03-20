@@ -5,7 +5,7 @@ library(uuid)
 library(jsonlite)
 library(igraph)
 
-APP_VERSION <- "1.1.0"
+APP_VERSION <- "1.2.0"
 
 # Security: explicit upload size limit (10MB) and grid limits
 options(shiny.maxRequestSize = 10 * 1024^2)
@@ -97,6 +97,9 @@ ui <- fluidPage(
       .help-content li { margin-bottom: 3px; }
       .chat-btn { margin: 2px 4px; }
       .chat-panel { background: #e7f3ff; padding: 10px; border-radius: 4px; margin-top: 6px; border: 1px solid #b3d7ff; }
+      .walkthrough-panel { background: #e8f5e9; border: 1px solid #81c784; border-radius: 8px; padding: 14px 18px; margin-bottom: 16px; font-size: 13px; line-height: 1.5; }
+      .walkthrough-panel strong { color: #2e7d32; }
+      .walkthrough-panel .wt-icon { font-size: 18px; margin-right: 6px; vertical-align: middle; }
       .elicit-panel { background: #fff8e6; padding: 10px; border-radius: 4px; border: 1px solid #ffc107; margin-bottom: 10px; }
       .elicit-panel h4 { margin-top: 0; }
       .elicit-panel h5 { color: #856404; margin-top: 0; font-size: 13px; }
@@ -301,6 +304,9 @@ ui <- fluidPage(
           actionButton("landing_existing", "Use an Existing Grid", class = "btn-outline-primary")
         ),
         div(style = "margin-top: 12px;",
+          actionButton("start_walkthrough", "Take a Guided Tour (Biscuits!)", class = "btn-outline-success")
+        ),
+        div(style = "margin-top: 12px;",
           actionButton("skip_to_full", "Switch to Full Site", class = "btn-outline-secondary btn-sm", style = "font-size: 11px;")
         )
       )
@@ -322,6 +328,7 @@ ui <- fluidPage(
   conditionalPanel(
     condition = "output.landing_step == 'triads'",
     div(class = "landing-page triad-wizard",
+      uiOutput("walkthrough_triads"),
       h2("How do these compare?"),
       p(class = "subtitle", "We'll show you 3 items at a time. Tap 2 that are similar, and 1 that is different."),
       uiOutput("wizard_progress"),
@@ -344,6 +351,7 @@ ui <- fluidPage(
   conditionalPanel(
     condition = "output.landing_step == 'results'",
     div(class = "landing-page", style = "max-width: 700px;",
+      uiOutput("walkthrough_results"),
       uiOutput("wizard_results_heading"),
       uiOutput("wizard_results_summary"),
       div(class = "continue-btn", style = "margin-top: 24px;",
@@ -359,6 +367,7 @@ ui <- fluidPage(
   conditionalPanel(
     condition = "output.landing_step == 'rating'",
     div(class = "landing-page rating-page",
+      uiOutput("walkthrough_rating"),
       uiOutput("rating_overall_progress"),
       uiOutput("rating_construct_label"),
       uiOutput("rating_elements_ui"),
@@ -373,6 +382,7 @@ ui <- fluidPage(
   conditionalPanel(
     condition = "output.landing_step == 'post_rating'",
     div(class = "landing-page", style = "max-width: 700px;",
+      uiOutput("walkthrough_post_rating"),
       h2("Your Grid"),
       p(class = "subtitle", "Here's a preview of your repertory grid analysis."),
       plotOutput("wizard_preview_plot", height = "400px"),
@@ -1738,6 +1748,7 @@ server <- function(input, output, session) {
 
   # Landing page state
   landing <- reactiveValues(step = "elements")
+  walkthrough <- reactiveValues(active = FALSE, steps = list())
 
   # Check URL query parameters on startup
   observe({
@@ -1875,6 +1886,22 @@ server <- function(input, output, session) {
     })
   })
 
+  # Handle "Take a Guided Tour" button
+  observeEvent(input$start_walkthrough, {
+    preset_file <- "dataExamples/presets/biscuits_walkthrough.json"
+    preset <- jsonlite::fromJSON(preset_file)
+    rv$elements <- preset$elements
+    walkthrough$active <- TRUE
+    walkthrough$steps <- preset$steps
+    triads <- safe_triads(preset$elements)
+    rv$all_triads <- triads
+    rv$current_triad_idx <- 1
+    rv$triad_similar <- character()
+    rv$triad_different <- NULL
+    landing$step <- "triads"
+    showNotification("Guided Tour started! Follow the green panels.", type = "message")
+  })
+
   # Handle landing page continue button
   observeEvent(input$landing_continue, {
     items <- c(input$landing_item1, input$landing_item2,
@@ -1883,6 +1910,9 @@ server <- function(input, output, session) {
     items <- trimws(items)
     items <- items[items != ""]
     if (length(items) >= 3) {
+      # Deactivate walkthrough if user enters their own elements
+      walkthrough$active <- FALSE
+      walkthrough$steps <- list()
       # Capture pseudonym (use random if blank)
       user_name <- trimws(input$user_pseudonym %||% "")
       if (user_name != "") rv$pseudonym <- user_name
@@ -1900,6 +1930,27 @@ server <- function(input, output, session) {
   })
 
   # Wizard: progress indicator
+  # Walkthrough narration panels (shown only during guided tour)
+  walkthrough_panel <- function(step_key) {
+    if (!walkthrough$active) return(NULL)
+    text <- walkthrough$steps[[step_key]]
+    if (is.null(text)) return(NULL)
+    # Convert **bold** markdown to HTML
+    text <- gsub("\\*\\*(.+?)\\*\\*", "<strong>\\1</strong>", text)
+    # Convert *italic* markdown to HTML
+    text <- gsub("\\*(.+?)\\*", "<em>\\1</em>", text)
+    div(class = "walkthrough-panel",
+      tags$span(class = "wt-icon", "\U0001F9ED"),
+      tags$strong("Guided Tour: "),
+      HTML(text)
+    )
+  }
+
+  output$walkthrough_triads <- renderUI({ walkthrough_panel("triads") })
+  output$walkthrough_results <- renderUI({ walkthrough_panel("results") })
+  output$walkthrough_rating <- renderUI({ walkthrough_panel("rating") })
+  output$walkthrough_post_rating <- renderUI({ walkthrough_panel("post_rating") })
+
   output$wizard_progress <- renderUI({
     req(rv$current_triad_idx > 0, length(rv$all_triads) > 0)
     total <- length(rv$all_triads)
@@ -3515,7 +3566,8 @@ server <- function(input, output, session) {
       # Use palette colors for diverging heatmap
       pal <- colorRampPalette(c(colors$heat_low, "#FFFFFF", colors$heat_high))(100)
     } else {
-      pal <- gray.colors(100, start = 0.95, end = 0.2)
+      # 5-step greyscale: 90%, 70%, 50%, 30%, 10% grey
+      pal <- colorRampPalette(c("#E6E6E6", "#B3B3B3", "#808080", "#4D4D4D", "#1A1A1A"))(100)
     }
     # sm is elements (rows) × constructs (cols)
     n_elem <- nrow(sm)
@@ -3722,7 +3774,8 @@ server <- function(input, output, session) {
       if (isTRUE(input$heatmap_use_color)) {
         pal <- colorRampPalette(c(colors$heat_low, "#FFFFFF", colors$heat_high))(100)
       } else {
-        pal <- gray.colors(100, start = 0.95, end = 0.2)
+        # 5-step greyscale: 90%, 70%, 50%, 30%, 10% grey
+        pal <- colorRampPalette(c("#E6E6E6", "#B3B3B3", "#808080", "#4D4D4D", "#1A1A1A"))(100)
       }
       n_elem <- nrow(sm); n_cons <- ncol(sm)
       z <- sm[n_elem:1, ]
