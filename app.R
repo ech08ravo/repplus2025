@@ -290,7 +290,7 @@ ui <- fluidPage(
         textInput("user_pseudonym", NULL, placeholder = "Leave blank for a random name"),
         tags$small(class = "text-muted", "This labels your grid when shared or added to a collection.")
       ),
-      p("To get started, list 6 things you'd like to compare. They could be people, places, products, ideas — anything in the same category."),
+      p("To get started, list up to 6 things you'd like to compare. They could be people, places, products, ideas — anything in the same category."),
       p(tags$em("For example: 6 friends, 6 cities you've lived in, 6 programming languages, 6 school subjects."), style = "color: #888; font-size: 12px;"),
       div(class = "item-row", span(class = "item-number", "1."), div(class = "item-input", textInput("landing_item1", NULL, placeholder = "e.g. Mathematics"))),
       div(class = "item-row", span(class = "item-number", "2."), div(class = "item-input", textInput("landing_item2", NULL, placeholder = "e.g. Physics"))),
@@ -459,7 +459,7 @@ ui <- fluidPage(
             condition = "input.info_impute % 2 == 1",
             div(class = "info-popup", style = "font-size: 11px;",
               tags$strong("Impute Missing Ratings"), tags$br(),
-              "When checked, any missing ratings will be replaced with the midpoint value (4 on a 1-7 scale) before analysis.",
+              "When checked, any missing ratings will be replaced with the midpoint value (3 on a 1-5 scale) before analysis.",
               tags$br(), tags$br(),
               tags$em("Use this when: "), "You have incomplete ratings but want to run analysis anyway. The imputed values are neutral and won't strongly influence results."
             )
@@ -591,12 +591,12 @@ ui <- fluidPage(
               ),
               h5("Understanding construct arrow labels"),
               div(style = "background: #fff3cd; padding: 8px; border-radius: 4px; border: 1px solid #ffc107; margin-top: 6px;",
-                p(style = "margin: 0;", tags$strong("Arrow labels show the HIGH-SCORING pole (rating = 7).")),
+                p(style = "margin: 0;", tags$strong("Arrow labels show the HIGH-SCORING pole (rating = 5).")),
                 p(style = "margin: 6px 0 0 0; font-size: 11px;",
-                  "Each construct has two poles: LEFT (rating 1) and RIGHT (rating 7). ",
-                  "The arrow points toward elements rated HIGH (7) on that construct. ",
+                  "Each construct has two poles: LEFT (rating 1) and RIGHT (rating 5). ",
+                  "The arrow points toward elements rated HIGH (5) on that construct. ",
                   "For example, if your construct is 'cheap - expensive' and the arrow label shows 'expensive', ",
-                  "elements near the arrow tip were rated as more expensive (closer to 7)."
+                  "elements near the arrow tip were rated as more expensive (closer to 5)."
                 ),
                 p(style = "margin: 6px 0 0 0; font-size: 11px;",
                   "Elements in the ", tags$em("opposite"), " direction from the arrow were rated LOW (closer to 1, the left pole)."
@@ -667,14 +667,14 @@ ui <- fluidPage(
                      h5("Crossplot Analysis"),
                      p("A scatter plot showing where each element falls on two constructs of your choice."),
                      tags$ul(
-                       tags$li(tags$strong("X-axis"), " = ratings on the first construct (1 = left pole, 7 = right pole)"),
+                       tags$li(tags$strong("X-axis"), " = ratings on the first construct (1 = left pole, 5 = right pole)"),
                        tags$li(tags$strong("Y-axis"), " = ratings on the second construct"),
                        tags$li(tags$strong("Each point"), " = one element from your grid")
                      ),
                      h5("How to interpret"),
                      tags$ul(
                        tags$li("Elements in the same quadrant share similar ratings on both constructs"),
-                       tags$li("The midpoint (4) is marked with dashed lines - this divides the plot into four quadrants"),
+                       tags$li("The midpoint (3) is marked with dashed lines - this divides the plot into four quadrants"),
                        tags$li("Use this to explore relationships between specific construct pairs"),
                        tags$li("Try different construct combinations to find meaningful patterns")
                      ),
@@ -1105,7 +1105,7 @@ ui <- fluidPage(
                      ),
                      h5("Construct Statistics"),
                      tags$ul(
-                       tags$li(tags$strong("Mean"), " - average rating on this construct across all elements. Near 4 = construct differentiates well; extreme values may indicate bias."),
+                       tags$li(tags$strong("Mean"), " - average rating on this construct across all elements. Near 3 = construct differentiates well; extreme values may indicate bias."),
                        tags$li(tags$strong("SD"), " - how much this construct differentiates between elements. Low SD = construct doesn't distinguish elements well; high SD = good differentiation.")
                      ),
                      h5("What to look for"),
@@ -1669,7 +1669,7 @@ ui <- fluidPage(
                      tags$ol(
                        tags$li("Your loaded grids automatically become the elements"),
                        tags$li("Define bipolar constructs for classifying grids (e.g., 'Expert - Novice')"),
-                       tags$li("Rate each grid on each construct using the 1-7 scale"),
+                       tags$li("Rate each grid on each construct using the 1-5 scale"),
                        tags$li("Click 'Build Metagrid' to create the higher-order grid"),
                        tags$li("Click 'Analyse as Current Grid' to run FOCUS, PCA, etc. on the metagrid")
                      ),
@@ -2095,8 +2095,8 @@ server <- function(input, output, session) {
     req(length(rv$elements) >= 2)
     n_e <- length(rv$elements)
     n_c <- nrow(rv$constructs)
-    # Use midpoint ratings (all 4s) as placeholder
-    sm <- matrix(4, nrow = n_e, ncol = n_c)
+    # Use midpoint ratings (all 3s) as placeholder
+    sm <- matrix(3, nrow = n_e, ncol = n_c)
     # Check if any real ratings exist and use them
     if (is.data.frame(rv$ratings) && nrow(rv$ratings) > 0) {
       construct_labels <- paste(rv$constructs$left, "-",
@@ -2472,7 +2472,7 @@ server <- function(input, output, session) {
         paste(rv$constructs$left, "-", rv$constructs$right),
         each = length(rv$elements)
       ),
-      rating = c(4, 2, 6, 5, 3, 7, 6, 4, 2),
+      rating = c(3, 2, 5, 4, 3, 5, 4, 3, 1),
       stringsAsFactors = FALSE
     )
   })
@@ -2819,7 +2819,7 @@ server <- function(input, output, session) {
         div(class = "info-popup",
           tags$strong("Rating: "), "For each element-construct pair, rate where the element falls.",
           tags$br(),
-          "1 = strongly LEFT pole, 4 = neutral, 7 = strongly RIGHT pole"
+          "1 = strongly LEFT pole, 3 = neutral, 5 = strongly RIGHT pole"
         )
       ),
 
@@ -2928,7 +2928,7 @@ server <- function(input, output, session) {
     fluidRow(
       column(4, tags$div(style = "text-align: left; font-weight: bold; color: #28a745; font-size: 12px;", paste0("1 = ", left_pole))),
       column(4, tags$div(style = "text-align: center; color: #666; font-size: 11px;", "4 = neutral")),
-      column(4, tags$div(style = "text-align: right; font-weight: bold; color: #dc3545; font-size: 12px;", paste0(right_pole, " = 7")))
+      column(4, tags$div(style = "text-align: right; font-weight: bold; color: #dc3545; font-size: 12px;", paste0(right_pole, " = 5")))
     )
   })
 
@@ -2938,7 +2938,7 @@ server <- function(input, output, session) {
 
     div(
       uiOutput("pole_labels_ui"),
-      sliderInput("rating_score", NULL, min = 1, max = 7, value = 4, width = "100%", ticks = TRUE)
+      sliderInput("rating_score", NULL, min = 1, max = 5, value = 3, width = "100%", ticks = TRUE)
     )
   })
 
@@ -3951,7 +3951,7 @@ server <- function(input, output, session) {
     y_right_pole <- rv$constructs$right[y_idx]
 
     # Create empty plot first
-    plot(NULL, xlim = c(1, 7), ylim = c(1, 7),
+    plot(NULL, xlim = c(1, 5), ylim = c(1, 5),
          xlab = "",
          ylab = "",
          main = "Crossplot: Element Positions",
@@ -3959,13 +3959,13 @@ server <- function(input, output, session) {
 
     # Add pole labels at axis ends - x-axis at ends, y-axis at origin with arrows
     mtext(x_left_pole, side = 1, at = 1, line = 2.5, cex = txt_size * 0.9, adj = 0, font = 3)
-    mtext(x_right_pole, side = 1, at = 7, line = 2.5, cex = txt_size * 0.9, adj = 1, font = 3)
+    mtext(x_right_pole, side = 1, at = 5, line = 2.5, cex = txt_size * 0.9, adj = 1, font = 3)
     # Y-axis labels at origin (bottom) with arrow indicating direction
     mtext(paste0(y_left_pole, " \u2192 ", y_right_pole), side = 2, line = 3, cex = txt_size * 0.85, font = 3)
 
     # Add grid lines if requested (before points so they're behind)
     if (input$crossplot_grid) {
-      abline(h = 1:7, v = 1:7, col = "gray90", lty = 1)
+      abline(h = 1:5, v = 1:5, col = "gray90", lty = 1)
       abline(h = 4, v = 4, col = "gray60", lty = 2, lwd = 1.5)
     }
 
@@ -4051,7 +4051,7 @@ server <- function(input, output, session) {
 
       par(mar = c(5, 5, 3, 2), cex.axis = txt_size, cex.lab = txt_size * 1.1, cex.main = txt_size * 1.2)
 
-      plot(NULL, xlim = c(1, 7), ylim = c(1, 7),
+      plot(NULL, xlim = c(1, 5), ylim = c(1, 5),
            xlab = "",
            ylab = "",
            main = "Crossplot: Element Positions",
@@ -4059,12 +4059,12 @@ server <- function(input, output, session) {
 
       # Add pole labels at axis ends - x-axis at ends, y-axis at origin with arrows
       mtext(x_left_pole, side = 1, at = 1, line = 2.5, cex = txt_size * 0.9, adj = 0, font = 3)
-      mtext(x_right_pole, side = 1, at = 7, line = 2.5, cex = txt_size * 0.9, adj = 1, font = 3)
+      mtext(x_right_pole, side = 1, at = 5, line = 2.5, cex = txt_size * 0.9, adj = 1, font = 3)
       # Y-axis labels at origin (bottom) with arrow indicating direction
       mtext(paste0(y_left_pole, " \u2192 ", y_right_pole), side = 2, line = 3, cex = txt_size * 0.85, font = 3)
 
       if (input$crossplot_grid) {
-        abline(h = 1:7, v = 1:7, col = "gray90", lty = 1)
+        abline(h = 1:5, v = 1:5, col = "gray90", lty = 1)
         abline(h = 4, v = 4, col = "gray60", lty = 2, lwd = 1.5)
       }
 
@@ -4581,7 +4581,7 @@ server <- function(input, output, session) {
       "Elements: ", paste(rv$elements, collapse = ", "), "\n",
       "Constructs (left pole - right pole):\n",
       paste(paste0("  - ", construct_labels), collapse = "\n"), "\n\n",
-      "Rating scale: 1 (left pole) to 7 (right pole)\n\n",
+      "Rating scale: 1 (left pole) to 5 (right pole)\n\n",
       "RATINGS MATRIX:\n", matrix_text
     )
   })
@@ -4862,7 +4862,7 @@ server <- function(input, output, session) {
       constructs = data.frame(left = character(), right = character(), stringsAsFactors = FALSE),
       ratings = data.frame(element = character(), construct = character(), rating = numeric(), stringsAsFactors = FALSE),
       scores_mat = NULL,
-      scale = c(1, 7)
+      scale = c(1, 5)
     )
 
     if (ext == "json") {
@@ -5053,7 +5053,7 @@ server <- function(input, output, session) {
       constructs = rv$constructs,
       ratings = rv$ratings,
       scores_mat = rv$scores_mat_last,
-      scale = c(1, 7),
+      scale = c(1, 5),
       source = "current"
     )
 
@@ -5065,7 +5065,7 @@ server <- function(input, output, session) {
       n_elements = length(rv$elements),
       n_constructs = nrow(rv$constructs),
       scale_min = 1,
-      scale_max = 7,
+      scale_max = 5,
       imported_at = Sys.time(),
       stringsAsFactors = FALSE
     ))
@@ -6108,7 +6108,7 @@ server <- function(input, output, session) {
           lapply(seq_along(grid_names), function(i) {
             input_id <- paste0("meta_rate_", i, "_", j)
             sliderInput(input_id, grid_names[i],
-                        min = 1, max = 7, value = 4, step = 1)
+                        min = 1, max = 5, value = 3, step = 1)
           })
         )
       })
