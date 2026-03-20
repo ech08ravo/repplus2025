@@ -5,6 +5,8 @@ library(uuid)
 library(jsonlite)
 library(igraph)
 
+APP_VERSION <- "1.0.0"
+
 # Security: explicit upload size limit (10MB) and grid limits
 options(shiny.maxRequestSize = 10 * 1024^2)
 MAX_ELEMENTS <- 50
@@ -270,7 +272,10 @@ ui <- fluidPage(
       $(document).on("click", ".chat-btn", function() { $(this).toggleClass("active-chat"); });
     '))
   ),
-  titlePanel("WebGrid.Online"),
+  titlePanel(div(style = "display: flex; align-items: baseline; gap: 10px;",
+    "WebGrid.Online",
+    tags$small(style = "font-size: 12px; color: #999;", paste0("v", APP_VERSION))
+  )),
   # Landing page - shown initially
   conditionalPanel(
     condition = "output.landing_step == 'elements'",
