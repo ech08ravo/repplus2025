@@ -5,7 +5,7 @@ library(uuid)
 library(jsonlite)
 library(igraph)
 
-APP_VERSION <- "1.0.0"
+APP_VERSION <- "1.1.0"
 
 # Security: explicit upload size limit (10MB) and grid limits
 options(shiny.maxRequestSize = 10 * 1024^2)
@@ -1677,6 +1677,9 @@ ui <- fluidPage(
   )  # end sidebarLayout
   )  # end conditionalPanel for main app
 )
+
+# Load RepPlus documentation once globally (shared read-only across all sessions)
+repplus_docs_global <- tryCatch(load_repplus_docs(), error = function(e) list())
 
 server <- function(input, output, session) {
 
@@ -4530,8 +4533,8 @@ server <- function(input, output, session) {
     )
   })
 
-  # Load RepPlus documentation once at startup
-  repplus_docs <- tryCatch(load_repplus_docs(), error = function(e) list())
+  # Use globally loaded docs (shared across sessions, read-only)
+  repplus_docs <- repplus_docs_global
 
   # Reactive values to store chat responses
   chat_responses <- reactiveValues(

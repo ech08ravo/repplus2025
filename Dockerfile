@@ -11,6 +11,9 @@ RUN apt-get update && apt-get install -y \
 # Install R packages
 RUN R -e "install.packages(c('shiny', 'OpenRepGrid', 'jsonlite', 'httr2', 'DT', 'uuid', 'igraph'), repos='https://cran.rstudio.com/')"
 
+# Copy Shiny Server config (idle timeout, sanitized errors)
+COPY shiny-server.conf /etc/shiny-server/shiny-server.conf
+
 # Copy app files
 COPY app.R /srv/shiny-server/webgrid/app.R
 COPY R/ /srv/shiny-server/webgrid/R/
