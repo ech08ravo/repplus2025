@@ -66,7 +66,7 @@ ui <- fluidPage(
           gc.parent().before('<li class=\"tab-row-break\"></li>');
           // Add legend after last multi-grid tab
           var lastTab = $('#main_tabs > li:last');
-          lastTab.after('<li class=\"mg-legend\"><span class=\"mg-any\"></span> any grids <span class=\"mg-common\" style=\"margin-left:8px;\"></span> requires shared constructs</li>');
+          lastTab.after('<li class=\"mg-legend\"><span class=\"sg-dot\"></span> single grid <span class=\"mg-any\" style=\"margin-left:8px;\"></span> any grids <span class=\"mg-common\" style=\"margin-left:8px;\"></span> shared constructs</li>');
         }
       });
     ")),
@@ -161,6 +161,7 @@ ui <- fluidPage(
         border-bottom-color: #fff;
       }
       .multigrid-icon { margin-right: 4px; font-size: 10px; }
+      .sg-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #0072B2; margin-right: 4px; vertical-align: middle; }
       .mg-any { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #2ca02c; margin-right: 4px; vertical-align: middle; }
       .mg-common { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #d4a017; margin-right: 4px; vertical-align: middle; }
       .mg-legend { display: inline-block; font-size: 10px; color: #666; padding: 4px 10px; margin-left: auto; white-space: nowrap; align-self: center; }
@@ -168,8 +169,11 @@ ui <- fluidPage(
       .nav-tabs#main_tabs { display: flex; flex-wrap: wrap; }
       .nav-tabs#main_tabs > .tab-row-break { flex-basis: 100%; height: 0; padding: 0; margin: 0; border: none; }
       @media (max-width: 992px) {
-        .nav-tabs#main_tabs { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .nav-tabs#main_tabs { flex-wrap: wrap; }
+        .nav-tabs#main_tabs > .tab-row-break { flex-basis: 100%; height: 4px; }
         .nav-tabs#main_tabs > li > a { white-space: nowrap; font-size: 11px; padding: 6px 8px; }
+        /* Each row scrolls independently */
+        .nav-tabs#main_tabs > li:not(.tab-row-break):not(.mg-legend) { flex-shrink: 0; }
       }
       @media (max-width: 992px) {
         .col-sm-2.sidebar { display: none; }
@@ -181,6 +185,13 @@ ui <- fluidPage(
         .sidebar-toggle-btn { display: none !important; }
       }
       .sidebar-toggle-btn { position: fixed; bottom: 16px; right: 16px; z-index: 1000; border-radius: 50%; width: 48px; height: 48px; font-size: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+      /* Collapsible sidebar sections */
+      .sidebar-section { border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 8px; }
+      .sidebar-toggle { cursor: pointer; user-select: none; margin: 0; padding: 6px 0; font-size: 14px; font-weight: 600; color: #333; }
+      .sidebar-toggle:hover { color: #0072B2; }
+      .sidebar-toggle .toggle-arrow { font-size: 10px; transition: transform 0.2s; display: inline-block; }
+      .sidebar-toggle.collapsed .toggle-arrow { transform: rotate(-90deg); }
+      .sidebar-content { padding-top: 4px; }
       .plot-toolbar { background: #f8f9fa; padding: 8px 12px; border-radius: 6px; margin: 8px 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
       .plot-toolbar .btn { margin: 0; }
       .help-btn.active-help { background: #17a2b8; color: #fff; border-color: #17a2b8; }
@@ -283,6 +294,9 @@ ui <- fluidPage(
         actionButton("landing_continue", "Continue", class = "btn-success btn-lg"),
         div(style = "margin-top: 12px;",
           actionButton("landing_existing", "Use an Existing Grid", class = "btn-outline-primary")
+        ),
+        div(style = "margin-top: 12px;",
+          actionButton("skip_to_full", "Switch to Full Site", class = "btn-outline-secondary btn-sm", style = "font-size: 11px;")
         )
       )
     )
@@ -390,53 +404,72 @@ ui <- fluidPage(
       actionButton("goto_simple_start", "Simple Start",
                    class = "btn-success btn-sm btn-block",
                    style = "margin-bottom: 16px; width: 100%;"),
-      h4("File Operations"),
-      fileInput("import_file", "Select Grid File", accept = c(".rgrid", ".json")),
-      uiOutput("load_grid_prompt"),
-      div(style = "margin-top: -20px;",
-        actionButton("import_grid", "Load to Editor", class = "btn-secondary btn-sm")
-      ),
-      tags$small(class = "text-muted", "Accepts .rgrid or .json files"),
-      actionButton("load_sample", "Load Sample Data", class = "btn-outline-info btn-sm", style = "margin-top: 8px;"),
-      div(style = "margin-top: 12px; padding-top: 8px; border-top: 1px dashed #ccc;",
-        tags$strong("Grid Collection", style = "font-size: 12px;"),
-        fileInput("import_multi_grid", "Select Grid File(s)",
-                  accept = c(".rgrid", ".json"), multiple = TRUE),
-        div(style = "margin-top: -20px;",
-          actionButton("add_files_to_collection", "Add to Collection", class = "btn-secondary btn-sm"),
-          actionButton("add_current_grid", "Add Current Grid",
-                       class = "btn-outline-success btn-sm", style = "margin-left: 4px;")
-        ),
-        uiOutput("grid_collection_summary")
-      ),
-      tags$hr(),
-      h4("Analysis"),
-      uiOutput("analyse_button_ui"),
-      div(style = "display: flex; align-items: center; gap: 6px; margin-top: 8px;",
-        checkboxInput("impute_missing", "Impute missing", value = FALSE),
-        actionButton("info_impute", "?", class = "btn-info",
-                     style = "width: 18px; height: 18px; padding: 0; font-size: 11px; line-height: 18px; border-radius: 50%; margin-top: -20px;")
-      ),
-      conditionalPanel(
-        condition = "input.info_impute % 2 == 1",
-        div(class = "info-popup", style = "font-size: 11px;",
-          tags$strong("Impute Missing Ratings"), tags$br(),
-          "When checked, any missing ratings will be replaced with the midpoint value (4 on a 1-7 scale) before analysis.",
-          tags$br(), tags$br(),
-          tags$em("Use this when: "), "You have incomplete ratings but want to run analysis anyway. The imputed values are neutral and won't strongly influence results."
+      # --- File Operations (collapsible) ---
+      tags$div(class = "sidebar-section",
+        tags$h4(class = "sidebar-toggle", onclick = "$(this).next('.sidebar-content').slideToggle(200); $(this).toggleClass('collapsed');",
+          "File Operations ", tags$span(class = "toggle-arrow", "\u25BC")),
+        tags$div(class = "sidebar-content",
+          fileInput("import_file", "Select Grid File", accept = c(".rgrid", ".json")),
+          uiOutput("load_grid_prompt"),
+          div(style = "margin-top: -20px;",
+            actionButton("import_grid", "Load to Editor", class = "btn-secondary btn-sm")
+          ),
+          tags$small(class = "text-muted", "Accepts .rgrid or .json files"),
+          actionButton("load_sample", "Load Sample Data", class = "btn-outline-info btn-sm", style = "margin-top: 8px;"),
+          div(style = "margin-top: 12px; padding-top: 8px; border-top: 1px dashed #ccc;",
+            tags$strong("Grid Collection", style = "font-size: 12px;"),
+            fileInput("import_multi_grid", "Select Grid File(s)",
+                      accept = c(".rgrid", ".json"), multiple = TRUE),
+            div(style = "margin-top: -20px;",
+              actionButton("add_files_to_collection", "Add to Collection", class = "btn-secondary btn-sm"),
+              actionButton("add_current_grid", "Add Current Grid",
+                           class = "btn-outline-success btn-sm", style = "margin-left: 4px;")
+            ),
+            uiOutput("grid_collection_summary")
+          )
         )
       ),
-      tags$hr(),
-      h4("Display Options"),
-      p("Each visualization has its own color palette selector.", style = "font-size: 11px; color: #666;"),
-      # Text size control
-      sliderInput("text_size", "Text Size", min = 0.8, max = 1.6, value = 1.2, step = 0.1),
-      # Grid cell size for heatmap/focus
-      sliderInput("grid_cell_size", "Heatmap/Focus Cell Size", min = 0.8, max = 2.0, value = 1.2, step = 0.1),
-      tags$hr(),
-      h4("Export"),
-      downloadButton("download_grid", "Download Grid as CSV"),
-      downloadButton("download_rgrid", "Download Grid as .rgrid"),
+      # --- Analysis (collapsible) ---
+      tags$div(class = "sidebar-section",
+        tags$h4(class = "sidebar-toggle", onclick = "$(this).next('.sidebar-content').slideToggle(200); $(this).toggleClass('collapsed');",
+          "Analysis ", tags$span(class = "toggle-arrow", "\u25BC")),
+        tags$div(class = "sidebar-content",
+          uiOutput("analyse_button_ui"),
+          div(style = "display: flex; align-items: center; gap: 6px; margin-top: 8px;",
+            checkboxInput("impute_missing", "Impute missing", value = FALSE),
+            actionButton("info_impute", "?", class = "btn-info",
+                         style = "width: 18px; height: 18px; padding: 0; font-size: 11px; line-height: 18px; border-radius: 50%; margin-top: -20px;")
+          ),
+          conditionalPanel(
+            condition = "input.info_impute % 2 == 1",
+            div(class = "info-popup", style = "font-size: 11px;",
+              tags$strong("Impute Missing Ratings"), tags$br(),
+              "When checked, any missing ratings will be replaced with the midpoint value (4 on a 1-7 scale) before analysis.",
+              tags$br(), tags$br(),
+              tags$em("Use this when: "), "You have incomplete ratings but want to run analysis anyway. The imputed values are neutral and won't strongly influence results."
+            )
+          )
+        )
+      ),
+      # --- Display Options (collapsible, collapsed by default) ---
+      tags$div(class = "sidebar-section",
+        tags$h4(class = "sidebar-toggle collapsed", onclick = "$(this).next('.sidebar-content').slideToggle(200); $(this).toggleClass('collapsed');",
+          "Display Options ", tags$span(class = "toggle-arrow", "\u25BC")),
+        tags$div(class = "sidebar-content", style = "display: none;",
+          p("Each visualization has its own colour palette selector.", style = "font-size: 11px; color: #666;"),
+          sliderInput("text_size", "Text Size", min = 0.8, max = 1.6, value = 1.2, step = 0.1),
+          sliderInput("grid_cell_size", "Heatmap/Focus Cell Size", min = 0.8, max = 2.0, value = 1.2, step = 0.1)
+        )
+      ),
+      # --- Export (collapsible, collapsed by default) ---
+      tags$div(class = "sidebar-section",
+        tags$h4(class = "sidebar-toggle collapsed", onclick = "$(this).next('.sidebar-content').slideToggle(200); $(this).toggleClass('collapsed');",
+          "Export ", tags$span(class = "toggle-arrow", "\u25BC")),
+        tags$div(class = "sidebar-content", style = "display: none;",
+          downloadButton("download_grid", "Download Grid as CSV"),
+          downloadButton("download_rgrid", "Download Grid as .rgrid")
+        )
+      ),
       tags$hr(),
       actionButton("clear_all", "Clear All Data", class = "btn-outline-danger btn-sm")
     ),
@@ -498,7 +531,8 @@ ui <- fluidPage(
           tags$hr(), h4("Analysis Summary"), verbatimTextOutput("analysis_summary")
         ),
         tabPanel(
-          "Biplot",
+          title = tagList(tags$span(class = "sg-dot"), "Biplot"),
+          value = "Biplot",
           h4("PCA Biplot"),
           p("2D visual map showing element and construct relationships using Principal Component Analysis"),
           fluidRow(
@@ -570,7 +604,7 @@ ui <- fluidPage(
             )
           )
         ),
-        tabPanel("Crossplot",
+        tabPanel(title = tagList(tags$span(class = "sg-dot"), "Crossplot"), value = "Crossplot",
                  fluidRow(
                    column(12,
                           h4("Crossplot Analysis"),
@@ -648,7 +682,7 @@ ui <- fluidPage(
                    )
                  )
         ),
-        tabPanel("Synopsis",
+        tabPanel(title = tagList(tags$span(class = "sg-dot"), "Synopsis"), value = "Synopsis",
                  fluidRow(
                    column(12,
                           h4("Synopsis Analysis"),
@@ -700,7 +734,9 @@ ui <- fluidPage(
                        tags$li("Skewed distributions may indicate response bias or genuine patterns"),
                        tags$li("Flat distributions suggest differentiated ratings"),
                        tags$li("In the scree plot, look for an 'elbow' where variance drops off - components before the elbow are most meaningful")
-                     )
+                     ),
+                     h5("Worked example"),
+                     p("A student rates 6 school subjects on constructs like 'practical - theoretical'. The Overall Distribution shows most ratings cluster around 3-5, suggesting a slight positive bias. The Element Distribution for 'Mathematics' is spread across the full range (high SD), meaning the student sees Maths as extreme on several dimensions. The Scree Plot shows PC1 explains 60% and PC2 adds 20% - so two dimensions capture most of the picture.")
                    )
                  ),
                  conditionalPanel(
@@ -718,7 +754,7 @@ ui <- fluidPage(
                    )
                  )
         ),
-        tabPanel("Heatmap",
+        tabPanel(title = tagList(tags$span(class = "sg-dot"), "Heatmap"), value = "Heatmap",
                  fluidRow(
                    column(4,
                      checkboxInput("heatmap_use_color", "Use color shading", value = TRUE)
@@ -761,7 +797,9 @@ ui <- fluidPage(
                        tags$li("Light/blue regions indicate low ratings (toward left pole)"),
                        tags$li("Uniform rows = element rated similarly across all constructs"),
                        tags$li("Uniform columns = construct doesn't differentiate between elements")
-                     )
+                     ),
+                     h5("Worked example"),
+                     p("In a grid of school subjects rated on 'easy - hard', 'practical - theoretical', and 'enjoy - dislike', the heatmap might show a dark band across the 'Mathematics' row on 'hard' and 'theoretical' but light on 'enjoy'. Meanwhile 'Geography' shows the opposite pattern. A uniform column on 'enjoy - dislike' (all mid-tones) would suggest this construct doesn't differentiate your subjects well.")
                    )
                  ),
                  conditionalPanel(
@@ -779,7 +817,7 @@ ui <- fluidPage(
                    )
                  )
         ),
-        tabPanel("Dendrograms",
+        tabPanel(title = tagList(tags$span(class = "sg-dot"), "Dendrograms"), value = "Dendrograms",
                  radioButtons("dend_type", NULL, choices = c("Elements", "Constructs"), inline = TRUE),
                  conditionalPanel(
                    condition = "input.dend_type == 'Elements'",
@@ -864,7 +902,7 @@ ui <- fluidPage(
                    )
                  )
         ),
-        tabPanel("Focus Cluster",
+        tabPanel(title = tagList(tags$span(class = "sg-dot"), "Focus Cluster"), value = "Focus Cluster",
                  fluidRow(
                    column(12,
                           h4("Focus Cluster Analysis"),
@@ -995,7 +1033,9 @@ ui <- fluidPage(
                        tags$li("Finding element groups that cluster together"),
                        tags$li("Identifying redundant constructs (matches > 90%)"),
                        tags$li("Discovering main conceptual dimensions")
-                     )
+                     ),
+                     h5("Worked example"),
+                     p("After running Focus on a school subjects grid, you might see Mathematics and Physics cluster together at 85% match, and Biology and Geography cluster at 78%. Meanwhile the constructs 'uses equations - no equations' and 'abstract - concrete' join at 92%, suggesting these are essentially the same dimension in the student's thinking. The reordered grid places these similar items adjacent, making the pattern visible at a glance.")
                    )
                  ),
                  conditionalPanel(
@@ -1028,7 +1068,7 @@ ui <- fluidPage(
                    )
                  )
         ),
-        tabPanel("Statistics",
+        tabPanel(title = tagList(tags$span(class = "sg-dot"), "Statistics"), value = "Statistics",
                  h4("Descriptive Statistics"),
                  h5("Element Statistics"),
                  verbatimTextOutput("stats_elements"),
@@ -1058,7 +1098,9 @@ ui <- fluidPage(
                        tags$li("Constructs with very low SD may not be useful - they rate all elements the same"),
                        tags$li("Elements with extreme means may be outliers worth examining"),
                        tags$li("Compare means to identify patterns in how you perceive different elements")
-                     )
+                     ),
+                     h5("Worked example"),
+                     p("In a school subjects grid, Mathematics has a mean of 5.8 (rated toward the right poles on most constructs) while Geography has a mean of 2.3 (rated toward left poles) - these are the most differently perceived subjects. The construct 'enjoy - dislike' has SD = 0.4 (rates all subjects similarly - not very discriminating) while 'practical - theoretical' has SD = 2.1 (strongly differentiates subjects - a useful construct).")
                    )
                  ),
                  conditionalPanel(
@@ -1078,7 +1120,7 @@ ui <- fluidPage(
         ),
 
         # ===== MULTI-GRID TABS =====
-        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), "Grid Collection"),
+        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), "Collect Grids"),
                  value = "Grid Collection",
                  h4("Manage Grid Collection"),
                  p("Upload multiple grids to compare and analyze relationships between them."),
@@ -1135,7 +1177,9 @@ ui <- fluidPage(
                        tags$li("At least 2 grids selected"),
                        tags$li("At least 2 common elements across selected grids"),
                        tags$li("Grids should ideally share the same elements (e.g., same interview protocol)")
-                     )
+                     ),
+                     h5("Worked example"),
+                     p("A teacher asks 8 students to each rate the same 6 school subjects (Mathematics, Physics, Chemistry, Biology, Geology, Geography) using their own constructs. Each student's grid is saved as a .rgrid file. The teacher uploads all 8 files, selects them in the table, and sees '6 common elements found'. Now the Socionets tab will show which students think most alike, and the Mode tab will reveal the group's consensus view of these subjects.")
                    )
                  )
         ),
@@ -1214,7 +1258,7 @@ ui <- fluidPage(
                  )
         ),
 
-        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), tags$span(class = "mg-any"), "Mode Grid"),
+        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), tags$span(class = "mg-any"), "Mode"),
                  value = "Mode Grid",
                  h4("Mode (Consensus) Grid"),
                  p("Generate a consensus grid representing commonality across multiple participants."),
@@ -1285,12 +1329,14 @@ ui <- fluidPage(
                        tags$li("Elements rated similarly across the group appear as clear colour bands \u2014 the group agrees on how to view them"),
                        tags$li("Elements with mixed colours indicate disagreement \u2014 people construe them differently"),
                        tags$li("Use 'Use as Current Grid' to load the mode grid and explore it with all single-grid analyses (biplot, focus, etc.)")
-                     )
+                     ),
+                     h5("Worked example"),
+                     p("Eight students each rate 6 school subjects. The Mode Grid extracts the most consensual constructs - perhaps 'practical - theoretical' (mode score 87%) and 'difficult - easy' (mode score 82%) appear in the mode because many students used similar distinctions. The heatmap shows Mathematics as strongly 'theoretical' and 'difficult' (deep orange), while Geography shows as 'practical' and 'easy' (deep blue). Chemistry appears white (near midpoint) - the group is split on where it falls.")
                    )
                  )
         ),
 
-        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), tags$span(class = "mg-common"), "Composite Grid"),
+        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), tags$span(class = "mg-common"), "Composite"),
                  value = "Composite Grid",
                  h4("Composite Grid"),
                  p("Merge multiple grids into a single combined grid for unified analysis."),
@@ -1334,7 +1380,9 @@ ui <- fluidPage(
                        tags$li("PrinGrid trajectories showing change over time"),
                        tags$li("Comparing perspectives on shared elements"),
                        tags$li("Focus analysis across multiple participants")
-                     )
+                     ),
+                     h5("Worked example"),
+                     p("Two students, Alice and Bob, each rated the same 6 school subjects but elicited their own constructs. Using 'Common Elements + All Constructs', the composite grid has 6 rows (the shared subjects) and columns from both students - e.g., 'practical - theoretical [Alice]' alongside 'hands-on - bookish [Bob]'. Running Focus on this composite might reveal that Alice's 'practical - theoretical' clusters tightly with Bob's 'hands-on - bookish' - they are using different words for the same idea.")
                    )
                  )
         ),
@@ -1381,7 +1429,9 @@ ui <- fluidPage(
                      tags$ul(
                        tags$li("Exactly 2 grids selected"),
                        tags$li("Grids must share both elements AND constructs")
-                     )
+                     ),
+                     h5("Worked example"),
+                     p("A student rates 6 school subjects before and after a term. MINUS reveals that Chemistry shifted by +3 on 'enjoy - dislike' (the student grew to like it) while Mathematics shifted by -2 on 'easy - hard' (it got harder). Most other cells are white (0 difference) - the student's views were largely stable. The biggest orange cell (Chemistry/enjoy) and the biggest blue cell (Maths/hard) are the key changes to discuss.")
                    )
                  )
         ),
@@ -1437,7 +1487,9 @@ ui <- fluidPage(
                        tags$li("Elements/constructs removed early = greatest sources of disagreement"),
                        tags$li("The final remaining grid = the core of shared construing"),
                        tags$li("Use 'Analyse Core with FOCUS' to examine the shared structure in detail")
-                     )
+                     ),
+                     h5("Worked example"),
+                     p("Comparing Alice's and Bob's grids (6 subjects, 5 shared constructs), CORE starts at 68% overall match. Removing 'Geology' (their biggest disagreement) raises it to 76%. Then removing 'enjoy - dislike' (they have opposite tastes) raises it to 84%. The remaining core of 5 subjects and 4 constructs at 84% match represents what Alice and Bob genuinely share in their construing of school subjects.")
                    )
                  )
         ),
@@ -1485,7 +1537,9 @@ ui <- fluidPage(
                        tags$li("Tracking change over time (pre/post interventions)"),
                        tags$li("Comparing different perspectives on the same elements"),
                        tags$li("Identifying which elements changed most in a learning context")
-                     )
+                     ),
+                     h5("Worked example"),
+                     p("A student rates 6 school subjects at the start and end of the year. In the trajectory plot, most subjects barely move (short arrows) - their perception is stable. But Chemistry has a long arrow moving from the 'dislike/theoretical' quadrant toward 'enjoy/practical', showing a significant shift in how the student construes Chemistry. This could reflect the impact of a new hands-on teaching approach introduced during the year.")
                    )
                  )
         ),
@@ -1548,7 +1602,9 @@ ui <- fluidPage(
                      tags$ul(
                        tags$li(tags$strong("Agreement (grids 1&3, 2&4):"), " Do they construe elements similarly?"),
                        tags$li(tags$strong("Understanding (grids 1&5, 2&6):"), " Can they predict how the other person rates elements?")
-                     )
+                     ),
+                     h5("Worked example"),
+                     p("Alice and Bob both rate 6 school subjects. Alice also fills in Bob's grid as she would (grid 4) and predicts Bob's ratings (grid 6). Comparing grids 2 & 4 (agreement) shows 72% match - Alice and Bob construe subjects fairly similarly. But comparing grids 2 & 6 (understanding) shows 88% - Alice can accurately predict how Bob will rate subjects, even where she disagrees. This means Alice understands Bob's perspective well, even when her own view differs.")
                    )
                  )
         ),
@@ -1687,7 +1743,12 @@ server <- function(input, output, session) {
   output$landing_step <- reactive({ landing$step })
   outputOptions(output, "landing_step", suspendWhenHidden = FALSE)
 
-  output$welcome_dismissed <- reactive({ !is.null(input$dismiss_welcome) })
+  show_welcome <- reactiveVal(FALSE)
+  output$welcome_dismissed <- reactive({
+    # Show welcome only if show_welcome was triggered AND not yet dismissed
+    if (!show_welcome()) return(TRUE)
+    !is.null(input$dismiss_welcome)
+  })
   outputOptions(output, "welcome_dismissed", suspendWhenHidden = FALSE)
 
   rv <- reactiveValues(
@@ -2165,7 +2226,15 @@ server <- function(input, output, session) {
     landing$step <- "elements"
   })
 
+  # Skip wizard and go straight to full app
+  observeEvent(input$skip_to_full, {
+    user_name <- trimws(input$user_pseudonym %||% "")
+    if (user_name != "") rv$pseudonym <- user_name
+    landing$step <- "done"
+  })
+
   observeEvent(input$post_rating_continue, {
+    show_welcome(TRUE)
     landing$step <- "done"
     # Enable imputation for any missing ratings, then auto-analyze
     if (length(rv$elements) >= 2 &&
