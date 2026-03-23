@@ -5,7 +5,7 @@ library(uuid)
 library(jsonlite)
 library(igraph)
 
-APP_VERSION <- "1.2.0"
+APP_VERSION <- "2.0.0"
 
 # Security: explicit upload size limit (10MB) and grid limits
 options(shiny.maxRequestSize = 10 * 1024^2)
@@ -61,6 +61,81 @@ ui <- fluidPage(
         w.document.write('<\\/body><\\/html>');
         w.document.close();
       }
+      // Client-side image resize and upload
+      function handleElementFile(inputNum) {
+        var fileInput = document.getElementById('file_input_' + inputNum);
+        if (!fileInput) return;
+        fileInput.click();
+      }
+      document.addEventListener('change', function(e) {
+        if (!e.target.id || !e.target.id.startsWith('file_input_')) return;
+        var inputNum = e.target.id.replace('file_input_', '');
+        var file = e.target.files[0];
+        if (!file) return;
+        if (file.size > 2 * 1024 * 1024) {
+          alert('File too large (max 2MB). Please choose a smaller file.');
+          e.target.value = '';
+          return;
+        }
+        var isImage = file.type.startsWith('image/');
+        var reader = new FileReader();
+        reader.onload = function(ev) {
+          if (isImage) {
+            // Resize images client-side
+            var img = new Image();
+            img.onload = function() {
+              var canvas = document.createElement('canvas');
+              var maxSize = 800;
+              var w = img.width, h = img.height;
+              if (w > h) { if (w > maxSize) { h = h * maxSize / w; w = maxSize; } }
+              else { if (h > maxSize) { w = w * maxSize / h; h = maxSize; } }
+              canvas.width = w; canvas.height = h;
+              canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+              var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+              Shiny.setInputValue('element_file_upload', {num: inputNum, data: dataUrl, name: file.name, type: 'image'}, {priority: 'event'});
+              var wrap = document.getElementById('file_wrap_' + inputNum);
+              var preview = document.getElementById('file_preview_' + inputNum);
+              var fname = document.getElementById('file_name_' + inputNum);
+              if (preview) { preview.src = dataUrl; preview.style.display = 'block'; }
+              if (fname) { fname.textContent = ''; fname.style.display = 'none'; }
+              if (wrap) { wrap.style.display = 'inline-block'; }
+            };
+            img.src = ev.target.result;
+          } else {
+            // Non-image: store as base64, show filename
+            Shiny.setInputValue('element_file_upload', {num: inputNum, data: ev.target.result, name: file.name, type: 'file'}, {priority: 'event'});
+            var wrap = document.getElementById('file_wrap_' + inputNum);
+            var preview = document.getElementById('file_preview_' + inputNum);
+            var fname = document.getElementById('file_name_' + inputNum);
+            if (preview) { preview.style.display = 'none'; }
+            if (fname) { fname.textContent = file.name; fname.style.display = 'block'; }
+            if (wrap) { wrap.style.display = 'inline-block'; }
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+      function removeElementFile(inputNum) {
+        var wrap = document.getElementById('file_wrap_' + inputNum);
+        var preview = document.getElementById('file_preview_' + inputNum);
+        var fname = document.getElementById('file_name_' + inputNum);
+        var fileInput = document.getElementById('file_input_' + inputNum);
+        if (wrap) wrap.style.display = 'none';
+        if (preview) { preview.src = ''; preview.style.display = 'none'; }
+        if (fname) { fname.textContent = ''; fname.style.display = 'none'; }
+        if (fileInput) fileInput.value = '';
+        Shiny.setInputValue('element_file_remove', inputNum, {priority: 'event'});
+      }
+      // Zoom image on click (lightbox)
+      $(document).on('click', '.triad-card-img, .rating-elem-img', function(e) {
+        e.stopPropagation();
+        e.preventDefault();
+        var src = this.src;
+        var overlay = document.createElement('div');
+        overlay.className = 'img-zoom-overlay';
+        overlay.innerHTML = '<img src=' + JSON.stringify(src) + '>';
+        overlay.onclick = function() { document.body.removeChild(overlay); };
+        document.body.appendChild(overlay);
+      });
       // Insert line break and legend before multi-grid tabs
       $(document).ready(function() {
         var gc = $('#main_tabs > li > a[data-value=\"Grid Collection\"]');
@@ -97,6 +172,20 @@ ui <- fluidPage(
       .help-content li { margin-bottom: 3px; }
       .chat-btn { margin: 2px 4px; }
       .chat-panel { background: #e7f3ff; padding: 10px; border-radius: 4px; margin-top: 6px; border: 1px solid #b3d7ff; }
+      .elem-img-wrap { position: relative; display: none; vertical-align: middle; margin-right: 6px; }
+      .elem-img-thumb { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; display: block; border: 1px solid #ddd; }
+      .elem-img-remove { position: absolute; top: -6px; right: -6px; width: 16px; height: 16px; border-radius: 50%; background: #dc3545; color: #fff; border: none; font-size: 10px; line-height: 16px; text-align: center; cursor: pointer; padding: 0; }
+      .elem-file-name { display: none; font-size: 9px; color: #666; max-width: 40px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
+      .elem-img-btn { padding: 2px 6px; font-size: 16px; cursor: pointer; border: 1px solid #ccc; border-radius: 4px; background: #f8f9fa; margin-left: 5px; vertical-align: middle; }
+      .elem-img-btn:hover { background: #e9ecef; }
+      .item-row { display: flex; align-items: center; gap: 0; }
+      .item-row .item-input { flex: 1; min-width: 0; }
+      .item-row .item-input .shiny-input-container { width: 100% !important; }
+      .item-row .elem-img-btn { flex-shrink: 0; }
+      .triad-card-img { width: 60px; height: 60px; border-radius: 6px; object-fit: cover; display: block; margin: 0 auto 6px; border: 1px solid #ddd; cursor: zoom-in; }
+      .img-zoom-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 9999; display: flex; align-items: center; justify-content: center; cursor: zoom-out; }
+      .img-zoom-overlay img { max-width: 90%; max-height: 90%; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+      .rating-elem-img { width: 32px; height: 32px; border-radius: 4px; object-fit: cover; vertical-align: middle; margin-right: 8px; border: 1px solid #ddd; }
       .walkthrough-panel { background: #e8f5e9; border: 1px solid #81c784; border-radius: 8px; padding: 14px 18px; margin-bottom: 16px; font-size: 13px; line-height: 1.5; }
       .walkthrough-panel strong { color: #2e7d32; }
       .walkthrough-panel .wt-icon { font-size: 18px; margin-right: 6px; vertical-align: middle; }
@@ -292,12 +381,13 @@ ui <- fluidPage(
       ),
       p("To get started, list up to 6 things you'd like to compare. They could be people, places, products, ideas — anything in the same category."),
       p(tags$em("For example: 6 friends, 6 cities you've lived in, 6 programming languages, 6 school subjects."), style = "color: #888; font-size: 12px;"),
-      div(class = "item-row", span(class = "item-number", "1."), div(class = "item-input", textInput("landing_item1", NULL, placeholder = "e.g. Mathematics"))),
-      div(class = "item-row", span(class = "item-number", "2."), div(class = "item-input", textInput("landing_item2", NULL, placeholder = "e.g. Physics"))),
-      div(class = "item-row", span(class = "item-number", "3."), div(class = "item-input", textInput("landing_item3", NULL, placeholder = "e.g. Chemistry"))),
-      div(class = "item-row", span(class = "item-number", "4."), div(class = "item-input", textInput("landing_item4", NULL, placeholder = "e.g. Biology"))),
-      div(class = "item-row", span(class = "item-number", "5."), div(class = "item-input", textInput("landing_item5", NULL, placeholder = "e.g. Geology"))),
-      div(class = "item-row", span(class = "item-number", "6."), div(class = "item-input", textInput("landing_item6", NULL, placeholder = "e.g. Geography"))),
+      p(style = "color: #888; font-size: 12px;", "You can upload images, media and documents using the ", tags$span("\U0001F4CE", style = "font-size: 14px;"), " button, but you still need a text label in the associated field."),
+      div(class = "item-row", span(class = "item-number", "1."), div(id = "file_wrap_1", class = "elem-img-wrap", tags$img(id = "file_preview_1", class = "elem-img-thumb"), span(id = "file_name_1", class = "elem-file-name"), tags$button(class = "elem-img-remove", onclick = "removeElementFile(1)", "\u00D7")), div(class = "item-input", textInput("landing_item1", NULL, placeholder = "e.g. Mathematics")), tags$button(class = "elem-img-btn", onclick = "handleElementFile(1)", "\U0001F4CE"), tags$input(type = "file", id = "file_input_1", accept = "image/*,.pdf,.doc,.docx,.txt,.csv", capture = "environment", style = "display:none;")),
+      div(class = "item-row", span(class = "item-number", "2."), div(id = "file_wrap_2", class = "elem-img-wrap", tags$img(id = "file_preview_2", class = "elem-img-thumb"), span(id = "file_name_2", class = "elem-file-name"), tags$button(class = "elem-img-remove", onclick = "removeElementFile(2)", "\u00D7")), div(class = "item-input", textInput("landing_item2", NULL, placeholder = "e.g. Physics")), tags$button(class = "elem-img-btn", onclick = "handleElementFile(2)", "\U0001F4CE"), tags$input(type = "file", id = "file_input_2", accept = "image/*,.pdf,.doc,.docx,.txt,.csv", capture = "environment", style = "display:none;")),
+      div(class = "item-row", span(class = "item-number", "3."), div(id = "file_wrap_3", class = "elem-img-wrap", tags$img(id = "file_preview_3", class = "elem-img-thumb"), span(id = "file_name_3", class = "elem-file-name"), tags$button(class = "elem-img-remove", onclick = "removeElementFile(3)", "\u00D7")), div(class = "item-input", textInput("landing_item3", NULL, placeholder = "e.g. Chemistry")), tags$button(class = "elem-img-btn", onclick = "handleElementFile(3)", "\U0001F4CE"), tags$input(type = "file", id = "file_input_3", accept = "image/*,.pdf,.doc,.docx,.txt,.csv", capture = "environment", style = "display:none;")),
+      div(class = "item-row", span(class = "item-number", "4."), div(id = "file_wrap_4", class = "elem-img-wrap", tags$img(id = "file_preview_4", class = "elem-img-thumb"), span(id = "file_name_4", class = "elem-file-name"), tags$button(class = "elem-img-remove", onclick = "removeElementFile(4)", "\u00D7")), div(class = "item-input", textInput("landing_item4", NULL, placeholder = "e.g. Biology")), tags$button(class = "elem-img-btn", onclick = "handleElementFile(4)", "\U0001F4CE"), tags$input(type = "file", id = "file_input_4", accept = "image/*,.pdf,.doc,.docx,.txt,.csv", capture = "environment", style = "display:none;")),
+      div(class = "item-row", span(class = "item-number", "5."), div(id = "file_wrap_5", class = "elem-img-wrap", tags$img(id = "file_preview_5", class = "elem-img-thumb"), span(id = "file_name_5", class = "elem-file-name"), tags$button(class = "elem-img-remove", onclick = "removeElementFile(5)", "\u00D7")), div(class = "item-input", textInput("landing_item5", NULL, placeholder = "e.g. Geology")), tags$button(class = "elem-img-btn", onclick = "handleElementFile(5)", "\U0001F4CE"), tags$input(type = "file", id = "file_input_5", accept = "image/*,.pdf,.doc,.docx,.txt,.csv", capture = "environment", style = "display:none;")),
+      div(class = "item-row", span(class = "item-number", "6."), div(id = "file_wrap_6", class = "elem-img-wrap", tags$img(id = "file_preview_6", class = "elem-img-thumb"), span(id = "file_name_6", class = "elem-file-name"), tags$button(class = "elem-img-remove", onclick = "removeElementFile(6)", "\u00D7")), div(class = "item-input", textInput("landing_item6", NULL, placeholder = "e.g. Geography")), tags$button(class = "elem-img-btn", onclick = "handleElementFile(6)", "\U0001F4CE"), tags$input(type = "file", id = "file_input_6", accept = "image/*,.pdf,.doc,.docx,.txt,.csv", capture = "environment", style = "display:none;")),
       div(class = "continue-btn",
         actionButton("landing_continue", "Continue", class = "btn-success btn-lg"),
         div(style = "margin-top: 12px;",
@@ -1773,6 +1863,8 @@ server <- function(input, output, session) {
   rv <- reactiveValues(
     pseudonym = generate_pseudonym(),
     elements = character(),
+    element_images = list(),  # Named list: element_name -> base64 data URI (images only)
+    element_files = list(),   # Named list: element_name -> list(data, name, type)
     constructs = data.frame(
       left = character(),
       right = character(),
@@ -1886,6 +1978,23 @@ server <- function(input, output, session) {
     })
   })
 
+  # Handle element file uploads from landing page
+  landing_files <- reactiveValues()  # Temporary store keyed by input number: list(data, name, type)
+  observeEvent(input$element_file_upload, {
+    info <- input$element_file_upload
+    if (!is.null(info$num) && !is.null(info$data)) {
+      landing_files[[as.character(info$num)]] <- list(
+        data = info$data, name = info$name, type = info$type
+      )
+    }
+  })
+
+  # Handle element file removal
+  observeEvent(input$element_file_remove, {
+    num <- as.character(input$element_file_remove)
+    landing_files[[num]] <- NULL
+  })
+
   # Handle "Take a Guided Tour" button
   observeEvent(input$start_walkthrough, {
     preset_file <- "dataExamples/presets/biscuits_walkthrough.json"
@@ -1917,6 +2026,24 @@ server <- function(input, output, session) {
       user_name <- trimws(input$user_pseudonym %||% "")
       if (user_name != "") rv$pseudonym <- user_name
       rv$elements <- items
+      # Associate uploaded files with element names
+      all_items <- c(input$landing_item1, input$landing_item2,
+                     input$landing_item3, input$landing_item4,
+                     input$landing_item5, input$landing_item6)
+      all_items <- trimws(all_items)
+      img_list <- list()
+      file_list <- list()
+      for (i in seq_along(all_items)) {
+        finfo <- landing_files[[as.character(i)]]
+        if (all_items[i] != "" && !is.null(finfo)) {
+          if (finfo$type == "image") {
+            img_list[[all_items[i]]] <- finfo$data
+          }
+          file_list[[all_items[i]]] <- finfo
+        }
+      }
+      rv$element_images <- img_list
+      rv$element_files <- file_list
       triads <- safe_triads(items)
       rv$all_triads <- triads
       rv$current_triad_idx <- 1
@@ -1981,9 +2108,13 @@ server <- function(input, output, session) {
       if (identical(rv$triad_different, elem)) {
         cls <- paste(cls, "is-different")
       }
+      img_tag <- NULL
+      if (!is.null(rv$element_images[[elem]])) {
+        img_tag <- tags$img(src = rv$element_images[[elem]], class = "triad-card-img")
+      }
       actionButton(
         paste0("wiz_card_", i),
-        elem,
+        tagList(img_tag, elem),
         class = cls
       )
     })
@@ -2357,8 +2488,12 @@ server <- function(input, output, session) {
           )
         )
       })
+      img_tag <- NULL
+      if (!is.null(rv$element_images[[elements[ei]]])) {
+        img_tag <- tags$img(src = rv$element_images[[elements[ei]]], class = "rating-elem-img")
+      }
       div(class = "rating-element",
-        div(class = "rating-element-name", elements[ei]),
+        div(class = "rating-element-name", img_tag, elements[ei]),
         div(class = "rating-scale",
           div(class = "rating-scale-track", btns)
         )
@@ -3133,8 +3268,10 @@ server <- function(input, output, session) {
         elements = rv$elements,
         constructs = rv$constructs,
         ratings = rv$ratings,
+        element_images = if (length(rv$element_images) > 0) rv$element_images else NULL,
+        element_files = if (length(rv$element_files) > 0) rv$element_files else NULL,
         timestamp = Sys.time(),
-        version = "1.0"
+        version = "1.2"
       )
       jsonlite::write_json(grid_data, file, pretty = TRUE, auto_unbox = TRUE)
     }
@@ -3297,6 +3434,18 @@ server <- function(input, output, session) {
             rating = numeric(),
             stringsAsFactors = FALSE
           )
+        }
+
+        # Restore element images and files if present
+        if (!is.null(grid_data$element_images)) {
+          rv$element_images <- as.list(grid_data$element_images)
+        } else {
+          rv$element_images <- list()
+        }
+        if (!is.null(grid_data$element_files)) {
+          rv$element_files <- as.list(grid_data$element_files)
+        } else {
+          rv$element_files <- list()
         }
 
         showNotification(
@@ -4883,6 +5032,9 @@ server <- function(input, output, session) {
         grid_data$ratings <- as.data.frame(json_data$ratings)
       }
       if (!is.null(json_data$name)) grid_data$name <- json_data$name
+      if (!is.null(json_data$element_images)) {
+        grid_data$element_images <- as.list(json_data$element_images)
+      }
 
     } else if (ext == "rgrid") {
       # Use same parsing logic as the working single-grid import
