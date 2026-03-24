@@ -429,16 +429,14 @@ ui <- fluidPage(
       div(class = "item-row", span(class = "item-number", "4."), div(id = "file_wrap_4", class = "elem-img-wrap", tags$img(id = "file_preview_4", class = "elem-img-thumb"), span(id = "file_name_4", class = "elem-file-name"), tags$button(class = "elem-img-remove", onclick = "removeElementFile(4)", "\u00D7")), div(class = "item-input", textInput("landing_item4", NULL, placeholder = "e.g. Biology")), tags$button(class = "elem-img-btn", onclick = "handleElementFile(4)", "\U0001F4CE"), tags$input(type = "file", id = "file_input_4", accept = "image/*,.pdf,.doc,.docx,.txt,.csv", capture = "environment", style = "display:none;")),
       div(class = "item-row", span(class = "item-number", "5."), div(id = "file_wrap_5", class = "elem-img-wrap", tags$img(id = "file_preview_5", class = "elem-img-thumb"), span(id = "file_name_5", class = "elem-file-name"), tags$button(class = "elem-img-remove", onclick = "removeElementFile(5)", "\u00D7")), div(class = "item-input", textInput("landing_item5", NULL, placeholder = "e.g. Geology")), tags$button(class = "elem-img-btn", onclick = "handleElementFile(5)", "\U0001F4CE"), tags$input(type = "file", id = "file_input_5", accept = "image/*,.pdf,.doc,.docx,.txt,.csv", capture = "environment", style = "display:none;")),
       div(class = "item-row", span(class = "item-number", "6."), div(id = "file_wrap_6", class = "elem-img-wrap", tags$img(id = "file_preview_6", class = "elem-img-thumb"), span(id = "file_name_6", class = "elem-file-name"), tags$button(class = "elem-img-remove", onclick = "removeElementFile(6)", "\u00D7")), div(class = "item-input", textInput("landing_item6", NULL, placeholder = "e.g. Geography")), tags$button(class = "elem-img-btn", onclick = "handleElementFile(6)", "\U0001F4CE"), tags$input(type = "file", id = "file_input_6", accept = "image/*,.pdf,.doc,.docx,.txt,.csv", capture = "environment", style = "display:none;")),
-      div(class = "continue-btn",
-        actionButton("landing_continue", "Continue", class = "btn-success btn-lg"),
-        div(style = "margin-top: 12px;",
-          actionButton("landing_existing", "Use an Existing Grid", class = "btn-outline-primary")
+      div(class = "continue-btn", style = "margin-top: 20px;",
+        div(style = "display: flex; gap: 10px; justify-content: center; align-items: center; flex-wrap: wrap;",
+          actionButton("landing_continue", "Continue", class = "btn-success btn-lg"),
+          actionButton("start_walkthrough", "Guided Tour (Biscuits!)", class = "btn-outline-success btn-sm")
         ),
-        div(style = "margin-top: 12px;",
-          actionButton("start_walkthrough", "Take a Guided Tour (Biscuits!)", class = "btn-outline-success")
-        ),
-        div(style = "margin-top: 12px;",
-          actionButton("skip_to_full", "Switch to Full Site", class = "btn-outline-secondary btn-sm", style = "font-size: 11px;")
+        div(style = "margin-top: 12px; display: flex; gap: 8px; justify-content: center;",
+          actionButton("landing_existing", "Use an Existing Grid", class = "btn-outline-primary btn-sm"),
+          actionButton("skip_to_full", "Full Site", class = "btn-outline-secondary btn-sm")
         )
       )
     )
@@ -2057,6 +2055,15 @@ server <- function(input, output, session) {
     preset_file <- "dataExamples/presets/biscuits_walkthrough.json"
     preset <- jsonlite::fromJSON(preset_file)
     rv$elements <- preset$elements
+    # Load element URLs if present
+    if (!is.null(preset$element_urls)) {
+      rv$element_urls <- as.list(preset$element_urls)
+      file_list <- list()
+      for (nm in names(preset$element_urls)) {
+        file_list[[nm]] <- list(data = preset$element_urls[[nm]], name = nm, type = "url")
+      }
+      rv$element_files <- file_list
+    }
     walkthrough$active <- TRUE
     walkthrough$steps <- preset$steps
     triads <- safe_triads(preset$elements)
