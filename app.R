@@ -5,7 +5,7 @@ library(uuid)
 library(jsonlite)
 library(igraph)
 
-APP_VERSION <- "2.0.0"
+APP_VERSION <- "2.1.0"
 
 # Security: explicit upload size limit (10MB) and grid limits
 options(shiny.maxRequestSize = 10 * 1024^2)
@@ -41,12 +41,27 @@ source("R/multigrid_analysis.r")
 
 ui <- fluidPage(
   tags$head(
+        tags$title("WebGrid.Online — Repertory Grid Analysis"),
         tags$script(HTML("
+      Shiny.addCustomMessageHandler('resetBuildFile', function(msg) {
+        removeElementFile('build');
+      });
       Shiny.addCustomMessageHandler('click_analyze', function(msg) {
-        setTimeout(function() {
+        var attempts = 0;
+        var tryClick = function() {
+          // Ensure Analysis sidebar section is open
+          var analysisSections = document.querySelectorAll('.sidebar-toggle.collapsed');
+          analysisSections.forEach(function(h) {
+            if (h.textContent.indexOf('Analysis') >= 0) {
+              $(h).next('.sidebar-content').show();
+              h.classList.remove('collapsed');
+            }
+          });
           var btn = document.getElementById('analyze');
-          if (btn) btn.click();
-        }, 500);
+          if (btn) { btn.click(); }
+          else if (attempts < 20) { attempts++; setTimeout(tryClick, 300); }
+        };
+        setTimeout(tryClick, 500);
       });
       // Pop out a plot into a new window
       function popoutPlot(plotId, title) {
@@ -114,6 +129,20 @@ ui <- fluidPage(
         };
         reader.readAsDataURL(file);
       });
+      function handleElementUrl(inputNum) {
+        var url = prompt('Paste a URL (webpage or image):');
+        if (!url) return;
+        Shiny.setInputValue('element_file_upload', {num: inputNum, data: url, name: url, type: 'url'}, {priority: 'event'});
+        var wrap = document.getElementById('file_wrap_' + inputNum);
+        var preview = document.getElementById('file_preview_' + inputNum);
+        var fname = document.getElementById('file_name_' + inputNum);
+        if (preview) { preview.style.display = 'none'; }
+        // Show truncated URL as label
+        var display = url.replace(/^https?:\\/\\//, '').substring(0, 30);
+        if (url.length > 30) display += '...';
+        if (fname) { fname.textContent = display; fname.style.display = 'block'; }
+        if (wrap) { wrap.style.display = 'inline-block'; }
+      }
       function removeElementFile(inputNum) {
         var wrap = document.getElementById('file_wrap_' + inputNum);
         var preview = document.getElementById('file_preview_' + inputNum);
@@ -125,6 +154,25 @@ ui <- fluidPage(
         if (fileInput) fileInput.value = '';
         Shiny.setInputValue('element_file_remove', inputNum, {priority: 'event'});
       }
+      // Replace broken images with paperclip icon using MutationObserver
+      new MutationObserver(function(mutations) {
+        document.querySelectorAll('img.triad-card-img, img.rating-elem-img, img.elem-img-thumb').forEach(function(img) {
+          if (!img._errorHandled) {
+            img._errorHandled = true;
+            img.onerror = function() {
+              var size = this.classList.contains('triad-card-img') ? '40' : '24';
+              var span = document.createElement('span');
+              span.style.cssText = 'font-size:' + size + 'px;display:block;text-align:center;margin:0 auto 6px;color:#999;';
+              span.textContent = '\uD83D\uDCCE';
+              this.parentNode.replaceChild(span, this);
+            };
+            // Check if already broken
+            if (img.complete && img.naturalWidth === 0 && img.src) {
+              img.onerror();
+            }
+          }
+        });
+      }).observe(document.body, {childList: true, subtree: true});
       // Zoom image on click (lightbox)
       $(document).on('click', '.triad-card-img, .rating-elem-img', function(e) {
         e.stopPropagation();
@@ -137,15 +185,7 @@ ui <- fluidPage(
         document.body.appendChild(overlay);
       });
       // Insert line break and legend before multi-grid tabs
-      $(document).ready(function() {
-        var gc = $('#main_tabs > li > a[data-value=\"Grid Collection\"]');
-        if (gc.length) {
-          gc.parent().before('<li class=\"tab-row-break\"></li>');
-          // Add legend after last multi-grid tab
-          var lastTab = $('#main_tabs > li:last');
-          lastTab.after('<li class=\"mg-legend\"><span class=\"sg-dot\"></span> single grid <span class=\"mg-any\" style=\"margin-left:8px;\"></span> any grids <span class=\"mg-common\" style=\"margin-left:8px;\"></span> shared constructs</li>');
-        }
-      });
+      // Insert tab row breaks - watch for tabs to appear in DOM
     ")),
         tags$style(HTML('
       .container-fluid { max-width: 1400px; }
@@ -182,7 +222,9 @@ ui <- fluidPage(
       .item-row .item-input { flex: 1; min-width: 0; }
       .item-row .item-input .shiny-input-container { width: 100% !important; }
       .item-row .elem-img-btn { flex-shrink: 0; }
-      .triad-card-img { width: 60px; height: 60px; border-radius: 6px; object-fit: cover; display: block; margin: 0 auto 6px; border: 1px solid #ddd; cursor: zoom-in; }
+      .triad-card-img { width: 60px; height: 60px; border-radius: 6px; object-fit: cover; display: block; margin: 0 auto 6px; border: 1px solid #ddd; cursor: zoom-in; background: #f0f0f0; }
+      .triad-card-img[src=""], .triad-card-img:not([src]) { display: none; }
+      .rating-elem-img[src=""], .rating-elem-img:not([src]) { display: none; }
       .img-zoom-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 9999; display: flex; align-items: center; justify-content: center; cursor: zoom-out; }
       .img-zoom-overlay img { max-width: 90%; max-height: 90%; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
       .rating-elem-img { width: 32px; height: 32px; border-radius: 4px; object-fit: cover; vertical-align: middle; margin-right: 8px; border: 1px solid #ddd; }
@@ -256,12 +298,11 @@ ui <- fluidPage(
       }
       .multigrid-icon { margin-right: 4px; font-size: 10px; }
       .sg-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #0072B2; margin-right: 4px; vertical-align: middle; }
+      #main_tabs > li > a[data-value="Grid Collection"] { border: 1px dashed #999; background: transparent; }
       .mg-any { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #2ca02c; margin-right: 4px; vertical-align: middle; }
       .mg-common { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #d4a017; margin-right: 4px; vertical-align: middle; }
       .mg-legend { display: inline-block; font-size: 10px; color: #666; padding: 4px 10px; margin-left: auto; white-space: nowrap; align-self: center; }
       /* Force multi-grid tabs onto second row */
-      .nav-tabs#main_tabs { display: flex; flex-wrap: wrap; }
-      .nav-tabs#main_tabs > .tab-row-break { flex-basis: 100%; height: 0; padding: 0; margin: 0; border: none; }
       @media (max-width: 992px) {
         .nav-tabs#main_tabs { flex-wrap: wrap; }
         .nav-tabs#main_tabs > .tab-row-break { flex-basis: 100%; height: 4px; }
@@ -379,9 +420,9 @@ ui <- fluidPage(
         textInput("user_pseudonym", NULL, placeholder = "Leave blank for a random name"),
         tags$small(class = "text-muted", "This labels your grid when shared or added to a collection.")
       ),
-      p("To get started, list up to 6 things you'd like to compare. They could be people, places, products, ideas — anything in the same category."),
+      p("To get started, list 4-6 things you'd like to compare. They could be people, places, products, ideas — anything in the same category."),
       p(tags$em("For example: 6 friends, 6 cities you've lived in, 6 programming languages, 6 school subjects."), style = "color: #888; font-size: 12px;"),
-      p(style = "color: #888; font-size: 12px;", "You can upload images, media and documents using the ", tags$span("\U0001F4CE", style = "font-size: 14px;"), " button, but you still need a text label in the associated field."),
+      p(style = "color: #888; font-size: 12px;", "You can attach images and documents using ", tags$span("\U0001F4CE", style = "font-size: 14px;"), ", or paste a URL directly into the text field. URLs will appear as clickable links during elicitation."),
       div(class = "item-row", span(class = "item-number", "1."), div(id = "file_wrap_1", class = "elem-img-wrap", tags$img(id = "file_preview_1", class = "elem-img-thumb"), span(id = "file_name_1", class = "elem-file-name"), tags$button(class = "elem-img-remove", onclick = "removeElementFile(1)", "\u00D7")), div(class = "item-input", textInput("landing_item1", NULL, placeholder = "e.g. Mathematics")), tags$button(class = "elem-img-btn", onclick = "handleElementFile(1)", "\U0001F4CE"), tags$input(type = "file", id = "file_input_1", accept = "image/*,.pdf,.doc,.docx,.txt,.csv", capture = "environment", style = "display:none;")),
       div(class = "item-row", span(class = "item-number", "2."), div(id = "file_wrap_2", class = "elem-img-wrap", tags$img(id = "file_preview_2", class = "elem-img-thumb"), span(id = "file_name_2", class = "elem-file-name"), tags$button(class = "elem-img-remove", onclick = "removeElementFile(2)", "\u00D7")), div(class = "item-input", textInput("landing_item2", NULL, placeholder = "e.g. Physics")), tags$button(class = "elem-img-btn", onclick = "handleElementFile(2)", "\U0001F4CE"), tags$input(type = "file", id = "file_input_2", accept = "image/*,.pdf,.doc,.docx,.txt,.csv", capture = "environment", style = "display:none;")),
       div(class = "item-row", span(class = "item-number", "3."), div(id = "file_wrap_3", class = "elem-img-wrap", tags$img(id = "file_preview_3", class = "elem-img-thumb"), span(id = "file_name_3", class = "elem-file-name"), tags$button(class = "elem-img-remove", onclick = "removeElementFile(3)", "\u00D7")), div(class = "item-input", textInput("landing_item3", NULL, placeholder = "e.g. Chemistry")), tags$button(class = "elem-img-btn", onclick = "handleElementFile(3)", "\U0001F4CE"), tags$input(type = "file", id = "file_input_3", accept = "image/*,.pdf,.doc,.docx,.txt,.csv", capture = "environment", style = "display:none;")),
@@ -509,11 +550,11 @@ ui <- fluidPage(
       actionButton("goto_simple_start", "Simple Start",
                    class = "btn-success btn-sm btn-block",
                    style = "margin-bottom: 16px; width: 100%;"),
-      # --- File Operations (collapsible) ---
+      # --- File Operations (collapsible, collapsed by default) ---
       tags$div(class = "sidebar-section",
-        tags$h4(class = "sidebar-toggle", onclick = "$(this).next('.sidebar-content').slideToggle(200); $(this).toggleClass('collapsed');",
+        tags$h4(class = "sidebar-toggle collapsed", onclick = "$(this).next('.sidebar-content').slideToggle(200); $(this).toggleClass('collapsed');",
           "File Operations ", tags$span(class = "toggle-arrow", "\u25BC")),
-        tags$div(class = "sidebar-content",
+        tags$div(class = "sidebar-content", style = "display: none;",
           fileInput("import_file", "Select Grid File", accept = c(".rgrid", ".json")),
           uiOutput("load_grid_prompt"),
           div(style = "margin-top: -20px;",
@@ -534,11 +575,11 @@ ui <- fluidPage(
           )
         )
       ),
-      # --- Analysis (collapsible) ---
+      # --- Analysis (collapsible, collapsed by default) ---
       tags$div(class = "sidebar-section",
-        tags$h4(class = "sidebar-toggle", onclick = "$(this).next('.sidebar-content').slideToggle(200); $(this).toggleClass('collapsed');",
+        tags$h4(class = "sidebar-toggle collapsed", onclick = "$(this).next('.sidebar-content').slideToggle(200); $(this).toggleClass('collapsed');",
           "Analysis ", tags$span(class = "toggle-arrow", "\u25BC")),
-        tags$div(class = "sidebar-content",
+        tags$div(class = "sidebar-content", style = "display: none;",
           uiOutput("analyse_button_ui"),
           div(style = "display: flex; align-items: center; gap: 6px; margin-top: 8px;",
             checkboxInput("impute_missing", "Impute missing", value = FALSE),
@@ -605,7 +646,19 @@ ui <- fluidPage(
               ),
               fluidRow(
                 column(6,
-                  textInput("element_name", NULL, placeholder = "Type element name"),
+                  div(style = "display: flex; align-items: center; gap: 0;",
+                    div(id = "build_file_wrap", class = "elem-img-wrap",
+                      tags$img(id = "build_file_preview", class = "elem-img-thumb"),
+                      span(id = "build_file_name", class = "elem-file-name"),
+                      tags$button(class = "elem-img-remove", onclick = "removeElementFile('build')", "\u00D7")
+                    ),
+                    div(style = "flex: 1; min-width: 0;",
+                      textInput("element_name", NULL, placeholder = "Type element name")
+                    ),
+                    tags$button(class = "elem-img-btn", onclick = "handleElementFile('build')", "\U0001F4CE"),
+                    tags$button(class = "elem-img-btn", onclick = "handleElementUrl('build')", "\U0001F517"),
+                    tags$input(type = "file", id = "file_input_build", accept = "image/*,.pdf,.doc,.docx,.txt,.csv", capture = "environment", style = "display:none;")
+                  ),
                   actionButton("add_element", "Add", class = "btn-warning btn-sm")
                 ),
                 column(6,
@@ -1224,8 +1277,9 @@ ui <- fluidPage(
                  )
         ),
 
-        # ===== MULTI-GRID TABS =====
-        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), "Collect Grids"),
+        # ===== MULTI-GRID TABS (dropdown) =====
+        navbarMenu("Multi-Grid \U0001F4CA\U0001F4CA",
+        tabPanel(title = "Collect Grids",
                  value = "Grid Collection",
                  h4("Manage Grid Collection"),
                  p("Upload multiple grids to compare and analyze relationships between them."),
@@ -1289,7 +1343,7 @@ ui <- fluidPage(
                  )
         ),
 
-        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), tags$span(class = "mg-any"), "Socionets"),
+        tabPanel(title = tagList(tags$span(class = "mg-any"), "Socionets"),
                  value = "Socionets",
                  h4("Socionets Analysis"),
                  p("Network visualization showing relationships between grids based on construct matching."),
@@ -1363,7 +1417,7 @@ ui <- fluidPage(
                  )
         ),
 
-        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), tags$span(class = "mg-any"), "Mode"),
+        tabPanel(title = tagList(tags$span(class = "mg-any"), "Mode"),
                  value = "Mode Grid",
                  h4("Mode (Consensus) Grid"),
                  p("Generate a consensus grid representing commonality across multiple participants."),
@@ -1441,7 +1495,116 @@ ui <- fluidPage(
                  )
         ),
 
-        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), tags$span(class = "mg-common"), "Composite"),
+        # ===== PrinGrid Trajectories Tab =====
+        tabPanel(title = tagList(tags$span(class = "mg-any"), "Trajectories"),
+                 value = "PrinGrid Trajectories",
+                 h4("PrinGrid Trajectories"),
+                 p("PCA-based visualisation showing how elements move in construct space across multiple grids (e.g., over time or between people)."),
+                 fluidRow(
+                   column(8,
+                          plotOutput("pringrid_traj_plot", height = "600px")
+                   ),
+                   column(4,
+                          checkboxInput("traj_show_arrows", "Show Movement Arrows", value = TRUE),
+                          checkboxInput("traj_show_labels", "Show Element Labels", value = TRUE),
+                          checkboxInput("traj_show_constructs", "Show Construct Lines", value = TRUE),
+                          sliderInput("traj_text_size", "Text Size",
+                                      min = 0.8, max = 2.0, value = 1.2, step = 0.1),
+                          actionButton("compute_trajectories", "Compute Trajectories", class = "btn-primary"),
+                          tags$hr(),
+                          downloadButton("download_traj_plot", "Download Plot"),
+                          downloadButton("download_traj_csv", "Download Positions (CSV)")
+                   )
+                 ),
+                 tags$hr(),
+                 h5("Variance Explained"),
+                 verbatimTextOutput("traj_variance"),
+                 tags$hr(),
+                 actionButton("help_trajectories", "Help me understand this", class = "btn-info help-btn"),
+                 conditionalPanel(
+                   condition = "input.help_trajectories % 2 == 1",
+                   div(class = "help-content",
+                     h5("PrinGrid Trajectories"),
+                     p("Trajectories extend the PCA biplot to show how the same elements are positioned differently across multiple grids."),
+                     h5("Reading the plot"),
+                     tags$ul(
+                       tags$li("Each grid's elements are shown in a different colour"),
+                       tags$li("Arrows connect the same element across grids, showing movement in construct space"),
+                       tags$li("Long arrows = large changes in how that element is construed"),
+                       tags$li("Short/no arrows = stable, consistent construing")
+                     ),
+                     h5("Use cases"),
+                     tags$ul(
+                       tags$li("Tracking change over time (pre/post interventions)"),
+                       tags$li("Comparing different perspectives on the same elements"),
+                       tags$li("Identifying which elements changed most in a learning context")
+                     ),
+                     h5("Worked example"),
+                     p("A student rates 6 school subjects at the start and end of the year. In the trajectory plot, most subjects barely move (short arrows) - their perception is stable. But Chemistry has a long arrow moving from the 'dislike/theoretical' quadrant toward 'enjoy/practical', showing a significant shift in how the student construes Chemistry. This could reflect the impact of a new hands-on teaching approach introduced during the year.")
+                   )
+                 )
+        ),
+
+        # ===== Class Metagrids Tab =====
+        tabPanel(title = tagList(tags$span(class = "mg-any"), "Class Metagrids"),
+                 value = "Class Metagrids",
+                 h4("Class Metagrids"),
+                 p("Create a higher-order grid where your grids become elements, rated on user-defined constructs for classification and comparison."),
+                 fluidRow(
+                   column(8,
+                     h5("Grid Elements (from your collection)"),
+                     DTOutput("metagrid_grids_table"),
+                     tags$hr(),
+                     h5("Define Meta-Constructs"),
+                     fluidRow(
+                       column(5, textInput("meta_left_pole", "Left Pole:", placeholder = "e.g., Expert perspective")),
+                       column(5, textInput("meta_right_pole", "Right Pole:", placeholder = "e.g., Novice perspective")),
+                       column(2, actionButton("add_meta_construct", "Add", class = "btn-primary btn-sm",
+                                              style = "margin-top: 24px;"))
+                     ),
+                     DTOutput("meta_constructs_table"),
+                     tags$hr(),
+                     h5("Rate Grids on Meta-Constructs"),
+                     uiOutput("meta_ratings_ui")
+                   ),
+                   column(4,
+                     actionButton("build_metagrid", "Build Metagrid", class = "btn-primary"),
+                     tags$hr(),
+                     actionButton("use_metagrid_as_current", "Analyse as Current Grid", class = "btn-success btn-sm"),
+                     tags$small(class = "text-muted", "Loads the metagrid into the editor for full analysis with all single-grid tools."),
+                     tags$hr(),
+                     downloadButton("download_metagrid", "Download Metagrid (.rgrid)")
+                   )
+                 ),
+                 tags$hr(),
+                 h5("Metagrid Preview"),
+                 DTOutput("metagrid_preview"),
+                 tags$hr(),
+                 actionButton("help_metagrid", "Help me understand this", class = "btn-info help-btn"),
+                 conditionalPanel(
+                   condition = "input.help_metagrid % 2 == 1",
+                   div(class = "help-content",
+                     h5("Class Metagrids"),
+                     p("A metagrid treats your grid collection as a set of elements and lets you classify them using new constructs."),
+                     h5("How to use"),
+                     tags$ol(
+                       tags$li("Your loaded grids automatically become the elements"),
+                       tags$li("Define bipolar constructs for classifying grids (e.g., 'Expert - Novice')"),
+                       tags$li("Rate each grid on each construct using the 1-5 scale"),
+                       tags$li("Click 'Build Metagrid' to create the higher-order grid"),
+                       tags$li("Click 'Analyse as Current Grid' to run FOCUS, PCA, etc. on the metagrid")
+                     ),
+                     h5("Example constructs"),
+                     tags$ul(
+                       tags$li("'Expert perspective - Novice perspective'"),
+                       tags$li("'Detailed grid - Sparse grid'"),
+                       tags$li("'Positive overall - Negative overall'")
+                     )
+                   )
+                 )
+        ),
+
+        tabPanel(title = tagList(tags$span(class = "mg-common"), "Composite"),
                  value = "Composite Grid",
                  h4("Composite Grid"),
                  p("Merge multiple grids into a single combined grid for unified analysis."),
@@ -1493,7 +1656,7 @@ ui <- fluidPage(
         ),
 
         # ===== MINUS Analysis Tab =====
-        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), tags$span(class = "mg-common"), "MINUS"),
+        tabPanel(title = tagList(tags$span(class = "mg-common"), "MINUS"),
                  value = "MINUS",
                  h4("MINUS Analysis: Grid Differences"),
                  p("Subtract one grid from another to see differences in construing. Requires two grids with shared elements AND constructs."),
@@ -1542,7 +1705,7 @@ ui <- fluidPage(
         ),
 
         # ===== CORE Analysis Tab =====
-        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), tags$span(class = "mg-common"), "CORE"),
+        tabPanel(title = tagList(tags$span(class = "mg-common"), "CORE"),
                  value = "CORE",
                  h4("CORE Analysis: Shared Construing"),
                  p("Iteratively removes the least agreed-upon elements and constructs, revealing the core of shared understanding between two grids."),
@@ -1599,58 +1762,8 @@ ui <- fluidPage(
                  )
         ),
 
-        # ===== PrinGrid Trajectories Tab =====
-        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), tags$span(class = "mg-any"), "Trajectories"),
-                 value = "PrinGrid Trajectories",
-                 h4("PrinGrid Trajectories"),
-                 p("PCA-based visualisation showing how elements move in construct space across multiple grids (e.g., over time or between people)."),
-                 fluidRow(
-                   column(8,
-                          plotOutput("pringrid_traj_plot", height = "600px")
-                   ),
-                   column(4,
-                          checkboxInput("traj_show_arrows", "Show Movement Arrows", value = TRUE),
-                          checkboxInput("traj_show_labels", "Show Element Labels", value = TRUE),
-                          checkboxInput("traj_show_constructs", "Show Construct Lines", value = TRUE),
-                          sliderInput("traj_text_size", "Text Size",
-                                      min = 0.8, max = 2.0, value = 1.2, step = 0.1),
-                          actionButton("compute_trajectories", "Compute Trajectories", class = "btn-primary"),
-                          tags$hr(),
-                          downloadButton("download_traj_plot", "Download Plot"),
-                          downloadButton("download_traj_csv", "Download Positions (CSV)")
-                   )
-                 ),
-                 tags$hr(),
-                 h5("Variance Explained"),
-                 verbatimTextOutput("traj_variance"),
-                 tags$hr(),
-                 actionButton("help_trajectories", "Help me understand this", class = "btn-info help-btn"),
-                 conditionalPanel(
-                   condition = "input.help_trajectories % 2 == 1",
-                   div(class = "help-content",
-                     h5("PrinGrid Trajectories"),
-                     p("Trajectories extend the PCA biplot to show how the same elements are positioned differently across multiple grids."),
-                     h5("Reading the plot"),
-                     tags$ul(
-                       tags$li("Each grid's elements are shown in a different colour"),
-                       tags$li("Arrows connect the same element across grids, showing movement in construct space"),
-                       tags$li("Long arrows = large changes in how that element is construed"),
-                       tags$li("Short/no arrows = stable, consistent construing")
-                     ),
-                     h5("Use cases"),
-                     tags$ul(
-                       tags$li("Tracking change over time (pre/post interventions)"),
-                       tags$li("Comparing different perspectives on the same elements"),
-                       tags$li("Identifying which elements changed most in a learning context")
-                     ),
-                     h5("Worked example"),
-                     p("A student rates 6 school subjects at the start and end of the year. In the trajectory plot, most subjects barely move (short arrows) - their perception is stable. But Chemistry has a long arrow moving from the 'dislike/theoretical' quadrant toward 'enjoy/practical', showing a significant shift in how the student construes Chemistry. This could reflect the impact of a new hands-on teaching approach introduced during the year.")
-                   )
-                 )
-        ),
-
         # ===== Exchange Grids Tab =====
-        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), tags$span(class = "mg-common"), "Comparison"),
+        tabPanel(title = tagList(tags$span(class = "mg-common"), "Comparison"),
                  value = "Exchange Grids",
                  h4("Exchange Grid Analysis"),
                  p("Structured protocol for measuring agreement and understanding between two people using Shaw's (1980) exchange procedure."),
@@ -1712,66 +1825,9 @@ ui <- fluidPage(
                      p("Alice and Bob both rate 6 school subjects. Alice also fills in Bob's grid as she would (grid 4) and predicts Bob's ratings (grid 6). Comparing grids 2 & 4 (agreement) shows 72% match - Alice and Bob construe subjects fairly similarly. But comparing grids 2 & 6 (understanding) shows 88% - Alice can accurately predict how Bob will rate subjects, even where she disagrees. This means Alice understands Bob's perspective well, even when her own view differs.")
                    )
                  )
-        ),
-
-        # ===== Class Metagrids Tab =====
-        tabPanel(title = tagList(tags$span(class = "multigrid-icon", "\U0001F4CA\U0001F4CA"), tags$span(class = "mg-any"), "Class Metagrids"),
-                 value = "Class Metagrids",
-                 h4("Class Metagrids"),
-                 p("Create a higher-order grid where your grids become elements, rated on user-defined constructs for classification and comparison."),
-                 fluidRow(
-                   column(8,
-                     h5("Grid Elements (from your collection)"),
-                     DTOutput("metagrid_grids_table"),
-                     tags$hr(),
-                     h5("Define Meta-Constructs"),
-                     fluidRow(
-                       column(5, textInput("meta_left_pole", "Left Pole:", placeholder = "e.g., Expert perspective")),
-                       column(5, textInput("meta_right_pole", "Right Pole:", placeholder = "e.g., Novice perspective")),
-                       column(2, actionButton("add_meta_construct", "Add", class = "btn-primary btn-sm",
-                                              style = "margin-top: 24px;"))
-                     ),
-                     DTOutput("meta_constructs_table"),
-                     tags$hr(),
-                     h5("Rate Grids on Meta-Constructs"),
-                     uiOutput("meta_ratings_ui")
-                   ),
-                   column(4,
-                     actionButton("build_metagrid", "Build Metagrid", class = "btn-primary"),
-                     tags$hr(),
-                     actionButton("use_metagrid_as_current", "Analyse as Current Grid", class = "btn-success btn-sm"),
-                     tags$small(class = "text-muted", "Loads the metagrid into the editor for full analysis with all single-grid tools."),
-                     tags$hr(),
-                     downloadButton("download_metagrid", "Download Metagrid (.rgrid)")
-                   )
-                 ),
-                 tags$hr(),
-                 h5("Metagrid Preview"),
-                 DTOutput("metagrid_preview"),
-                 tags$hr(),
-                 actionButton("help_metagrid", "Help me understand this", class = "btn-info help-btn"),
-                 conditionalPanel(
-                   condition = "input.help_metagrid % 2 == 1",
-                   div(class = "help-content",
-                     h5("Class Metagrids"),
-                     p("A metagrid treats your grid collection as a set of elements and lets you classify them using new constructs."),
-                     h5("How to use"),
-                     tags$ol(
-                       tags$li("Your loaded grids automatically become the elements"),
-                       tags$li("Define bipolar constructs for classifying grids (e.g., 'Expert - Novice')"),
-                       tags$li("Rate each grid on each construct using the 1-5 scale"),
-                       tags$li("Click 'Build Metagrid' to create the higher-order grid"),
-                       tags$li("Click 'Analyse as Current Grid' to run FOCUS, PCA, etc. on the metagrid")
-                     ),
-                     h5("Example constructs"),
-                     tags$ul(
-                       tags$li("'Expert perspective - Novice perspective'"),
-                       tags$li("'Detailed grid - Sparse grid'"),
-                       tags$li("'Positive overall - Negative overall'")
-                     )
-                   )
-                 )
         )
+        ),  # end navbarMenu
+
       )  # end tabsetPanel
     )  # end mainPanel
   )  # end sidebarLayout
@@ -1864,6 +1920,7 @@ server <- function(input, output, session) {
     pseudonym = generate_pseudonym(),
     elements = character(),
     element_images = list(),  # Named list: element_name -> base64 data URI (images only)
+    element_urls = list(),    # Named list: element_name -> URL string
     element_files = list(),   # Named list: element_name -> list(data, name, type)
     constructs = data.frame(
       left = character(),
@@ -2018,7 +2075,11 @@ server <- function(input, output, session) {
                input$landing_item5, input$landing_item6)
     items <- trimws(items)
     items <- items[items != ""]
-    if (length(items) >= 3) {
+    if (length(items) >= 3 && length(items) < 4) {
+      showNotification("Please enter at least 4 items. With only 3 you'll get just 1 construct, which isn't enough for analysis.", type = "error")
+      return()
+    }
+    if (length(items) >= 4) {
       # Deactivate walkthrough if user enters their own elements
       walkthrough$active <- FALSE
       walkthrough$steps <- list()
@@ -2032,17 +2093,27 @@ server <- function(input, output, session) {
                      input$landing_item5, input$landing_item6)
       all_items <- trimws(all_items)
       img_list <- list()
+      url_list <- list()
       file_list <- list()
       for (i in seq_along(all_items)) {
+        elem <- all_items[i]
+        if (elem == "") next
         finfo <- landing_files[[as.character(i)]]
-        if (all_items[i] != "" && !is.null(finfo)) {
+        if (!is.null(finfo)) {
           if (finfo$type == "image") {
-            img_list[[all_items[i]]] <- finfo$data
+            img_list[[elem]] <- finfo$data
+          } else if (finfo$type == "url") {
+            url_list[[elem]] <- finfo$data
           }
-          file_list[[all_items[i]]] <- finfo
+          file_list[[elem]] <- finfo
+        } else if (grepl("^https?://", elem)) {
+          # Auto-detect URLs typed into text fields
+          url_list[[elem]] <- elem
+          file_list[[elem]] <- list(data = elem, name = elem, type = "url")
         }
       }
       rv$element_images <- img_list
+      rv$element_urls <- url_list
       rv$element_files <- file_list
       triads <- safe_triads(items)
       rv$all_triads <- triads
@@ -2051,7 +2122,7 @@ server <- function(input, output, session) {
       rv$triad_different <- NULL
       landing$step <- "triads"
     } else {
-      showNotification("Please enter at least 3 items.",
+      showNotification("Please enter at least 4 items.",
                        type = "warning")
     }
   })
@@ -2108,13 +2179,19 @@ server <- function(input, output, session) {
       if (identical(rv$triad_different, elem)) {
         cls <- paste(cls, "is-different")
       }
-      img_tag <- NULL
+      media_tag <- NULL
       if (!is.null(rv$element_images[[elem]])) {
-        img_tag <- tags$img(src = rv$element_images[[elem]], class = "triad-card-img")
+        media_tag <- tags$img(src = rv$element_images[[elem]], class = "triad-card-img",
+          onerror = "this.style.display='none';")
+      } else if (!is.null(rv$element_urls[[elem]])) {
+        media_tag <- tags$a(href = "#",
+          onclick = sprintf("event.stopPropagation(); event.preventDefault(); window.open('%s','_blank','width=1000,height=700,scrollbars=yes,resizable=yes');", gsub("'", "\\\\'", rv$element_urls[[elem]])),
+          style = "font-size: 28px; display: block; text-align: center; margin: 0 auto 6px; text-decoration: none; cursor: pointer;",
+          "\U0001F517")
       }
       actionButton(
         paste0("wiz_card_", i),
-        tagList(img_tag, elem),
+        tagList(media_tag, elem),
         class = cls
       )
     })
@@ -2426,13 +2503,41 @@ server <- function(input, output, session) {
   observeEvent(input$post_rating_continue, {
     show_welcome(TRUE)
     landing$step <- "done"
-    # Enable imputation for any missing ratings, then auto-analyze
+    # Auto-analyze directly (no need to click button via JS)
     if (length(rv$elements) >= 2 &&
         is.data.frame(rv$constructs) && nrow(rv$constructs) >= 2 &&
         is.data.frame(rv$ratings) && nrow(rv$ratings) > 0) {
       updateCheckboxInput(session, "impute_missing", value = TRUE)
-      session$sendCustomMessage("click_analyze", list())
-      # Switch to Biplot tab after analysis
+      # Build scores matrix and run analysis inline
+      tryCatch({
+        construct_labels <- paste(rv$constructs$left, "-", rv$constructs$right)
+        n_e <- length(rv$elements)
+        n_c <- length(construct_labels)
+        scores_mat <- matrix(NA_real_, nrow = n_e, ncol = n_c)
+        for (i in seq_len(n_e)) {
+          for (j in seq_len(n_c)) {
+            match_idx <- rv$ratings$element == rv$elements[i] &
+              rv$ratings$construct == construct_labels[j]
+            scores_mat[i, j] <- rv$ratings$rating[match_idx][1]
+          }
+        }
+        # Impute missing
+        if (any(is.na(scores_mat))) {
+          scores_mat[is.na(scores_mat)] <- 3
+        }
+        rv$scores_mat_last <- scores_mat
+        scores_vec <- as.vector(t(scores_mat))
+        rv$repgrid_last <- makeRepgrid(list(
+          name = rv$elements,
+          l.name = rv$constructs$left,
+          r.name = rv$constructs$right,
+          scores = scores_vec
+        ))
+        rv$imputed_last <- any(is.na(scores_mat))
+        showNotification("Analysis complete!", type = "message", duration = 2)
+      }, error = function(e) {
+        showNotification(paste("Auto-analysis error:", e$message), type = "error")
+      })
       updateTabsetPanel(session, "main_tabs", selected = "Biplot")
     }
   })
@@ -2488,12 +2593,18 @@ server <- function(input, output, session) {
           )
         )
       })
-      img_tag <- NULL
+      media_tag <- NULL
       if (!is.null(rv$element_images[[elements[ei]]])) {
-        img_tag <- tags$img(src = rv$element_images[[elements[ei]]], class = "rating-elem-img")
+        media_tag <- tags$img(src = rv$element_images[[elements[ei]]], class = "rating-elem-img",
+          onerror = "this.style.display='none';")
+      } else if (!is.null(rv$element_urls[[elements[ei]]])) {
+        media_tag <- tags$a(href = "#",
+          onclick = sprintf("event.preventDefault(); window.open('%s','_blank','width=1000,height=700,scrollbars=yes,resizable=yes');", gsub("'", "\\\\'", rv$element_urls[[elements[ei]]])),
+          style = "font-size: 16px; margin-right: 6px; text-decoration: none; cursor: pointer;",
+          "\U0001F517")
       }
       div(class = "rating-element",
-        div(class = "rating-element-name", img_tag, elements[ei]),
+        div(class = "rating-element-name", media_tag, elements[ei]),
         div(class = "rating-scale",
           div(class = "rating-scale-track", btns)
         )
@@ -2615,8 +2726,22 @@ server <- function(input, output, session) {
   # Add element / construct / rating
   observeEvent(input$add_element, {
     req(input$element_name)
-    rv$elements <- c(rv$elements, input$element_name)
+    elem_name <- input$element_name
+    rv$elements <- c(rv$elements, elem_name)
+    # Capture any attached file/URL from build page
+    build_file <- landing_files[["build"]]
+    if (!is.null(build_file)) {
+      if (build_file$type == "image") {
+        rv$element_images[[elem_name]] <- build_file$data
+      } else if (build_file$type == "url") {
+        rv$element_urls[[elem_name]] <- build_file$data
+      }
+      rv$element_files[[elem_name]] <- build_file
+      landing_files[["build"]] <- NULL
+    }
     updateTextInput(session, "element_name", value = "")
+    # Reset the build file preview via JS
+    session$sendCustomMessage("resetBuildFile", TRUE)
   })
 
   # Load sample fruit elements (plain text for compatibility)
@@ -3119,6 +3244,13 @@ server <- function(input, output, session) {
         }
         elements <- elements[seq_len(remaining)]
         showNotification(paste0("Trimmed to ", MAX_ELEMENTS, " elements (maximum)."), type = "warning")
+      }
+      # Detect URLs and store them separately
+      for (elem in elements) {
+        if (grepl("^https?://", elem)) {
+          rv$element_urls[[elem]] <- elem
+          rv$element_files[[elem]] <- list(data = elem, name = elem, type = "url")
+        }
       }
       rv$elements <- c(rv$elements, elements)
       # Clear the textarea using JavaScript
