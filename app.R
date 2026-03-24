@@ -2055,15 +2055,22 @@ server <- function(input, output, session) {
     preset_file <- "dataExamples/presets/biscuits_walkthrough.json"
     preset <- jsonlite::fromJSON(preset_file)
     rv$elements <- preset$elements
+    # Load element images if present
+    if (!is.null(preset$element_images)) {
+      rv$element_images <- as.list(preset$element_images)
+    }
     # Load element URLs if present
     if (!is.null(preset$element_urls)) {
       rv$element_urls <- as.list(preset$element_urls)
-      file_list <- list()
+    }
+    # Build file list from both
+    file_list <- list()
+    if (!is.null(preset$element_urls)) {
       for (nm in names(preset$element_urls)) {
         file_list[[nm]] <- list(data = preset$element_urls[[nm]], name = nm, type = "url")
       }
-      rv$element_files <- file_list
     }
+    rv$element_files <- file_list
     walkthrough$active <- TRUE
     walkthrough$steps <- preset$steps
     triads <- safe_triads(preset$elements)
@@ -2186,19 +2193,21 @@ server <- function(input, output, session) {
       if (identical(rv$triad_different, elem)) {
         cls <- paste(cls, "is-different")
       }
-      media_tag <- NULL
+      img_tag <- NULL
+      link_tag <- NULL
       if (!is.null(rv$element_images[[elem]])) {
-        media_tag <- tags$img(src = rv$element_images[[elem]], class = "triad-card-img",
+        img_tag <- tags$img(src = rv$element_images[[elem]], class = "triad-card-img",
           onerror = "this.style.display='none';")
-      } else if (!is.null(rv$element_urls[[elem]])) {
-        media_tag <- tags$a(href = "#",
+      }
+      if (!is.null(rv$element_urls[[elem]])) {
+        link_tag <- tags$a(href = "#",
           onclick = sprintf("event.stopPropagation(); event.preventDefault(); window.open('%s','_blank','width=1000,height=700,scrollbars=yes,resizable=yes');", gsub("'", "\\\\'", rv$element_urls[[elem]])),
-          style = "font-size: 28px; display: block; text-align: center; margin: 0 auto 6px; text-decoration: none; cursor: pointer;",
+          style = "font-size: 14px; text-decoration: none; cursor: pointer; margin-left: 4px;",
           "\U0001F517")
       }
       actionButton(
         paste0("wiz_card_", i),
-        tagList(media_tag, elem),
+        tagList(img_tag, elem, link_tag),
         class = cls
       )
     })
@@ -2600,18 +2609,20 @@ server <- function(input, output, session) {
           )
         )
       })
-      media_tag <- NULL
+      img_tag <- NULL
+      link_tag <- NULL
       if (!is.null(rv$element_images[[elements[ei]]])) {
-        media_tag <- tags$img(src = rv$element_images[[elements[ei]]], class = "rating-elem-img",
+        img_tag <- tags$img(src = rv$element_images[[elements[ei]]], class = "rating-elem-img",
           onerror = "this.style.display='none';")
-      } else if (!is.null(rv$element_urls[[elements[ei]]])) {
-        media_tag <- tags$a(href = "#",
+      }
+      if (!is.null(rv$element_urls[[elements[ei]]])) {
+        link_tag <- tags$a(href = "#",
           onclick = sprintf("event.preventDefault(); window.open('%s','_blank','width=1000,height=700,scrollbars=yes,resizable=yes');", gsub("'", "\\\\'", rv$element_urls[[elements[ei]]])),
-          style = "font-size: 16px; margin-right: 6px; text-decoration: none; cursor: pointer;",
+          style = "font-size: 14px; margin-left: 4px; text-decoration: none; cursor: pointer;",
           "\U0001F517")
       }
       div(class = "rating-element",
-        div(class = "rating-element-name", media_tag, elements[ei]),
+        div(class = "rating-element-name", img_tag, elements[ei], link_tag),
         div(class = "rating-scale",
           div(class = "rating-scale-track", btns)
         )

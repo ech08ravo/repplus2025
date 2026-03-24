@@ -8,10 +8,17 @@
     "Lemon Crisp": "https://www.arnotts.com/brands/arnotts-biscuits/cream-and-fancy-biscuits",
     "Salada": "https://www.arnotts.com/brands/salada"
   },
+  "element_images": {
+    "Monte Carlo": "https://images.ctfassets.net/qifm0zg3y057/7t2nPrCvelYlhd4fDPt8LP/c2e6acd73fba5d64c635504afd0b73a3/Monte_Carlo__2_.png",
+    "Scotch Finger": "https://images.ctfassets.net/qifm0zg3y057/4oaNMiNW33AfYGZs9G7g1q/219f099e8c9cc446bd6074fea68b9095/Website_-_product_carousel_tiles__44_.png",
+    "Tim Tam": "https://images.ctfassets.net/qifm0zg3y057/7qC8wb0yTFNzxrJsAKSJ3p/a5cb2ac2f4394a1f1474b8359667068f/Tim_Tam_Original.jpg",
+    "Lemon Crisp": "https://images.ctfassets.net/qifm0zg3y057/2u9sXK2SvgGShRPmduT1hl/15fcb5f7edb83bc6985a0ace0c6df931/Lemon_Crisp__1_.png",
+    "Salada": "https://images.ctfassets.net/qifm0zg3y057/5obj5E7ErFgZMmZa48zSz9/1f4f4c15f46e15b44d915e459a358be9/Salada.png"
+  },
   "walkthrough": true,
   "steps": {
     "elements": "These 5 biscuits are your **elements** — the things you'll be comparing. In repertory grid technique, elements are always things in the same category. Here we're using Arnott's biscuits, but you could compare anything: colleagues, cities, software tools, teaching methods.",
-    "triads": "Now we'll show you 3 biscuits at a time. Pick **2 that are similar** and **1 that is different**. Then describe *how* the two are alike and how the odd one out differs. This creates a **construct** — a personal dimension you use to distinguish between things. There are no right answers — your constructs reveal how *you* think. Click the link icon to view the product page in a new window.",
+    "triads": "Now we'll show you 3 biscuits at a time. Pick **2 that are similar** and **1 that is different**. Then describe *how* the two are alike and how the odd one out differs. This creates a **construct** — a personal dimension you use to distinguish between things. There are no right answers — your constructs reveal how *you* think. Click the image to zoom, or the link icon to view the product page.",
     "results": "These are your **personal constructs** — the dimensions you naturally use to think about biscuits. Notice they come in pairs (e.g., 'sweet - savoury'). In Personal Construct Theory (Kelly, 1955), these bipolar dimensions are the building blocks of how you make sense of the world.",
     "rating": "Now rate each biscuit on each of your constructs using the 1-5 scale. A rating of 1 means the biscuit is strongly like the left pole, and 5 means it's strongly like the right pole. Try to use the full range — this gives richer data for analysis.",
     "post_rating": "Here's your first visualisation — a PCA biplot showing how your biscuits relate to each other in your personal construct space. Biscuits plotted close together (e.g., Tim Tam and Lemon Crisp?) are ones you see as similar. The construct arrows show which dimensions drive the differences. Click 'Explore Other Visualisations' to try heatmaps, dendrograms, Focus clustering, and more."
