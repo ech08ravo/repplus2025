@@ -5,7 +5,7 @@ library(uuid)
 library(jsonlite)
 library(igraph)
 
-APP_VERSION <- "2.1.0"
+APP_VERSION <- "2.2.0"
 
 # Security: explicit upload size limit (10MB) and grid limits
 options(shiny.maxRequestSize = 10 * 1024^2)
@@ -43,6 +43,15 @@ ui <- fluidPage(
   tags$head(
         tags$title("WebGrid.Online — Repertory Grid Analysis"),
         tags$script(HTML("
+      Shiny.addCustomMessageHandler('openAnalysis', function(msg) {
+        // Open Analysis sidebar section if collapsed
+        $('.sidebar-toggle.collapsed').each(function() {
+          if ($(this).text().indexOf('Analysis') >= 0) {
+            $(this).next('.sidebar-content').show();
+            $(this).removeClass('collapsed');
+          }
+        });
+      });
       Shiny.addCustomMessageHandler('resetBuildFile', function(msg) {
         removeElementFile('build');
       });
@@ -374,15 +383,38 @@ ui <- fluidPage(
     ')),
     tags$script(HTML('
       Shiny.addCustomMessageHandler("copyToClipboard", function(text) {
-        navigator.clipboard.writeText(text).then(function() {
-          // Show success message
+        function showFeedback(msg) {
           var btn = document.querySelector(".copy-feedback");
           if (btn) {
-            btn.textContent = "Copied! Now paste into Claude.ai";
+            btn.textContent = msg;
             btn.style.display = "inline";
-            setTimeout(function() { btn.style.display = "none"; }, 3000);
+            setTimeout(function() { btn.style.display = "none"; }, 4000);
           }
-        });
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(function() {
+            showFeedback("Copied! Now paste into Claude.ai");
+          }).catch(function() {
+            // Fallback for non-HTTPS
+            var ta = document.createElement("textarea");
+            ta.value = text;
+            ta.style.cssText = "position:fixed;left:-9999px;";
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand("copy");
+            document.body.removeChild(ta);
+            showFeedback("Copied! Now paste into Claude.ai");
+          });
+        } else {
+          var ta = document.createElement("textarea");
+          ta.value = text;
+          ta.style.cssText = "position:fixed;left:-9999px;";
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand("copy");
+          document.body.removeChild(ta);
+          showFeedback("Copied! Now paste into Claude.ai");
+        }
       });
       Shiny.addCustomMessageHandler("clearTextarea", function(id) {
         var el = document.getElementById(id);
@@ -485,10 +517,7 @@ ui <- fluidPage(
       uiOutput("wizard_results_summary"),
       div(class = "continue-btn", style = "margin-top: 24px;",
         uiOutput("wizard_mailto_constructs"),
-        div(style = "margin-top: 12px;",
-          actionButton("results_to_app", "Continue to Rating",
-                       class = "btn-success btn-lg")
-        )
+        uiOutput("results_continue_ui")
       )
     )
   ),
@@ -573,11 +602,11 @@ ui <- fluidPage(
           )
         )
       ),
-      # --- Analysis (collapsible, collapsed by default) ---
+      # --- Analysis (collapsible, open by default) ---
       tags$div(class = "sidebar-section",
-        tags$h4(class = "sidebar-toggle collapsed", onclick = "$(this).next('.sidebar-content').slideToggle(200); $(this).toggleClass('collapsed');",
+        tags$h4(class = "sidebar-toggle", onclick = "$(this).next('.sidebar-content').slideToggle(200); $(this).toggleClass('collapsed');",
           "Analysis ", tags$span(class = "toggle-arrow", "\u25BC")),
-        tags$div(class = "sidebar-content", style = "display: none;",
+        tags$div(class = "sidebar-content",
           uiOutput("analyse_button_ui"),
           div(style = "display: flex; align-items: center; gap: 6px; margin-top: 8px;",
             checkboxInput("impute_missing", "Impute missing", value = FALSE),
@@ -746,14 +775,17 @@ ui <- fluidPage(
             )
           ),
           conditionalPanel(
-            condition = "input.chat_biplot % 2 == 1",
+            condition = "(input.chat_biplot || 0) % 2 == 1",
             div(class = "chat-panel",
               h5("Ask Claude about your PCA Biplot"),
               textInput("chat_biplot_question", "Your question:", placeholder = "e.g., Why are elements A and B so close together?"),
               div(class = "btn-group-chat",
-                actionButton("ask_biplot", "Ask Claude (API)", class = "btn-primary"),
+                actionButton("ask_biplot", "Ask Claude (API)", class = "btn-primary", style = "display:none;"),
                 actionButton("copy_biplot", "Copy to Clipboard", class = "btn-secondary"),
-                tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary", "Open Claude.ai"),
+                tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary btn-sm", "Claude.ai"),
+                tags$a(href = "https://chatgpt.com", target = "_blank", class = "btn btn-outline-secondary btn-sm", "ChatGPT"),
+                tags$a(href = "https://gemini.google.com", target = "_blank", class = "btn btn-outline-secondary btn-sm", "Gemini"),
+                tags$a(href = "https://copilot.microsoft.com", target = "_blank", class = "btn btn-outline-secondary btn-sm", "Copilot"),
                 span(class = "copy-feedback", style = "display:none;")
               ),
               uiOutput("biplot_response")
@@ -824,14 +856,17 @@ ui <- fluidPage(
                    )
                  ),
                  conditionalPanel(
-                   condition = "input.chat_crossplot % 2 == 1",
+                   condition = "(input.chat_crossplot || 0) % 2 == 1",
                    div(class = "chat-panel",
                      h5("Ask Claude about your Crossplot"),
                      textInput("chat_crossplot_question", "Your question:", placeholder = "e.g., Why is element X in that quadrant?"),
                      div(class = "btn-group-chat",
-                       actionButton("ask_crossplot", "Ask Claude (API)", class = "btn-primary"),
+                       actionButton("ask_crossplot", "Ask Claude (API)", class = "btn-primary", style = "display:none;"),
                        actionButton("copy_crossplot", "Copy to Clipboard", class = "btn-secondary"),
-                       tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary", "Open Claude.ai"),
+                       tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary btn-sm", "Claude.ai"),
+                tags$a(href = "https://chatgpt.com", target = "_blank", class = "btn btn-outline-secondary btn-sm", "ChatGPT"),
+                tags$a(href = "https://gemini.google.com", target = "_blank", class = "btn btn-outline-secondary btn-sm", "Gemini"),
+                tags$a(href = "https://copilot.microsoft.com", target = "_blank", class = "btn btn-outline-secondary btn-sm", "Copilot"),
                        span(class = "copy-feedback", style = "display:none;")
                      ),
                      uiOutput("crossplot_response")
@@ -896,14 +931,17 @@ ui <- fluidPage(
                    )
                  ),
                  conditionalPanel(
-                   condition = "input.chat_synopsis % 2 == 1",
+                   condition = "(input.chat_synopsis || 0) % 2 == 1",
                    div(class = "chat-panel",
                      h5("Ask Claude about your Synopsis"),
                      textInput("chat_synopsis_question", "Your question:", placeholder = "e.g., Why is my distribution skewed?"),
                      div(class = "btn-group-chat",
-                       actionButton("ask_synopsis", "Ask Claude (API)", class = "btn-primary"),
+                       actionButton("ask_synopsis", "Ask Claude (API)", class = "btn-primary", style = "display:none;"),
                        actionButton("copy_synopsis", "Copy to Clipboard", class = "btn-secondary"),
-                       tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary", "Open Claude.ai"),
+                       tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary btn-sm", "Claude.ai"),
+                tags$a(href = "https://chatgpt.com", target = "_blank", class = "btn btn-outline-secondary btn-sm", "ChatGPT"),
+                tags$a(href = "https://gemini.google.com", target = "_blank", class = "btn btn-outline-secondary btn-sm", "Gemini"),
+                tags$a(href = "https://copilot.microsoft.com", target = "_blank", class = "btn btn-outline-secondary btn-sm", "Copilot"),
                        span(class = "copy-feedback", style = "display:none;")
                      ),
                      uiOutput("synopsis_response")
@@ -959,14 +997,17 @@ ui <- fluidPage(
                    )
                  ),
                  conditionalPanel(
-                   condition = "input.chat_heatmap % 2 == 1",
+                   condition = "(input.chat_heatmap || 0) % 2 == 1",
                    div(class = "chat-panel",
                      h5("Ask Claude about your Heatmap"),
                      textInput("chat_heatmap_question", "Your question:", placeholder = "e.g., Why does this row look different?"),
                      div(class = "btn-group-chat",
-                       actionButton("ask_heatmap", "Ask Claude (API)", class = "btn-primary"),
+                       actionButton("ask_heatmap", "Ask Claude (API)", class = "btn-primary", style = "display:none;"),
                        actionButton("copy_heatmap", "Copy to Clipboard", class = "btn-secondary"),
-                       tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary", "Open Claude.ai"),
+                       tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary btn-sm", "Claude.ai"),
+                tags$a(href = "https://chatgpt.com", target = "_blank", class = "btn btn-outline-secondary btn-sm", "ChatGPT"),
+                tags$a(href = "https://gemini.google.com", target = "_blank", class = "btn btn-outline-secondary btn-sm", "Gemini"),
+                tags$a(href = "https://copilot.microsoft.com", target = "_blank", class = "btn btn-outline-secondary btn-sm", "Copilot"),
                        span(class = "copy-feedback", style = "display:none;")
                      ),
                      uiOutput("heatmap_response")
@@ -1002,14 +1043,17 @@ ui <- fluidPage(
                      )
                    ),
                    conditionalPanel(
-                     condition = "input.chat_dend_elem % 2 == 1",
+                     condition = "(input.chat_dend_elem || 0) % 2 == 1",
                      div(class = "chat-panel",
                        h5("Ask Claude about your Element Dendrogram"),
                        textInput("chat_dend_elem_question", "Your question:", placeholder = "e.g., Why do A and B cluster together?"),
                        div(class = "btn-group-chat",
-                         actionButton("ask_dend_elem", "Ask Claude (API)", class = "btn-primary"),
+                         actionButton("ask_dend_elem", "Ask Claude (API)", class = "btn-primary", style = "display:none;"),
                          actionButton("copy_dend_elem", "Copy to Clipboard", class = "btn-secondary"),
-                         tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary", "Open Claude.ai"),
+                         tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary btn-sm", "Claude.ai"),
+                tags$a(href = "https://chatgpt.com", target = "_blank", class = "btn btn-outline-secondary btn-sm", "ChatGPT"),
+                tags$a(href = "https://gemini.google.com", target = "_blank", class = "btn btn-outline-secondary btn-sm", "Gemini"),
+                tags$a(href = "https://copilot.microsoft.com", target = "_blank", class = "btn btn-outline-secondary btn-sm", "Copilot"),
                          span(class = "copy-feedback", style = "display:none;")
                        ),
                        uiOutput("dend_elem_response")
@@ -1043,14 +1087,17 @@ ui <- fluidPage(
                      )
                    ),
                    conditionalPanel(
-                     condition = "input.chat_dend_const % 2 == 1",
+                     condition = "(input.chat_dend_const || 0) % 2 == 1",
                      div(class = "chat-panel",
                        h5("Ask Claude about your Construct Dendrogram"),
                        textInput("chat_dend_const_question", "Your question:", placeholder = "e.g., Are these constructs redundant?"),
                        div(class = "btn-group-chat",
-                         actionButton("ask_dend_const", "Ask Claude (API)", class = "btn-primary"),
+                         actionButton("ask_dend_const", "Ask Claude (API)", class = "btn-primary", style = "display:none;"),
                          actionButton("copy_dend_const", "Copy to Clipboard", class = "btn-secondary"),
-                         tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary", "Open Claude.ai"),
+                         tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary btn-sm", "Claude.ai"),
+                tags$a(href = "https://chatgpt.com", target = "_blank", class = "btn btn-outline-secondary btn-sm", "ChatGPT"),
+                tags$a(href = "https://gemini.google.com", target = "_blank", class = "btn btn-outline-secondary btn-sm", "Gemini"),
+                tags$a(href = "https://copilot.microsoft.com", target = "_blank", class = "btn btn-outline-secondary btn-sm", "Copilot"),
                          span(class = "copy-feedback", style = "display:none;")
                        ),
                        uiOutput("dend_const_response")
@@ -1195,14 +1242,17 @@ ui <- fluidPage(
                    )
                  ),
                  conditionalPanel(
-                   condition = "input.chat_focus % 2 == 1",
+                   condition = "(input.chat_focus || 0) % 2 == 1",
                    div(class = "chat-panel",
                      h5("Ask Claude about your Focus Cluster Analysis"),
                      textInput("chat_focus_question", "Your question:", placeholder = "e.g., What does this cluster pattern mean?"),
                      div(class = "btn-group-chat",
-                       actionButton("ask_focus", "Ask Claude (API)", class = "btn-primary"),
+                       actionButton("ask_focus", "Ask Claude (API)", class = "btn-primary", style = "display:none;"),
                        actionButton("copy_focus", "Copy to Clipboard", class = "btn-secondary"),
-                       tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary", "Open Claude.ai"),
+                       tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary btn-sm", "Claude.ai"),
+                tags$a(href = "https://chatgpt.com", target = "_blank", class = "btn btn-outline-secondary btn-sm", "ChatGPT"),
+                tags$a(href = "https://gemini.google.com", target = "_blank", class = "btn btn-outline-secondary btn-sm", "Gemini"),
+                tags$a(href = "https://copilot.microsoft.com", target = "_blank", class = "btn btn-outline-secondary btn-sm", "Copilot"),
                        span(class = "copy-feedback", style = "display:none;")
                      ),
                      uiOutput("focus_response")
@@ -1260,14 +1310,17 @@ ui <- fluidPage(
                    )
                  ),
                  conditionalPanel(
-                   condition = "input.chat_stats % 2 == 1",
+                   condition = "(input.chat_stats || 0) % 2 == 1",
                    div(class = "chat-panel",
                      h5("Ask Claude about your Statistics"),
                      textInput("chat_stats_question", "Your question:", placeholder = "e.g., Why is this element's SD so high?"),
                      div(class = "btn-group-chat",
-                       actionButton("ask_stats", "Ask Claude (API)", class = "btn-primary"),
+                       actionButton("ask_stats", "Ask Claude (API)", class = "btn-primary", style = "display:none;"),
                        actionButton("copy_stats", "Copy to Clipboard", class = "btn-secondary"),
-                       tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary", "Open Claude.ai"),
+                       tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary btn-sm", "Claude.ai"),
+                tags$a(href = "https://chatgpt.com", target = "_blank", class = "btn btn-outline-secondary btn-sm", "ChatGPT"),
+                tags$a(href = "https://gemini.google.com", target = "_blank", class = "btn btn-outline-secondary btn-sm", "Gemini"),
+                tags$a(href = "https://copilot.microsoft.com", target = "_blank", class = "btn btn-outline-secondary btn-sm", "Copilot"),
                        span(class = "copy-feedback", style = "display:none;")
                      ),
                      uiOutput("stats_response")
@@ -1891,14 +1944,14 @@ server <- function(input, output, session) {
   })
 
   # Landing page state
-  landing <- reactiveValues(step = "elements")
+  landing <- reactiveValues(step = "done")
   walkthrough <- reactiveValues(active = FALSE, steps = list())
 
   # Check URL query parameters on startup
   observe({
     query <- parseQueryString(session$clientData$url_search)
-    if (!is.null(query$mode) && query$mode == "full") {
-      landing$step <- "done"
+    if (!is.null(query$mode) && query$mode == "simple") {
+      landing$step <- "elements"
     }
   }) |> bindEvent(session$clientData$url_search, once = TRUE)
 
@@ -2333,10 +2386,17 @@ server <- function(input, output, session) {
         }
       }
     }
-    # Can't do PCA on constant matrix - add small jitter
-    if (sd(sm) == 0) sm <- sm + matrix(
-      rnorm(n_e * n_c, 0, 0.1), nrow = n_e)
-    pc <- prcomp(sm, scale. = TRUE)
+    # Remove zero-variance columns and handle constant matrix
+    col_vars <- apply(sm, 2, var, na.rm = TRUE)
+    if (any(col_vars == 0, na.rm = TRUE)) {
+      sm <- sm[, col_vars > 0, drop = FALSE]
+    }
+    if (ncol(sm) < 2) {
+      plot.new(); text(0.5, 0.5, "Need more varied ratings for PCA.", cex = 1.2); return()
+    }
+    if (sd(sm) == 0) sm <- sm + matrix(rnorm(nrow(sm) * ncol(sm), 0, 0.1), nrow = nrow(sm))
+    pc <- tryCatch(prcomp(sm, scale. = TRUE), error = function(e) NULL)
+    if (is.null(pc)) { plot.new(); text(0.5, 0.5, "PCA failed. Try varying your ratings more.", cex = 1.2); return() }
     ex <- pc$x[, 1:min(2, ncol(pc$x))]
     if (is.null(dim(ex))) return()
     load <- cor(sm, pc$x)[, 1:min(2, ncol(pc$x))]
@@ -2392,6 +2452,24 @@ server <- function(input, output, session) {
   # Results page: go to rating step
   observeEvent(input$results_to_app, {
     landing$step <- "rating"
+  })
+
+  # Results page: dynamic continue/back buttons
+  output$results_continue_ui <- renderUI({
+    n_const <- if (is.data.frame(rv$constructs)) nrow(rv$constructs) else 0
+    if (n_const >= 2) {
+      div(style = "margin-top: 12px;",
+        actionButton("results_to_app", "Continue to Rating", class = "btn-success btn-lg")
+      )
+    } else {
+      div(style = "margin-top: 12px;",
+        p(style = "color: #dc3545; font-weight: 600;",
+          if (n_const == 0) "You need at least 2 constructs to continue. Go back and compare some triads."
+          else "You need at least 2 constructs to continue. Go back and add one more."
+        ),
+        actionButton("results_back", "Go Back to Triads", class = "btn-warning btn-lg")
+      )
+    }
   })
 
   # Results page: go back to add more constructs
@@ -2478,8 +2556,12 @@ server <- function(input, output, session) {
           }
         }
       }
-      if (sd(sm) == 0) sm <- sm + matrix(rnorm(n_e * n_c, 0, 0.1), nrow = n_e)
-      pc <- prcomp(sm, scale. = TRUE)
+      col_vars <- apply(sm, 2, var, na.rm = TRUE)
+      if (any(col_vars == 0, na.rm = TRUE)) sm <- sm[, col_vars > 0, drop = FALSE]
+      if (ncol(sm) < 2) { plot.new(); text(0.5, 0.5, "Need more varied ratings.", cex = 1.2); return() }
+      if (sd(sm) == 0) sm <- sm + matrix(rnorm(nrow(sm) * ncol(sm), 0, 0.1), nrow = nrow(sm))
+      pc <- tryCatch(prcomp(sm, scale. = TRUE), error = function(e) NULL)
+      if (is.null(pc)) { plot.new(); text(0.5, 0.5, "PCA failed.", cex = 1.2); return() }
       ex <- pc$x[, 1:min(2, ncol(pc$x))]
       load <- cor(sm, pc$x)[, 1:min(2, ncol(pc$x))]
       par(mar = c(4, 4, 2, 2))
@@ -2739,6 +2821,8 @@ server <- function(input, output, session) {
       rating = c(3, 2, 5, 4, 3, 5, 4, 3, 1),
       stringsAsFactors = FALSE
     )
+    # Open the Analysis sidebar section
+    session$sendCustomMessage("openAnalysis", TRUE)
   })
 
   # Add element / construct / rating
@@ -3604,6 +3688,7 @@ server <- function(input, output, session) {
                  nrow(rv$ratings), " ratings from JSON"),
           type = "message"
         )
+        session$sendCustomMessage("openAnalysis", TRUE)
 
       } else if (file_ext == "rgrid") {
         # Import .rgrid format
@@ -3747,6 +3832,7 @@ server <- function(input, output, session) {
     rv$imputed_last <- imputed
 
     showNotification("Analysis complete!", type = "message", duration = 2)
+    updateTabsetPanel(session, "main_tabs", selected = "Biplot")
     }, error = function(e) {
       showNotification(paste("Analysis error:", e$message), type = "error")
     })
@@ -3806,7 +3892,7 @@ server <- function(input, output, session) {
     # Offset overlapping element labels
     el_pos <- rep(3, nrow(ex))
     pos_cycle <- c(3, 4, 1, 2)
-    thresh <- diff(range(xlim)) * 0.08
+    thresh <- diff(range(xlim)) * 0.15
     for (i in seq_len(nrow(ex))) {
       for (j in seq_len(i - 1)) {
         d <- sqrt(sum((ex[i, ] - ex[j, ])^2))
@@ -3817,15 +3903,18 @@ server <- function(input, output, session) {
     }
     # Scale text down when many elements/constructs overlap
     n_items <- nrow(ex) + nrow(load)
-    label_scale <- if (n_items > 10) 0.8 else if (n_items > 7) 0.9 else 1.0
+    label_scale <- if (n_items > 10) 0.65 else if (n_items > 7) 0.75 else if (n_items > 4) 0.85 else 1.0
     text(ex, labels = rv$elements, pos = el_pos,
          col = colors$element, cex = txt_size * label_scale, font = 2)
 
-    # PrinGrid format: draw lines through origin with both poles labeled
+    # PrinGrid format: draw lines through origin with arrowhead toward right pole
     for (i in 1:nrow(load)) {
-      lines(c(-load[i, 1], load[i, 1]), c(-load[i, 2], load[i, 2]),
+      # Line from left pole to origin
+      lines(c(-load[i, 1], 0), c(-load[i, 2], 0),
             col = colors$construct, lwd = 2)
-      points(load[i, 1], load[i, 2], pch = 4, col = colors$construct, cex = 0.8)
+      # Arrow from origin to right pole
+      arrows(0, 0, load[i, 1], load[i, 2],
+             col = colors$construct, lwd = 2, length = 0.12)
       points(-load[i, 1], -load[i, 2], pch = 4, col = colors$construct, cex = 0.8)
     }
 
@@ -3976,7 +4065,11 @@ server <- function(input, output, session) {
     content = function(file) {
       req(rv$scores_mat_last)
       sm <- rv$scores_mat_last
-      pc <- prcomp(sm, scale. = TRUE)
+      col_vars <- apply(sm, 2, var, na.rm = TRUE)
+      if (any(col_vars == 0, na.rm = TRUE)) sm <- sm[, col_vars > 0, drop = FALSE]
+      req(ncol(sm) >= 2)
+      pc <- tryCatch(prcomp(sm, scale. = TRUE), error = function(e) NULL)
+      req(pc)
       ex <- pc$x[, 1:2]
       load <- cor(sm, pc$x)[, 1:2]
       colors <- get_palette_colors(input$biplot_palette)
@@ -3987,7 +4080,7 @@ server <- function(input, output, session) {
       xlim <- c(x_range[1] - x_expand, x_range[2] + x_expand)
       ylim <- c(y_range[1] - y_expand, y_range[2] + y_expand)
       n_items <- nrow(ex) + nrow(load)
-      label_scale <- if (n_items > 10) 0.8 else if (n_items > 7) 0.9 else 1.0
+      label_scale <- if (n_items > 10) 0.65 else if (n_items > 7) 0.75 else if (n_items > 4) 0.85 else 1.0
       png(file, width = 1200, height = 900, res = 120)
       par(mar = c(4, 6, 2, 6), cex.axis = txt_size, cex.lab = txt_size * 1.1)
       plot(ex, type = "n", xlab = "PC1", ylab = "PC2", xlim = xlim, ylim = ylim)
@@ -4194,6 +4287,7 @@ server <- function(input, output, session) {
     req(rv$scores_mat_last)
     req(input$crossplot_x, input$crossplot_y)
 
+    tryCatch({
     sm <- rv$scores_mat_last
     construct_labels <- paste(rv$constructs$left, "-", rv$constructs$right)
 
@@ -4296,6 +4390,9 @@ server <- function(input, output, session) {
 
     # Add box around plot
     box()
+    }, error = function(e) {
+      plot.new(); text(0.5, 0.5, paste("Crossplot error:", e$message), cex = 0.9)
+    })
   })
 
   output$download_crossplot <- downloadHandler(
@@ -4478,8 +4575,13 @@ server <- function(input, output, session) {
       }
 
     } else if (input$synopsis_type == "scree") {
-      # Scree plot
-      pca_result <- prcomp(sm, scale. = TRUE)
+      # Scree plot - remove zero-variance columns
+      sm_pca <- sm
+      col_vars <- apply(sm_pca, 2, var, na.rm = TRUE)
+      if (any(col_vars == 0, na.rm = TRUE)) sm_pca <- sm_pca[, col_vars > 0, drop = FALSE]
+      if (ncol(sm_pca) < 2) { plot.new(); text(0.5, 0.5, "Need more varied ratings for scree plot.", cex = 1.2); return() }
+      pca_result <- tryCatch(prcomp(sm_pca, scale. = TRUE), error = function(e) NULL)
+      if (is.null(pca_result)) { plot.new(); text(0.5, 0.5, "PCA failed.", cex = 1.2); return() }
       variance_explained <- (pca_result$sdev^2) / sum(pca_result$sdev^2) * 100
       cumulative_var <- cumsum(variance_explained)
 
@@ -4590,7 +4692,12 @@ server <- function(input, output, session) {
         }
 
       } else if (input$synopsis_type == "scree") {
-        pca_result <- prcomp(sm, scale. = TRUE)
+        sm_pca <- sm
+        col_vars <- apply(sm_pca, 2, var, na.rm = TRUE)
+        if (any(col_vars == 0, na.rm = TRUE)) sm_pca <- sm_pca[, col_vars > 0, drop = FALSE]
+        if (ncol(sm_pca) < 2) return()
+        pca_result <- tryCatch(prcomp(sm_pca, scale. = TRUE), error = function(e) NULL)
+        if (is.null(pca_result)) return()
         variance_explained <- (pca_result$sdev^2) / sum(pca_result$sdev^2) * 100
         cumulative_var <- cumsum(variance_explained)
 
