@@ -61,7 +61,7 @@ compute_grid_match <- function(grid_a, grid_b, common_elements, power = 1.0) {
   )
 }
 
-#' Compute directional match from grid A's constructs to grid B
+#' Compute directional match from grid A's constructs to grid B (vectorised)
 #' @param mat_a Matrix of ratings for grid A (common elements x constructs)
 #' @param mat_b Matrix of ratings for grid B (common elements x constructs)
 #' @param power Minkowski power
@@ -73,37 +73,30 @@ compute_directional_match <- function(mat_a, mat_b, power, max_distance) {
 
   if (n_constructs_a == 0 || n_constructs_b == 0) return(NA)
 
-  # For each construct in A, find the best-matching construct in B
+  # Vectorised: For each construct in A, compute distances to all constructs in B
+  scale_mid <- (max(mat_b, na.rm = TRUE) + min(mat_b, na.rm = TRUE)) / 2
+
   best_matches <- numeric(n_constructs_a)
 
   for (i in seq_len(n_constructs_a)) {
     construct_a <- mat_a[, i]
-    best_match <- 0
 
-    for (j in seq_len(n_constructs_b)) {
-      construct_b <- mat_b[, j]
+    # Normal orientation: distance between construct_a and each construct in B
+    diff_normal <- abs(construct_a - mat_b)
+    diff_normal[is.na(diff_normal)] <- 0
+    dist_normal <- colSums(diff_normal^power)^(1/power)
 
-      # Try normal orientation
-      diff_normal <- abs(construct_a - construct_b)
-      diff_normal <- diff_normal[!is.na(diff_normal)]
+    # Reversed orientation: flip constructs in B around midpoint
+    mat_b_rev <- 2 * scale_mid - mat_b
+    diff_reversed <- abs(construct_a - mat_b_rev)
+    diff_reversed[is.na(diff_reversed)] <- 0
+    dist_reversed <- colSums(diff_reversed^power)^(1/power)
 
-      # Try reversed orientation (flip construct B around midpoint)
-      scale_mid <- (max(mat_b, na.rm = TRUE) + min(mat_b, na.rm = TRUE)) / 2
-      construct_b_rev <- 2 * scale_mid - construct_b
-      diff_reversed <- abs(construct_a - construct_b_rev)
-      diff_reversed <- diff_reversed[!is.na(diff_reversed)]
-
-      if (length(diff_normal) > 0) {
-        dist_normal <- sum(diff_normal^power)^(1/power)
-        dist_reversed <- sum(diff_reversed^power)^(1/power)
-
-        # Use better match
-        distance <- min(dist_normal, dist_reversed)
-        similarity <- max(0, 100 * (1 - distance / max_distance))
-        best_match <- max(best_match, similarity)
-      }
-    }
-    best_matches[i] <- best_match
+    # Use better match (lower distance) for each pair
+    distances <- pmin(dist_normal, dist_reversed)
+    # Convert distances to similarities and find best
+    similarities <- pmax(0, 100 * (1 - distances / max_distance))
+    best_matches[i] <- max(similarities)
   }
 
   # Average of best matches for all constructs in A
@@ -147,7 +140,7 @@ compute_match_matrix <- function(grids, common_elements = NULL, power = 1.0) {
   match_mat
 }
 
-#' Find similar constructs between two grids
+#' Find similar constructs between two grids (vectorised)
 #' @param grid_a First grid object
 #' @param grid_b Second grid object
 #' @param common_elements Elements to compare on
@@ -178,55 +171,51 @@ find_similar_constructs <- function(grid_a, grid_b, common_elements,
   if (!is.null(grid_b$scale)) mat_b <- normalize_scale(mat_b, grid_b$scale, target_scale)
 
   scale_range <- target_scale[2] - target_scale[1]
+  scale_mid <- (target_scale[1] + target_scale[2]) / 2
   max_distance <- length(common_elements) * scale_range
 
   # Construct labels
   labels_a <- paste(grid_a$constructs$left, "-", grid_a$constructs$right)
   labels_b <- paste(grid_b$constructs$left, "-", grid_b$constructs$right)
 
-  results <- list()
+  # Vectorised: for each construct in A, compute distances to all constructs in B
+  results_list <- list()
 
   for (i in seq_len(ncol(mat_a))) {
-    for (j in seq_len(ncol(mat_b))) {
-      construct_a <- mat_a[, i]
-      construct_b <- mat_b[, j]
+    construct_a <- mat_a[, i]
 
-      # Normal orientation
-      diff_normal <- abs(construct_a - construct_b)
-      diff_normal <- diff_normal[!is.na(diff_normal)]
+    # Normal orientation
+    diff_normal <- abs(construct_a - mat_b)
+    diff_normal[is.na(diff_normal)] <- 0
+    dist_normal <- colSums(diff_normal^power)^(1/power)
 
-      # Reversed orientation
-      scale_mid <- (target_scale[1] + target_scale[2]) / 2
-      construct_b_rev <- 2 * scale_mid - construct_b
-      diff_reversed <- abs(construct_a - construct_b_rev)
-      diff_reversed <- diff_reversed[!is.na(diff_reversed)]
+    # Reversed orientation
+    mat_b_rev <- 2 * scale_mid - mat_b
+    diff_reversed <- abs(construct_a - mat_b_rev)
+    diff_reversed[is.na(diff_reversed)] <- 0
+    dist_reversed <- colSums(diff_reversed^power)^(1/power)
 
-      if (length(diff_normal) > 0) {
-        dist_normal <- sum(diff_normal^power)^(1/power)
-        dist_reversed <- sum(diff_reversed^power)^(1/power)
+    # Choose better match and compute similarities
+    reversed_vec <- dist_reversed < dist_normal
+    distances <- pmin(dist_normal, dist_reversed)
+    similarities <- pmax(0, 100 * (1 - distances / max_distance))
 
-        if (dist_normal <= dist_reversed) {
-          similarity <- max(0, 100 * (1 - dist_normal / max_distance))
-          reversed <- FALSE
-        } else {
-          similarity <- max(0, 100 * (1 - dist_reversed / max_distance))
-          reversed <- TRUE
-        }
-
-        if (similarity >= cutoff) {
-          results[[length(results) + 1]] <- data.frame(
-            construct_a = labels_a[i],
-            construct_b = labels_b[j],
-            similarity = round(similarity, 1),
-            reversed = reversed,
-            stringsAsFactors = FALSE
-          )
-        }
+    # Filter by cutoff and collect results
+    above_cutoff <- which(similarities >= cutoff)
+    if (length(above_cutoff) > 0) {
+      for (j in above_cutoff) {
+        results_list[[length(results_list) + 1]] <- data.frame(
+          construct_a = labels_a[i],
+          construct_b = labels_b[j],
+          similarity = round(similarities[j], 1),
+          reversed = reversed_vec[j],
+          stringsAsFactors = FALSE
+        )
       }
     }
   }
 
-  if (length(results) == 0) {
+  if (length(results_list) == 0) {
     return(data.frame(
       construct_a = character(),
       construct_b = character(),
@@ -236,7 +225,7 @@ find_similar_constructs <- function(grid_a, grid_b, common_elements,
     ))
   }
 
-  result_df <- do.call(rbind, results)
+  result_df <- do.call(rbind, results_list)
   result_df[order(-result_df$similarity), ]
 }
 

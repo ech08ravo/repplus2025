@@ -1,61 +1,68 @@
 # Focus clustering analysis functions
 # Based on Shaw (1980) FOCUS algorithm from RepGrid manual
 
-#' Compute element-element similarity matrix
+#' Compute element-element similarity matrix (vectorised)
 compute_element_similarities <- function(scores_matrix, power = 1.0) {
   n_elements <- nrow(scores_matrix)
   sim_matrix <- matrix(0, nrow = n_elements, ncol = n_elements)
-  
+
+  # Diagonal = 100 (perfect match with self)
+  diag(sim_matrix) <- 100
+
+  # Vectorised computation of pairwise Minkowski distances
+  # For each element i, compute distance to all other elements j
+  scale_range <- max(scores_matrix, na.rm = TRUE) - min(scores_matrix, na.rm = TRUE)
+  n_constructs <- ncol(scores_matrix)
+  max_distance <- n_constructs * scale_range
+
+  # Vectorise pairwise comparison using outer product on each construct
+  # Then aggregate across constructs using Minkowski power
   for (i in 1:n_elements) {
-    for (j in 1:n_elements) {
-      if (i == j) {
-        sim_matrix[i, j] <- 100
-      } else {
-        # Minkowski distance with specified power
-        diff_vec <- abs(scores_matrix[i, ] - scores_matrix[j, ])
-        diff_vec <- diff_vec[!is.na(diff_vec)]
-        if (length(diff_vec) > 0) {
-          distance <- sum(diff_vec^power)^(1/power)
-          max_distance <- length(diff_vec) * (max(scores_matrix, na.rm = TRUE) - min(scores_matrix, na.rm = TRUE))
-          similarity <- max(0, 100 * (1 - distance / max_distance))
-          sim_matrix[i, j] <- similarity
-        }
-      }
-    }
+    diff_mat <- abs(scores_matrix[i, , drop = FALSE] - scores_matrix)
+    # Remove NAs for distance calculation
+    diff_mat[is.na(diff_mat)] <- 0
+    # Compute Minkowski distances: sum of absolute differences raised to power
+    distances <- colSums(diff_mat^power)^(1/power)
+    # Convert to similarity (0-100)
+    sim_matrix[i, -i] <- pmax(0, 100 * (1 - distances[-i] / max_distance))
   }
+
   sim_matrix
 }
 
-#' Compute construct-construct similarity matrix  
+#' Compute construct-construct similarity matrix (vectorised)
 compute_construct_similarities <- function(scores_matrix, power = 1.0) {
   n_constructs <- ncol(scores_matrix)
   sim_matrix <- matrix(0, nrow = n_constructs, ncol = n_constructs)
-  
+
+  # Diagonal = 100 (perfect match with self)
+  diag(sim_matrix) <- 100
+
+  # Vectorised computation: construct i vs all other constructs j
+  scale_range <- max(scores_matrix, na.rm = TRUE) - min(scores_matrix, na.rm = TRUE)
+  scale_mid <- (max(scores_matrix, na.rm = TRUE) + min(scores_matrix, na.rm = TRUE)) / 2
+  n_elements <- nrow(scores_matrix)
+  max_distance <- n_elements * scale_range
+
   for (i in 1:n_constructs) {
-    for (j in 1:n_constructs) {
-      if (i == j) {
-        sim_matrix[i, j] <- 100
-      } else {
-        # Try both normal and reversed construct
-        diff_normal <- abs(scores_matrix[, i] - scores_matrix[, j])
-        diff_reversed <- abs(scores_matrix[, i] - (max(scores_matrix, na.rm = TRUE) + min(scores_matrix, na.rm = TRUE) - scores_matrix[, j]))
-        
-        diff_normal <- diff_normal[!is.na(diff_normal)]
-        diff_reversed <- diff_reversed[!is.na(diff_reversed)]
-        
-        if (length(diff_normal) > 0) {
-          dist_normal <- sum(diff_normal^power)^(1/power)
-          dist_reversed <- sum(diff_reversed^power)^(1/power)
-          
-          # Use the better match (normal or reversed)
-          distance <- min(dist_normal, dist_reversed)
-          max_distance <- length(diff_normal) * (max(scores_matrix, na.rm = TRUE) - min(scores_matrix, na.rm = TRUE))
-          similarity <- max(0, 100 * (1 - distance / max_distance))
-          sim_matrix[i, j] <- similarity
-        }
-      }
-    }
+    construct_i <- scores_matrix[, i]
+    # Normal orientation: direct differences
+    diff_normal <- abs(construct_i - scores_matrix)
+    diff_normal[is.na(diff_normal)] <- 0
+    dist_normal <- colSums(diff_normal^power)^(1/power)
+
+    # Reversed orientation: flip construct around midpoint
+    construct_i_rev <- 2 * scale_mid - construct_i
+    diff_reversed <- abs(construct_i_rev - scores_matrix)
+    diff_reversed[is.na(diff_reversed)] <- 0
+    dist_reversed <- colSums(diff_reversed^power)^(1/power)
+
+    # Use the better match (lower distance) for each pair
+    distances <- pmin(dist_normal, dist_reversed)
+    # Convert to similarity (0-100), preserving diagonal
+    sim_matrix[i, -i] <- pmax(0, 100 * (1 - distances[-i] / max_distance))
   }
+
   sim_matrix
 }
 

@@ -40,6 +40,7 @@ source("R/claude_api.R")
 source("R/multigrid_analysis.r")
 
 ui <- fluidPage(
+  lang = "en",
   tags$head(
         tags$title("WebGrid.Online — Repertory Grid Analysis"),
         tags$script(HTML("
@@ -380,6 +381,9 @@ ui <- fluidPage(
       .wizard-buttons { margin-top: 24px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
       .triad-instruction { background: #fff3cd; padding: 10px 14px; border-radius: 6px; border: 1px solid #ffc107; font-size: 13px; margin-bottom: 16px; }
       .triad-wizard .instruction-text { background: #fff3cd; padding: 10px 14px; border-radius: 6px; border: 1px solid #ffc107; font-size: 13px; margin-bottom: 16px; }
+      .skip-to-main { position: absolute; top: -40px; left: 0; background: #000; color: #fff; padding: 8px 12px; text-decoration: none; z-index: 100; }
+      .skip-to-main:focus { top: 0; }
+      *:focus { outline: 2px solid #0072B2; outline-offset: 2px; }
     ')),
     tags$script(HTML('
       Shiny.addCustomMessageHandler("copyToClipboard", function(text) {
@@ -428,15 +432,28 @@ ui <- fluidPage(
         if (btn) btn.click();
       });
       Shiny.addCustomMessageHandler("scrollToElement", function(id) {
-        var el = document.getElementById(id);
-        if (el) {
-          el.scrollIntoView({ behavior: "smooth", block: "start" });
-        }
+        scrollToElement(id);
       });
-      $(document).on("click", ".help-btn", function() { $(this).toggleClass("active-help"); });
-      $(document).on("click", ".chat-btn", function() { $(this).toggleClass("active-chat"); });
+      $(document).on("click", ".help-btn", function() {
+        $(this).toggleClass("active-help");
+        var isExpanded = $(this).hasClass("active-help");
+        $(this).attr("aria-expanded", isExpanded ? "true" : "false");
+      });
+      $(document).on("click", ".chat-btn", function() {
+        $(this).toggleClass("active-chat");
+        var isExpanded = $(this).hasClass("active-chat");
+        $(this).attr("aria-expanded", isExpanded ? "true" : "false");
+      });
+      // Respect prefers-reduced-motion on smooth scrolling
+      function scrollToElement(id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        var prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        el.scrollIntoView({ behavior: prefersReduced ? "auto" : "smooth", block: "start" });
+      }
     '))
   ),
+  tags$a(href = "#main_content", class = "skip-to-main", "Skip to main content"),
   titlePanel(div(style = "display: flex; align-items: baseline; gap: 10px;",
     "WebGrid.Online",
     tags$small(style = "font-size: 12px; color: #999;", paste0("v", APP_VERSION))
@@ -739,8 +756,8 @@ ui <- fluidPage(
                         onclick = "popoutPlot('pca_biplot', 'PCA Biplot')",
                         "\U0001F5D7 Pop Out"),
             downloadButton("download_biplot_png", "Download PNG", class = "btn-outline-secondary btn-sm"),
-            actionButton("help_biplot", "Help me understand this visualisation", class = "btn-info help-btn"),
-            actionButton("chat_biplot", "Chat about this data", class = "btn-success chat-btn")
+            actionButton("help_biplot", "Help me understand this visualisation", class = "btn-info help-btn", `aria-label` = "Show/hide help for biplot visualization", `aria-expanded` = "false"),
+            actionButton("chat_biplot", "Chat about this data", class = "btn-success chat-btn", `aria-label` = "Show/hide chat panel for biplot data", `aria-expanded` = "false")
           ),
           conditionalPanel(
             condition = "input.help_biplot % 2 == 1",
@@ -831,8 +848,8 @@ ui <- fluidPage(
                                onclick = "popoutPlot('crossplot_plot', 'Crossplot')",
                                "\U0001F5D7 Pop Out"),
                    downloadButton("download_crossplot_png", "Download PNG", class = "btn-outline-secondary btn-sm"),
-                   actionButton("help_crossplot", "Help me understand this visualisation", class = "btn-info help-btn"),
-                   actionButton("chat_crossplot", "Chat about this data", class = "btn-success chat-btn")
+                   actionButton("help_crossplot", "Help me understand this visualisation", class = "btn-info help-btn", `aria-label` = "Show/hide help for crossplot visualization", `aria-expanded` = "false"),
+                   actionButton("chat_crossplot", "Chat about this data", class = "btn-success chat-btn", `aria-label` = "Show/hide chat panel for crossplot data", `aria-expanded` = "false")
                  ),
                  conditionalPanel(
                    condition = "input.help_crossplot % 2 == 1",
@@ -905,8 +922,8 @@ ui <- fluidPage(
                                onclick = "popoutPlot('synopsis_plot', 'Synopsis')",
                                "\U0001F5D7 Pop Out"),
                    downloadButton("download_synopsis_png", "Download PNG", class = "btn-outline-secondary btn-sm"),
-                   actionButton("help_synopsis", "Help me understand this visualisation", class = "btn-info help-btn"),
-                   actionButton("chat_synopsis", "Chat about this data", class = "btn-success chat-btn")
+                   actionButton("help_synopsis", "Help me understand this visualisation", class = "btn-info help-btn", `aria-label` = "Show/hide help for synopsis visualization", `aria-expanded` = "false"),
+                   actionButton("chat_synopsis", "Chat about this data", class = "btn-success chat-btn", `aria-label` = "Show/hide chat panel for synopsis data", `aria-expanded` = "false")
                  ),
                  conditionalPanel(
                    condition = "input.help_synopsis % 2 == 1",
@@ -971,8 +988,8 @@ ui <- fluidPage(
                                onclick = "popoutPlot('heatmap_plot', 'Heatmap')",
                                "\U0001F5D7 Pop Out"),
                    downloadButton("download_heatmap_png", "Download PNG", class = "btn-outline-secondary btn-sm"),
-                   actionButton("help_heatmap", "Help me understand this visualisation", class = "btn-info help-btn"),
-                   actionButton("chat_heatmap", "Chat about this data", class = "btn-success chat-btn")
+                   actionButton("help_heatmap", "Help me understand this visualisation", class = "btn-info help-btn", `aria-label` = "Show/hide help for heatmap visualization", `aria-expanded` = "false"),
+                   actionButton("chat_heatmap", "Chat about this data", class = "btn-success chat-btn", `aria-label` = "Show/hide chat panel for heatmap data", `aria-expanded` = "false")
                  ),
                  conditionalPanel(
                    condition = "input.help_heatmap % 2 == 1",
@@ -1024,8 +1041,8 @@ ui <- fluidPage(
                                  onclick = "popoutPlot('dend_elements', 'Element Dendrogram')",
                                  "\U0001F5D7 Pop Out"),
                      downloadButton("download_dend_elem_png", "Download PNG", class = "btn-outline-secondary btn-sm"),
-                     actionButton("help_dend_elem", "Help me understand this visualisation", class = "btn-info help-btn"),
-                     actionButton("chat_dend_elem", "Chat about this data", class = "btn-success chat-btn")
+                     actionButton("help_dend_elem", "Help me understand this visualisation", class = "btn-info help-btn", `aria-label` = "Show/hide help for element dendrogram", `aria-expanded` = "false"),
+                     actionButton("chat_dend_elem", "Chat about this data", class = "btn-success chat-btn", `aria-label` = "Show/hide chat panel for element dendrogram data", `aria-expanded` = "false")
                    ),
                    conditionalPanel(
                      condition = "input.help_dend_elem % 2 == 1",
@@ -1068,8 +1085,8 @@ ui <- fluidPage(
                                  onclick = "popoutPlot('dend_constructs', 'Construct Dendrogram')",
                                  "\U0001F5D7 Pop Out"),
                      downloadButton("download_dend_const_png", "Download PNG", class = "btn-outline-secondary btn-sm"),
-                     actionButton("help_dend_const", "Help me understand this visualisation", class = "btn-info help-btn"),
-                     actionButton("chat_dend_const", "Chat about this data", class = "btn-success chat-btn")
+                     actionButton("help_dend_const", "Help me understand this visualisation", class = "btn-info help-btn", `aria-label` = "Show/hide help for construct dendrogram", `aria-expanded` = "false"),
+                     actionButton("chat_dend_const", "Chat about this data", class = "btn-success chat-btn", `aria-label` = "Show/hide chat panel for construct dendrogram data", `aria-expanded` = "false")
                    ),
                    conditionalPanel(
                      condition = "input.help_dend_const % 2 == 1",
@@ -1206,8 +1223,8 @@ ui <- fluidPage(
                    )
                  ),
                  tags$hr(),
-                 actionButton("help_focus", "Help me understand this visualisation", class = "btn-info help-btn"),
-                 actionButton("chat_focus", "Chat about this data", class = "btn-success chat-btn"),
+                 actionButton("help_focus", "Help me understand this visualisation", class = "btn-info help-btn", `aria-label` = "Show/hide help for focus cluster visualization", `aria-expanded` = "false"),
+                 actionButton("chat_focus", "Chat about this data", class = "btn-success chat-btn", `aria-label` = "Show/hide chat panel for focus cluster data", `aria-expanded` = "false"),
                  conditionalPanel(
                    condition = "input.help_focus % 2 == 1",
                    div(class = "help-content",
@@ -1282,8 +1299,8 @@ ui <- fluidPage(
                  h5("Construct Statistics"),
                  verbatimTextOutput("stats_constructs"),
                  tags$hr(),
-                 actionButton("help_stats", "Help me understand this visualisation", class = "btn-info help-btn"),
-                 actionButton("chat_stats", "Chat about this data", class = "btn-success chat-btn"),
+                 actionButton("help_stats", "Help me understand this visualisation", class = "btn-info help-btn", `aria-label` = "Show/hide help for statistics visualization", `aria-expanded` = "false"),
+                 actionButton("chat_stats", "Chat about this data", class = "btn-success chat-btn", `aria-label` = "Show/hide chat panel for statistics data", `aria-expanded` = "false"),
                  conditionalPanel(
                    condition = "input.help_stats % 2 == 1",
                    div(class = "help-content",
@@ -1367,7 +1384,7 @@ ui <- fluidPage(
                    )
                  ),
                  tags$hr(),
-                 actionButton("help_collection", "Help me understand this", class = "btn-info help-btn"),
+                 actionButton("help_collection", "Help me understand this", class = "btn-info help-btn", `aria-label` = "Show/hide help for grid collection", `aria-expanded` = "false"),
                  conditionalPanel(
                    condition = "input.help_collection % 2 == 1",
                    div(class = "help-content",
@@ -1434,7 +1451,7 @@ ui <- fluidPage(
                  h5("Match Matrix"),
                  DTOutput("match_matrix_table"),
                  tags$hr(),
-                 actionButton("help_socionets", "Help me understand this visualisation", class = "btn-info help-btn"),
+                 actionButton("help_socionets", "Help me understand this visualisation", class = "btn-info help-btn", `aria-label` = "Show/hide help for socionets visualization", `aria-expanded` = "false"),
                  conditionalPanel(
                    condition = "input.help_socionets % 2 == 1",
                    div(class = "help-content",
@@ -1511,7 +1528,7 @@ ui <- fluidPage(
                    )
                  ),
                  tags$hr(),
-                 actionButton("help_mode", "Help me understand this", class = "btn-info help-btn"),
+                 actionButton("help_mode", "Help me understand this", class = "btn-info help-btn", `aria-label` = "Show/hide help for mode grid", `aria-expanded` = "false"),
                  conditionalPanel(
                    condition = "input.help_mode % 2 == 1",
                    div(class = "help-content",
@@ -1571,7 +1588,7 @@ ui <- fluidPage(
                  h5("Variance Explained"),
                  verbatimTextOutput("traj_variance"),
                  tags$hr(),
-                 actionButton("help_trajectories", "Help me understand this", class = "btn-info help-btn"),
+                 actionButton("help_trajectories", "Help me understand this", class = "btn-info help-btn", `aria-label` = "Show/hide help for trajectories visualization", `aria-expanded` = "false"),
                  conditionalPanel(
                    condition = "input.help_trajectories % 2 == 1",
                    div(class = "help-content",
@@ -1631,7 +1648,7 @@ ui <- fluidPage(
                  h5("Metagrid Preview"),
                  DTOutput("metagrid_preview"),
                  tags$hr(),
-                 actionButton("help_metagrid", "Help me understand this", class = "btn-info help-btn"),
+                 actionButton("help_metagrid", "Help me understand this", class = "btn-info help-btn", `aria-label` = "Show/hide help for metagrid", `aria-expanded` = "false"),
                  conditionalPanel(
                    condition = "input.help_metagrid % 2 == 1",
                    div(class = "help-content",
@@ -1681,7 +1698,7 @@ ui <- fluidPage(
                    )
                  ),
                  tags$hr(),
-                 actionButton("help_composite", "Help me understand this", class = "btn-info help-btn"),
+                 actionButton("help_composite", "Help me understand this", class = "btn-info help-btn", `aria-label` = "Show/hide help for composite grid", `aria-expanded` = "false"),
                  conditionalPanel(
                    condition = "input.help_composite % 2 == 1",
                    div(class = "help-content",
