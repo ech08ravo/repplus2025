@@ -33,21 +33,33 @@ WebGrid.Online (formerly RepPlusApp) is a Shiny application for Repertory Grid a
 ## Project Structure
 
 ```
-RepPlusApp/
-├── app.R                        # Main Shiny application (~5800 lines, UI + Server)
+WebGrid.Online/
+├── app.R                        # Main Shiny application (6612 lines, UI + Server)
 ├── R/
-│   ├── focus_analysis.r         # Focus clustering algorithm (Shaw 1980)
-│   ├── multigrid_analysis.r     # Multi-grid analysis (SOCIOGRIDS)
-│   ├── claude_api.R             # Claude API integration for chat features
-│   └── triadic_elicitation.r    # Triadic elicitation helper functions
-├── dataExamples/                # Sample grid data files
-├── RepPlusDocs/                 # Documentation directory (includes WebGrid-Online-Manual.md)
+│   ├── focus_analysis.r         # Focus clustering algorithm (Shaw 1980, 381 lines)
+│   ├── multigrid_analysis.r     # Multi-grid analysis (SOCIOGRIDS, 1337 lines)
+│   ├── claude_api.R             # Claude API integration (245 lines)
+│   ├── triadic_elicitation.r    # Triadic elicitation helpers (105 lines)
+│   └── score_matrix_helper.r    # Utility functions (17 lines)
+├── dataExamples/                # Sample grid data files and presets
+│   ├── *.rgrid                  # 9 sample grid files
+│   ├── *.csv                    # Sample data in CSV format
+│   ├── presets/                 # JSON preset element sets
+│   ├── QUICK_START.md           # Quick start guide
+│   └── CONTACT_LENS_INSTRUCTIONS.md
+├── RepPlusDocs/                 # Documentation (PDFs, user manual, text docs)
 ├── CLAUDE_PROJECT_DOCS.md       # This documentation
-├── Dockerfile                   # Docker deployment config
+├── CHANGELOG.md                 # Release notes (v2.2.0)
+├── FOCUS_USER_GUIDE.md          # Focus analysis guide
+├── FOCUS_IMPLEMENTATION.md      # Focus algorithm technical details
+├── README.md                    # User documentation and setup
+├── LICENCE.md                   # License information
+├── .gitignore                   # Git ignore patterns
+├── Dockerfile                   # Docker image config
 ├── docker-compose.yml           # Docker compose config
-├── deploy.sh                    # Deployment script
+├── shiny-server.conf            # Shiny server config
 ├── renv/                        # R environment management
-└── rsconnect/                   # Shiny deployment config
+└── renv.lock                    # Locked R dependency versions
 ```
 
 ## Key Concepts
@@ -71,37 +83,41 @@ The app uses triadic elicitation to help users generate constructs:
 The UI uses `fluidPage` with a sidebar layout:
 
 **Sidebar (width=2)**:
+- Wizard landing page (onboarding with preset picker)
 - File import (.rgrid, .json)
 - Sample data loader
 - Analysis button
 - Impute missing checkbox
 - Display options (text size, cell size)
-- Export buttons (CSV, .rgrid)
+- Export buttons (CSV, .rgrid, JSON)
 
 **Main Panel (width=10)** - Two tabsetPanels on separate rows:
 
-*Single-Grid Tabs (`tabsetPanel(id = "main_tabs")`):*
-1. **Build Grid** - Element entry, triadic elicitation, construct management
-2. **Grid Summary** - Elements list, analysis summary, missing ratings
-3. **Biplot** - PCA visualization with element points and construct arrows
-4. **Crossplot** - 2D scatter plot on two selected constructs
-5. **Synopsis** - Grid overview visualization
-6. **Heatmap** - Color-coded rating matrix with dendrograms
-7. **Element Dendrogram** - Hierarchical clustering of elements
-8. **Construct Dendrogram** - Hierarchical clustering of constructs
-9. **Focus Cluster** - Shaw's FOCUS algorithm with dendrograms
-10. **Statistics** - Detailed element and construct statistics
+*Single-Grid Tabs (`tabsetPanel(id = "main_tabs")`): 10 tabs*
+1. **Build Grid** - Element entry with attachments, triadic elicitation, construct management, ratings table
+2. **Grid Summary** - Elements and constructs overview, missing ratings analysis, summary statistics
+3. **Biplot** - PCA visualization with element points and construct vectors (palette selectable)
+4. **Crossplot** - 2D scatter plot on two selected constructs with overlap handling (palette selectable)
+5. **Synopsis** - Rating distributions (overall, by element, by construct) and scree plot (palette selectable)
+6. **Heatmap** - Color-coded rating matrix with row/column clustering (palette selectable)
+7. **Dendrograms** - Element and construct hierarchical clustering trees
+8. **Focus Cluster** - Shaw's FOCUS algorithm with sorted grid, dendrograms, and similarity stats (SPACED variant toggle, palette selectable)
+9. **Statistics** - Element and construct descriptive statistics (means, SD, ranges)
+10. (Legacy: Some versions may combine Dendrograms)
 
-*Multi-Grid Tabs (`tabsetPanel(id = "multi_tabs")`, styled with gradient CSS icons):*
-1. **Grid Collection** - Import, manage, and organize grid collection
-2. **Socionets** - Network visualization of grid relationships
+*Multi-Grid Tabs (`navbarMenu("Multi-Grid ...")`): 9 tabs with distinct styling*
+1. **Collect Grids** - Import and manage multiple grids
+2. **Socionets** - Network visualization of grid relationships (igraph)
 3. **Mode Grid** - Consensus grid (average/median ratings)
 4. **Composite Grid** - Merged grid combining elements/constructs
-5. **MINUS** - Grid difference analysis (comparing two grids)
-6. **CORE** - Shared construing analysis (iterative comparison)
-7. **PrinGrid Trajectories** - PCA trajectory visualization over time/sequence
-8. **Exchange Grids** - 6-grid exchange protocol analysis
-9. **Class Metagrids** - Metagrid classification across multiple grids
+5. **Comparison** - Compare two grids side-by-side
+6. **MINUS** - Grid difference analysis (Shaw's MINUS protocol)
+7. **CORE** - Shared construing analysis (iterative)
+8. **Trajectories** - PrinGrid PCA trajectories over sequence/time
+9. **Exchange Grids** - 6-grid exchange protocol (agreement & understanding)
+10. **Class Metagrids** - Metagrid classification across multiple grids (in navbarMenu)
+
+All multi-grid tabs normalize to c(1,7) scale before comparison.
 
 ### Server Components (app.R)
 
@@ -483,12 +499,19 @@ All multi-grid operations normalize to c(1,7) scale before comparison.
 
 ## Known Issues / Future Enhancements
 
+### Current (v2.2.0)
 - Focus cluster dendrograms generate harmless `horiz` warnings (cosmetic only)
-- Consider adding: export to PDF, more clustering methods, statistical tests
-- Grid completion tracking could be more prominent
-- Planned: image elements (upload photos or select from mobile photo library)
-- Planned: per-visualisation email in full app
-- Planned: additional preset grids for different course exercises
+- Triad display may show placeholder paperclip icon for broken image URLs (fallback works correctly)
+
+### Planned Enhancements
+- PDF export capability
+- Additional clustering methods (e.g., Ward linkage alternatives)
+- Statistical significance tests for grid comparisons
+- More preset grids for academic exercises
+- Per-visualization email buttons in full app (foundation in place)
+- Mobile photo library integration for element attachments
+- Advanced visualization options (3D, interactive plots)
+- Batch processing for multiple grid analyses
 
 ## References
 

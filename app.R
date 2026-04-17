@@ -462,7 +462,7 @@ ui <- fluidPage(
   conditionalPanel(
     condition = "output.landing_step == 'elements'",
     div(class = "landing-page",
-      h2("Welcome to WebGrid.Online"),
+      h1("Welcome to WebGrid.Online", style = "font-size: 24px;"),
       p(class = "subtitle", "A repertory grid helps you explore how you think about things by comparing them."),
       div(style = "margin-bottom: 16px;",
         tags$label("Your name or pseudonym", style = "font-size: 13px; font-weight: 600;"),
@@ -494,7 +494,7 @@ ui <- fluidPage(
   conditionalPanel(
     condition = "output.landing_step == 'presets'",
     div(class = "landing-page",
-      h2("Choose a Grid"),
+      h1("Choose a Grid", style = "font-size: 24px;"),
       p(class = "subtitle", "Select a pre-built grid with elements and constructs ready to rate."),
       uiOutput("preset_list"),
       div(class = "continue-btn", style = "margin-top: 16px;",
@@ -507,7 +507,7 @@ ui <- fluidPage(
     condition = "output.landing_step == 'triads'",
     div(class = "landing-page triad-wizard",
       uiOutput("walkthrough_triads"),
-      h2("How do these compare?"),
+      h1("How do these compare?", style = "font-size: 24px;"),
       p(class = "subtitle", "We'll show you 3 items at a time. Tap 2 that are similar, and 1 that is different."),
       uiOutput("wizard_progress"),
       div(class = "instruction-text",
@@ -558,7 +558,7 @@ ui <- fluidPage(
     condition = "output.landing_step == 'post_rating'",
     div(class = "landing-page", style = "max-width: 700px;",
       uiOutput("walkthrough_post_rating"),
-      h2("Your Grid"),
+      h1("Your Grid", style = "font-size: 24px;"),
       p(class = "subtitle", "Here's a preview of your repertory grid analysis."),
       plotOutput("wizard_preview_plot", height = "400px"),
       div(class = "continue-btn", style = "margin-top: 24px;",
@@ -575,14 +575,14 @@ ui <- fluidPage(
   # Main app - shown after results
   conditionalPanel(
     condition = "output.landing_step == 'done'",
-  tags$button(id = "sidebar_toggle", class = "btn btn-primary sidebar-toggle-btn", onclick = "document.querySelector('.col-sm-2.sidebar').classList.toggle('d-block'); this.classList.toggle('active');", "\u2630"),
+  tags$button(id = "sidebar_toggle", class = "btn btn-primary sidebar-toggle-btn", onclick = "document.querySelector('.col-sm-2.sidebar').classList.toggle('d-block'); this.classList.toggle('active');", `aria-label` = "Toggle sidebar visibility", "\u2630"),
   conditionalPanel(
     condition = "!output.welcome_dismissed",
     div(style = "background: #e3f2fd; border: 1px solid #90caf9; border-radius: 8px; padding: 16px 20px; margin-bottom: 16px; position: relative;",
       tags$button(type = "button", class = "close", style = "position: absolute; top: 8px; right: 12px; font-size: 18px; background: none; border: none; cursor: pointer;",
-        onclick = "Shiny.setInputValue('dismiss_welcome', true, {priority: 'event'}); $(this).parent().parent().hide();",
+        onclick = "Shiny.setInputValue('dismiss_welcome', true, {priority: 'event'}); $(this).parent().parent().hide();", `aria-label` = "Close welcome message",
         "\u00D7"),
-      h4("Your grid is ready!", style = "margin-top: 0;"),
+      h1("Your grid is ready!", style = "margin-top: 0; font-size: 20px;"),
       p("Explore your data using the tabs above. Start with the ", tags$strong("Biplot"), " for a visual overview."),
       p("The second row of tabs (with coloured dots) lets you compare multiple grids together.", style = "margin-bottom: 0; font-size: 12px; color: #666;")
     )

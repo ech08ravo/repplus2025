@@ -1,6 +1,29 @@
+# macOS
 .DS_Store
-.claude/
+.AppleDouble
+.LSOverride
+
+# R environment
 .RData
 .Rhistory
-.Rproj.user/
+.Rprofile
 .Renviron
+.Rproj.user/
+
+# Claude AI / IDE
+.claude/
+.vscode/
+.idea/
+
+# renv
+renv/library/
+
+# Editor temporary files
+*~
+*.swp
+*.swo
+*.tmp
+
+# Build artifacts
+rsconnect/
+
