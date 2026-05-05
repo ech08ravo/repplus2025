@@ -1,0 +1,28 @@
+{
+  "name": "Guided Tour: Time Person of the Year",
+  "elements": ["Angela Merkel", "Barack Obama", "Donald Trump", "Greta Thunberg", "Mahatma Gandhi", "Mark Zuckerberg"],
+  "element_urls": {
+    "Angela Merkel": "https://en.wikipedia.org/wiki/Angela_Merkel",
+    "Barack Obama": "https://en.wikipedia.org/wiki/Barack_Obama",
+    "Donald Trump": "https://en.wikipedia.org/wiki/Donald_Trump",
+    "Greta Thunberg": "https://en.wikipedia.org/wiki/Greta_Thunberg",
+    "Mahatma Gandhi": "https://en.wikipedia.org/wiki/Mahatma_Gandhi",
+    "Mark Zuckerberg": "https://en.wikipedia.org/wiki/Mark_Zuckerberg"
+  },
+  "element_images": {
+    "Angela Merkel": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Angela_Merkel_2019_cropped.jpg/250px-Angela_Merkel_2019_cropped.jpg",
+    "Barack Obama": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8d/President_Barack_Obama.jpg/250px-President_Barack_Obama.jpg",
+    "Donald Trump": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/16/Official_Presidential_Portrait_of_President_Donald_J._Trump_%282025%29.jpg/250px-Official_Presidential_Portrait_of_President_Donald_J._Trump_%282025%29.jpg",
+    "Greta Thunberg": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/78/Greta_Thunberg_in_November_in_Stockholm_%28cropped%29%282%29.jpg/250px-Greta_Thunberg_in_November_in_Stockholm_%28cropped%29%282%29.jpg",
+    "Mahatma Gandhi": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7a/Mahatma-Gandhi%2C_studio%2C_1931.jpg/250px-Mahatma-Gandhi%2C_studio%2C_1931.jpg",
+    "Mark Zuckerberg": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/21/Mark_Zuckerberg_in_September_2025_%28cropped%29.jpg/250px-Mark_Zuckerberg_in_September_2025_%28cropped%29.jpg"
+  },
+  "walkthrough": true,
+  "steps": {
+    "elements": "These 6 figures are your **elements** — the people you'll be comparing. Each has been named Time Magazine's 'Person of the Year', recognising them as individuals who shaped the news (for better or worse) in a given year. In repertory grid technique, elements are always things in the same category. Here we're using public figures, but you could compare anything: colleagues, leaders, teachers, historical figures. Click the image to zoom, or the link icon to view their Wikipedia page.",
+    "triads": "Now we'll show you 3 figures at a time. Pick **2 that are similar** and **1 that is different**. Then describe *how* the two are alike and how the odd one out differs. This creates a **construct** — a personal dimension you use to distinguish between people. There are no right answers — your constructs reveal how *you* think about leadership, influence, and character.",
+    "results": "These are your **personal constructs** — the dimensions you naturally use to think about influential people. Notice they come in pairs (e.g., 'idealist - pragmatist'). In Personal Construct Theory (Kelly, 1955), these bipolar dimensions are the building blocks of how you make sense of the world — including the public figures who shape it.",
+    "rating": "Now rate each figure on each of your constructs using the 1-5 scale. A rating of 1 means the person is strongly like the left pole, and 5 means they are strongly like the right pole. Try to use the full range — this gives richer data for analysis.",
+    "post_rating": "Here's your first visualisation — a PCA biplot showing how these figures relate to each other in your personal construct space. People plotted close together are ones you see as similar. The construct arrows show which dimensions drive the differences. Click 'Explore Other Visualisations' to try heatmaps, dendrograms, Focus clustering, and more."
+  }
+}

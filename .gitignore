@@ -27,3 +27,6 @@ renv/library/
 # Build artifacts
 rsconnect/
 
+# Deployment docs (contains server credentials)
+DEPLOY_INSTRUCTIONS.md
+
