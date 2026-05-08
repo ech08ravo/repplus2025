@@ -15,14 +15,17 @@ compute_element_similarities <- function(scores_matrix, power = 1.0) {
   n_constructs <- ncol(scores_matrix)
   max_distance <- n_constructs * scale_range
 
-  # Vectorise pairwise comparison using outer product on each construct
-  # Then aggregate across constructs using Minkowski power
+  # Pairwise comparison using sweep so the broadcast is well-defined when
+  # n_elements != n_constructs (matrix - matrix with mismatched row counts
+  # would error "non-conformable arrays"; sweep applies the row-i vector
+  # along the column margin of the full matrix).
   for (i in 1:n_elements) {
-    diff_mat <- abs(scores_matrix[i, , drop = FALSE] - scores_matrix)
+    diff_mat <- abs(sweep(scores_matrix, 2, scores_matrix[i, ], "-"))
     # Remove NAs for distance calculation
     diff_mat[is.na(diff_mat)] <- 0
-    # Compute Minkowski distances: sum of absolute differences raised to power
-    distances <- colSums(diff_mat^power)^(1/power)
+    # Per-element Minkowski distance: sum across constructs (the column
+    # axis), one distance per element row.
+    distances <- rowSums(diff_mat^power)^(1/power)
     # Convert to similarity (0-100)
     sim_matrix[i, -i] <- pmax(0, 100 * (1 - distances[-i] / max_distance))
   }
