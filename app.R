@@ -3327,7 +3327,7 @@ server <- function(input, output, session) {
           tags$br(),
           "You can now:",
           tags$ul(style = "margin: 6px 0;",
-            tags$li(actionLink("goto_analysis", "Run Analysis"), " - See your results in the analysis tabs"),
+            tags$li(actionLink("goto_analysis_link", "Run Analysis"), " - See your results in the analysis tabs"),
             tags$li(actionLink("add_more_constructs", "Add More Constructs"), " - Enrich your grid with additional dimensions"),
             tags$li("Save or email your grid using the buttons below")
           )
@@ -3554,7 +3554,7 @@ server <- function(input, output, session) {
 
   # Action link handlers for guidance panel
   # Use JavaScript to click the analyze button
-  observeEvent(input$goto_analysis, {
+  observeEvent(input$goto_analysis_link, {
     session$sendCustomMessage("clickButton", "analyze")
   })
 
