@@ -4352,13 +4352,19 @@ server <- function(input, output, session) {
   # Statistics outputs
   output$stats_elements <- renderPrint({
     repgrid_obj <- rv$repgrid_last
-    if (is.null(repgrid_obj)) return()
+    if (is.null(repgrid_obj)) {
+      cat("No analysis yet. Click 'Analyse Grid' in the sidebar to populate statistics.")
+      return()
+    }
     statsElements(repgrid_obj, trim = 30)
   })
 
   output$stats_constructs <- renderPrint({
     repgrid_obj <- rv$repgrid_last
-    if (is.null(repgrid_obj)) return()
+    if (is.null(repgrid_obj)) {
+      cat("No analysis yet. Click 'Analyse Grid' in the sidebar to populate statistics.")
+      return()
+    }
     statsConstructs(repgrid_obj, trim = 30)
   })
 
