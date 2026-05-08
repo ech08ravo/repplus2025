@@ -1,0 +1,215 @@
+{
+  "elements": ["Angela Merkel", "Barack Obama", "Donald Trump", "Greta Thunberg", "Mahatma Gandhi", "Mark Zuckerberg"],
+  "constructs": [
+    {
+      "left": "american",
+      "right": "european"
+    },
+    {
+      "left": "woman",
+      "right": "man"
+    },
+    {
+      "left": "nonwhite",
+      "right": "white"
+    },
+    {
+      "left": "leader",
+      "right": "techbro"
+    },
+    {
+      "left": "environmental interest",
+      "right": "destructive"
+    },
+    {
+      "left": "peaceful",
+      "right": "warmongering"
+    }
+  ],
+  "ratings": [
+    {
+      "element": "Angela Merkel",
+      "construct": "american - european",
+      "rating": 5
+    },
+    {
+      "element": "Barack Obama",
+      "construct": "american - european",
+      "rating": 1
+    },
+    {
+      "element": "Donald Trump",
+      "construct": "american - european",
+      "rating": 2
+    },
+    {
+      "element": "Greta Thunberg",
+      "construct": "american - european",
+      "rating": 5
+    },
+    {
+      "element": "Mahatma Gandhi",
+      "construct": "american - european",
+      "rating": 3
+    },
+    {
+      "element": "Mark Zuckerberg",
+      "construct": "american - european",
+      "rating": 1
+    },
+    {
+      "element": "Angela Merkel",
+      "construct": "woman - man",
+      "rating": 1
+    },
+    {
+      "element": "Barack Obama",
+      "construct": "woman - man",
+      "rating": 5
+    },
+    {
+      "element": "Donald Trump",
+      "construct": "woman - man",
+      "rating": 5
+    },
+    {
+      "element": "Greta Thunberg",
+      "construct": "woman - man",
+      "rating": 2
+    },
+    {
+      "element": "Mahatma Gandhi",
+      "construct": "woman - man",
+      "rating": 5
+    },
+    {
+      "element": "Mark Zuckerberg",
+      "construct": "woman - man",
+      "rating": 5
+    },
+    {
+      "element": "Angela Merkel",
+      "construct": "nonwhite - white",
+      "rating": 5
+    },
+    {
+      "element": "Barack Obama",
+      "construct": "nonwhite - white",
+      "rating": 2
+    },
+    {
+      "element": "Donald Trump",
+      "construct": "nonwhite - white",
+      "rating": 5
+    },
+    {
+      "element": "Greta Thunberg",
+      "construct": "nonwhite - white",
+      "rating": 5
+    },
+    {
+      "element": "Mahatma Gandhi",
+      "construct": "nonwhite - white",
+      "rating": 1
+    },
+    {
+      "element": "Mark Zuckerberg",
+      "construct": "nonwhite - white",
+      "rating": 5
+    },
+    {
+      "element": "Angela Merkel",
+      "construct": "leader - techbro",
+      "rating": 1
+    },
+    {
+      "element": "Barack Obama",
+      "construct": "leader - techbro",
+      "rating": 1
+    },
+    {
+      "element": "Donald Trump",
+      "construct": "leader - techbro",
+      "rating": 3
+    },
+    {
+      "element": "Greta Thunberg",
+      "construct": "leader - techbro",
+      "rating": 2
+    },
+    {
+      "element": "Mahatma Gandhi",
+      "construct": "leader - techbro",
+      "rating": 1
+    },
+    {
+      "element": "Mark Zuckerberg",
+      "construct": "leader - techbro",
+      "rating": 5
+    },
+    {
+      "element": "Angela Merkel",
+      "construct": "environmental interest - destructive",
+      "rating": 2
+    },
+    {
+      "element": "Barack Obama",
+      "construct": "environmental interest - destructive",
+      "rating": 3
+    },
+    {
+      "element": "Donald Trump",
+      "construct": "environmental interest - destructive",
+      "rating": 5
+    },
+    {
+      "element": "Greta Thunberg",
+      "construct": "environmental interest - destructive",
+      "rating": 1
+    },
+    {
+      "element": "Mahatma Gandhi",
+      "construct": "environmental interest - destructive",
+      "rating": 3
+    },
+    {
+      "element": "Mark Zuckerberg",
+      "construct": "environmental interest - destructive",
+      "rating": 5
+    },
+    {
+      "element": "Angela Merkel",
+      "construct": "peaceful - warmongering",
+      "rating": 1
+    },
+    {
+      "element": "Barack Obama",
+      "construct": "peaceful - warmongering",
+      "rating": 3
+    },
+    {
+      "element": "Donald Trump",
+      "construct": "peaceful - warmongering",
+      "rating": 5
+    },
+    {
+      "element": "Greta Thunberg",
+      "construct": "peaceful - warmongering",
+      "rating": 1
+    },
+    {
+      "element": "Mahatma Gandhi",
+      "construct": "peaceful - warmongering",
+      "rating": 1
+    },
+    {
+      "element": "Mark Zuckerberg",
+      "construct": "peaceful - warmongering",
+      "rating": 3
+    }
+  ],
+  "element_images": {},
+  "element_files": {},
+  "timestamp": "2026-05-08 06:20:12",
+  "version": "1.2"
+}

@@ -1,0 +1,147 @@
+{
+  "elements": ["Angela Merkel", "Barack Obama", "Donald Trump", "Greta Thunberg", "Mahatma Gandhi", "Mark Zuckerberg"],
+  "constructs": [
+    {
+      "left": "man",
+      "right": "woman"
+    },
+    {
+      "left": "european",
+      "right": "usian"
+    },
+    {
+      "left": "non-white",
+      "right": "white"
+    },
+    {
+      "left": "national leader",
+      "right": "techbro"
+    }
+  ],
+  "ratings": [
+    {
+      "element": "Angela Merkel",
+      "construct": "man - woman",
+      "rating": 5
+    },
+    {
+      "element": "Barack Obama",
+      "construct": "man - woman",
+      "rating": 1
+    },
+    {
+      "element": "Donald Trump",
+      "construct": "man - woman",
+      "rating": 1
+    },
+    {
+      "element": "Greta Thunberg",
+      "construct": "man - woman",
+      "rating": 4
+    },
+    {
+      "element": "Mahatma Gandhi",
+      "construct": "man - woman",
+      "rating": 1
+    },
+    {
+      "element": "Mark Zuckerberg",
+      "construct": "man - woman",
+      "rating": 1
+    },
+    {
+      "element": "Angela Merkel",
+      "construct": "european - usian",
+      "rating": 1
+    },
+    {
+      "element": "Barack Obama",
+      "construct": "european - usian",
+      "rating": 5
+    },
+    {
+      "element": "Donald Trump",
+      "construct": "european - usian",
+      "rating": 4
+    },
+    {
+      "element": "Greta Thunberg",
+      "construct": "european - usian",
+      "rating": 1
+    },
+    {
+      "element": "Mahatma Gandhi",
+      "construct": "european - usian",
+      "rating": 3
+    },
+    {
+      "element": "Mark Zuckerberg",
+      "construct": "european - usian",
+      "rating": 5
+    },
+    {
+      "element": "Angela Merkel",
+      "construct": "non-white - white",
+      "rating": 5
+    },
+    {
+      "element": "Barack Obama",
+      "construct": "non-white - white",
+      "rating": 2
+    },
+    {
+      "element": "Donald Trump",
+      "construct": "non-white - white",
+      "rating": 5
+    },
+    {
+      "element": "Greta Thunberg",
+      "construct": "non-white - white",
+      "rating": 5
+    },
+    {
+      "element": "Mahatma Gandhi",
+      "construct": "non-white - white",
+      "rating": 1
+    },
+    {
+      "element": "Mark Zuckerberg",
+      "construct": "non-white - white",
+      "rating": 5
+    },
+    {
+      "element": "Angela Merkel",
+      "construct": "national leader - techbro",
+      "rating": 1
+    },
+    {
+      "element": "Barack Obama",
+      "construct": "national leader - techbro",
+      "rating": 1
+    },
+    {
+      "element": "Donald Trump",
+      "construct": "national leader - techbro",
+      "rating": 1
+    },
+    {
+      "element": "Greta Thunberg",
+      "construct": "national leader - techbro",
+      "rating": 3
+    },
+    {
+      "element": "Mahatma Gandhi",
+      "construct": "national leader - techbro",
+      "rating": 1
+    },
+    {
+      "element": "Mark Zuckerberg",
+      "construct": "national leader - techbro",
+      "rating": 5
+    }
+  ],
+  "element_images": {},
+  "element_files": {},
+  "timestamp": "2026-05-08 06:08:27",
+  "version": "1.2"
+}
