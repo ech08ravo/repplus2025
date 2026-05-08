@@ -6,7 +6,11 @@ services:
     container_name: repplus
     restart: unless-stopped
     ports:
-      - "127.0.0.1:3838:3838"
+      # Bind to the Docker bridge gateway so nginx (on the bridge network) can
+      # reach the app via http://172.17.0.1:3838/, while public traffic on the
+      # host's external interface cannot. 172.17.0.1 is the default docker0
+      # gateway; if the host's docker0 IP differs, change this accordingly.
+      - "172.17.0.1:3838:3838"
     environment:
       - SHINY_LOG_LEVEL=INFO
     mem_limit: 1g
