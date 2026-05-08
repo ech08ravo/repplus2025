@@ -13,6 +13,24 @@ MAX_ELEMENTS <- 50
 MAX_CONSTRUCTS <- 100
 MAX_GRIDS <- 50
 MAX_TRIADS <- 30  # Sample triads when elements > threshold
+MAX_CHATS_PER_MIN <- 10  # Per-session cap on Claude API calls
+
+# Reject URLs that aren't http(s) or mailto. Returns NA for anything else
+# (javascript:, data:, file:, vbscript:, etc.) so ingest paths can drop them.
+safe_url <- function(u) {
+  if (!is.character(u) || length(u) != 1 || is.na(u)) return(NA_character_)
+  u_trim <- trimws(u)
+  if (!nzchar(u_trim)) return(NA_character_)
+  if (!grepl("^(https?|mailto):", u_trim, ignore.case = TRUE)) return(NA_character_)
+  u_trim
+}
+
+# Filter a named list of URLs through safe_url; drop invalid entries.
+sanitize_url_list <- function(lst) {
+  if (is.null(lst) || length(lst) == 0) return(list())
+  out <- lapply(lst, safe_url)
+  out[!vapply(out, is.na, logical(1))]
+}
 
 # Random pseudonym generator (adjective + animal)
 generate_pseudonym <- function() {
@@ -1907,6 +1925,24 @@ repplus_docs_global <- tryCatch(load_repplus_docs(), error = function(e) list())
 
 server <- function(input, output, session) {
 
+  # Per-session rate limit for Claude API calls. Rolling 60-second window.
+  chat_call_log <- reactiveVal(numeric(0))
+  check_chat_rate_limit <- function() {
+    now <- as.numeric(Sys.time())
+    recent <- chat_call_log()
+    recent <- recent[recent > now - 60]
+    if (length(recent) >= MAX_CHATS_PER_MIN) {
+      showNotification(
+        paste0("Rate limit: max ", MAX_CHATS_PER_MIN,
+               " questions per minute. Please wait a moment."),
+        type = "warning", duration = 5
+      )
+      return(FALSE)
+    }
+    chat_call_log(c(recent, now))
+    TRUE
+  }
+
   # Non-reactive palette function for use with specific palette names
   get_palette_colors <- function(palette) {
     if (is.null(palette)) palette <- "wong"
@@ -2129,16 +2165,15 @@ server <- function(input, output, session) {
     if (!is.null(preset$element_images)) {
       rv$element_images <- as.list(preset$element_images)
     }
-    # Load element URLs if present
-    if (!is.null(preset$element_urls)) {
-      rv$element_urls <- as.list(preset$element_urls)
+    # Load element URLs if present (filter to safe schemes only)
+    safe_preset_urls <- sanitize_url_list(preset$element_urls)
+    if (length(safe_preset_urls) > 0) {
+      rv$element_urls <- safe_preset_urls
     }
     # Build file list from both
     file_list <- list()
-    if (!is.null(preset$element_urls)) {
-      for (nm in names(preset$element_urls)) {
-        file_list[[nm]] <- list(data = preset$element_urls[[nm]], name = nm, type = "url")
-      }
+    for (nm in names(safe_preset_urls)) {
+      file_list[[nm]] <- list(data = safe_preset_urls[[nm]], name = nm, type = "url")
     }
     rv$element_files <- file_list
     walkthrough$active <- TRUE
@@ -2187,7 +2222,8 @@ server <- function(input, output, session) {
           if (finfo$type == "image") {
             img_list[[elem]] <- finfo$data
           } else if (finfo$type == "url") {
-            url_list[[elem]] <- finfo$data
+            su <- safe_url(finfo$data)
+            if (!is.na(su)) url_list[[elem]] <- su
           }
           file_list[[elem]] <- finfo
         } else if (grepl("^https?://", elem)) {
@@ -2853,7 +2889,8 @@ server <- function(input, output, session) {
       if (build_file$type == "image") {
         rv$element_images[[elem_name]] <- build_file$data
       } else if (build_file$type == "url") {
-        rv$element_urls[[elem_name]] <- build_file$data
+        su <- safe_url(build_file$data)
+        if (!is.na(su)) rv$element_urls[[elem_name]] <- su
       }
       rv$element_files[[elem_name]] <- build_file
       landing_files[["build"]] <- NULL
@@ -5056,6 +5093,7 @@ server <- function(input, output, session) {
   })
 
   observeEvent(input$ask_biplot, {
+    if (!check_chat_rate_limit()) return()
     chat_responses$biplot <- list(loading = TRUE, success = FALSE)
     question <- if (is.null(input$chat_biplot_question) || input$chat_biplot_question == "") {
       "What patterns do you see in this PCA Biplot?"
@@ -5084,6 +5122,7 @@ server <- function(input, output, session) {
   })
 
   observeEvent(input$ask_crossplot, {
+    if (!check_chat_rate_limit()) return()
     chat_responses$crossplot <- list(loading = TRUE, success = FALSE)
     question <- if (is.null(input$chat_crossplot_question) || input$chat_crossplot_question == "") {
       "What patterns do you see in this Crossplot?"
@@ -5112,6 +5151,7 @@ server <- function(input, output, session) {
   })
 
   observeEvent(input$ask_synopsis, {
+    if (!check_chat_rate_limit()) return()
     chat_responses$synopsis <- list(loading = TRUE, success = FALSE)
     question <- if (is.null(input$chat_synopsis_question) || input$chat_synopsis_question == "") {
       "What patterns do you see in this Synopsis?"
@@ -5140,6 +5180,7 @@ server <- function(input, output, session) {
   })
 
   observeEvent(input$ask_heatmap, {
+    if (!check_chat_rate_limit()) return()
     chat_responses$heatmap <- list(loading = TRUE, success = FALSE)
     question <- if (is.null(input$chat_heatmap_question) || input$chat_heatmap_question == "") {
       "What patterns do you see in this Heatmap?"
@@ -5168,6 +5209,7 @@ server <- function(input, output, session) {
   })
 
   observeEvent(input$ask_dend_elem, {
+    if (!check_chat_rate_limit()) return()
     chat_responses$dend_elem <- list(loading = TRUE, success = FALSE)
     question <- if (is.null(input$chat_dend_elem_question) || input$chat_dend_elem_question == "") {
       "What patterns do you see in this Element Dendrogram?"
@@ -5196,6 +5238,7 @@ server <- function(input, output, session) {
   })
 
   observeEvent(input$ask_dend_const, {
+    if (!check_chat_rate_limit()) return()
     chat_responses$dend_const <- list(loading = TRUE, success = FALSE)
     question <- if (is.null(input$chat_dend_const_question) || input$chat_dend_const_question == "") {
       "What patterns do you see in this Construct Dendrogram?"
@@ -5224,6 +5267,7 @@ server <- function(input, output, session) {
   })
 
   observeEvent(input$ask_focus, {
+    if (!check_chat_rate_limit()) return()
     chat_responses$focus <- list(loading = TRUE, success = FALSE)
     question <- if (is.null(input$chat_focus_question) || input$chat_focus_question == "") {
       "What patterns do you see in this Focus Cluster analysis?"
@@ -5252,6 +5296,7 @@ server <- function(input, output, session) {
   })
 
   observeEvent(input$ask_stats, {
+    if (!check_chat_rate_limit()) return()
     chat_responses$stats <- list(loading = TRUE, success = FALSE)
     question <- if (is.null(input$chat_stats_question) || input$chat_stats_question == "") {
       "What patterns do you see in these Statistics?"
@@ -6092,6 +6137,7 @@ server <- function(input, output, session) {
 
   observeEvent(input$run_foci, {
     req(focus_result())
+    if (!check_chat_rate_limit()) return()
     chat_responses$foci <- list(loading = TRUE, success = FALSE)
 
     construct_labels <- paste(rv$constructs$left, "-", rv$constructs$right)

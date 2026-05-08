@@ -1,5 +1,5 @@
 # WebGrid.Online Dockerfile
-FROM rocker/shiny:4.4.0
+FROM rocker/shiny:4.5.3
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
