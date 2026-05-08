@@ -232,6 +232,13 @@ ui <- fluidPage(
       // Insert tab row breaks - watch for tabs to appear in DOM
     ")),
         tags$style(HTML('
+      /* Hide conditionalPanel contents until Shiny evaluates their condition.
+         Without this, every panel briefly flashes on first paint (the landing
+         page is first in the DOM, so it dominates) before Shiny.js hides the
+         ones whose condition is false, then the server pushes the real state.
+         Shiny.js calls $(el).show() which sets display:block inline,
+         overriding this rule. */
+      [data-display-if] { display: none; }
       .container-fluid { max-width: 1400px; }
       body { font-size: 13px; }
       .form-group { margin-bottom: 8px; }
