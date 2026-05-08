@@ -797,6 +797,7 @@ ui <- fluidPage(
                         onclick = "popoutPlot('pca_biplot', 'PCA Biplot')",
                         "\U0001F5D7 Pop Out"),
             downloadButton("download_biplot_png", "Download PNG", class = "btn-outline-secondary btn-sm"),
+            downloadButton("save_grid_biplot", "Save Grid", class = "btn-outline-secondary btn-sm"),
             actionButton("help_biplot", "Help me understand this visualisation", class = "btn-info help-btn", `aria-label` = "Show/hide help for biplot visualization", `aria-expanded` = "false"),
             actionButton("chat_biplot", "Chat about this data", class = "btn-success chat-btn", `aria-label` = "Show/hide chat panel for biplot data", `aria-expanded` = "false")
           ),
@@ -889,6 +890,7 @@ ui <- fluidPage(
                                onclick = "popoutPlot('crossplot_plot', 'Crossplot')",
                                "\U0001F5D7 Pop Out"),
                    downloadButton("download_crossplot_png", "Download PNG", class = "btn-outline-secondary btn-sm"),
+                   downloadButton("save_grid_crossplot", "Save Grid", class = "btn-outline-secondary btn-sm"),
                    actionButton("help_crossplot", "Help me understand this visualisation", class = "btn-info help-btn", `aria-label` = "Show/hide help for crossplot visualization", `aria-expanded` = "false"),
                    actionButton("chat_crossplot", "Chat about this data", class = "btn-success chat-btn", `aria-label` = "Show/hide chat panel for crossplot data", `aria-expanded` = "false")
                  ),
@@ -963,6 +965,7 @@ ui <- fluidPage(
                                onclick = "popoutPlot('synopsis_plot', 'Synopsis')",
                                "\U0001F5D7 Pop Out"),
                    downloadButton("download_synopsis_png", "Download PNG", class = "btn-outline-secondary btn-sm"),
+                   downloadButton("save_grid_synopsis", "Save Grid", class = "btn-outline-secondary btn-sm"),
                    actionButton("help_synopsis", "Help me understand this visualisation", class = "btn-info help-btn", `aria-label` = "Show/hide help for synopsis visualization", `aria-expanded` = "false"),
                    actionButton("chat_synopsis", "Chat about this data", class = "btn-success chat-btn", `aria-label` = "Show/hide chat panel for synopsis data", `aria-expanded` = "false")
                  ),
@@ -1029,6 +1032,7 @@ ui <- fluidPage(
                                onclick = "popoutPlot('heatmap_plot', 'Heatmap')",
                                "\U0001F5D7 Pop Out"),
                    downloadButton("download_heatmap_png", "Download PNG", class = "btn-outline-secondary btn-sm"),
+                   downloadButton("save_grid_heatmap", "Save Grid", class = "btn-outline-secondary btn-sm"),
                    actionButton("help_heatmap", "Help me understand this visualisation", class = "btn-info help-btn", `aria-label` = "Show/hide help for heatmap visualization", `aria-expanded` = "false"),
                    actionButton("chat_heatmap", "Chat about this data", class = "btn-success chat-btn", `aria-label` = "Show/hide chat panel for heatmap data", `aria-expanded` = "false")
                  ),
@@ -1082,6 +1086,7 @@ ui <- fluidPage(
                                  onclick = "popoutPlot('dend_elements', 'Element Dendrogram')",
                                  "\U0001F5D7 Pop Out"),
                      downloadButton("download_dend_elem_png", "Download PNG", class = "btn-outline-secondary btn-sm"),
+                     downloadButton("save_grid_dend_elem", "Save Grid", class = "btn-outline-secondary btn-sm"),
                      actionButton("help_dend_elem", "Help me understand this visualisation", class = "btn-info help-btn", `aria-label` = "Show/hide help for element dendrogram", `aria-expanded` = "false"),
                      actionButton("chat_dend_elem", "Chat about this data", class = "btn-success chat-btn", `aria-label` = "Show/hide chat panel for element dendrogram data", `aria-expanded` = "false")
                    ),
@@ -1126,6 +1131,7 @@ ui <- fluidPage(
                                  onclick = "popoutPlot('dend_constructs', 'Construct Dendrogram')",
                                  "\U0001F5D7 Pop Out"),
                      downloadButton("download_dend_const_png", "Download PNG", class = "btn-outline-secondary btn-sm"),
+                     downloadButton("save_grid_dend_const", "Save Grid", class = "btn-outline-secondary btn-sm"),
                      actionButton("help_dend_const", "Help me understand this visualisation", class = "btn-info help-btn", `aria-label` = "Show/hide help for construct dendrogram", `aria-expanded` = "false"),
                      actionButton("chat_dend_const", "Chat about this data", class = "btn-success chat-btn", `aria-label` = "Show/hide chat panel for construct dendrogram data", `aria-expanded` = "false")
                    ),
@@ -1250,7 +1256,8 @@ ui <- fluidPage(
                    tags$button(type = "button", class = "btn btn-outline-info btn-sm",
                                onclick = "popoutPlot('focus_plot', 'Focus Cluster')",
                                "\U0001F5D7 Pop Out"),
-                   downloadButton("download_focus_png", "Download PNG", class = "btn-outline-secondary btn-sm")
+                   downloadButton("download_focus_png", "Download PNG", class = "btn-outline-secondary btn-sm"),
+                   downloadButton("save_grid_focus", "Save Grid", class = "btn-outline-secondary btn-sm")
                  ),
                  h4("Match Data"),
                  fluidRow(
@@ -3570,23 +3577,33 @@ server <- function(input, output, session) {
   })
 
   # Save grid as JSON
-  output$save_grid_json <- downloadHandler(
-    filename = function() {
-      paste0("repgrid_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".json")
-    },
-    content = function(file) {
-      grid_data <- list(
-        elements = rv$elements,
-        constructs = rv$constructs,
-        ratings = rv$ratings,
-        element_images = if (length(rv$element_images) > 0) rv$element_images else NULL,
-        element_files = if (length(rv$element_files) > 0) rv$element_files else NULL,
-        timestamp = Sys.time(),
-        version = "1.2"
-      )
-      jsonlite::write_json(grid_data, file, pretty = TRUE, auto_unbox = TRUE)
-    }
-  )
+  # Shared Save Grid handler — bound to several output IDs so a "Save Grid"
+  # button can sit next to each chart's Download PNG without users hunting
+  # in the Export section.
+  make_save_grid_handler <- function() {
+    downloadHandler(
+      filename = function() {
+        paste0("repgrid_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".json")
+      },
+      content = function(file) {
+        grid_data <- list(
+          elements = rv$elements,
+          constructs = rv$constructs,
+          ratings = rv$ratings,
+          element_images = if (length(rv$element_images) > 0) rv$element_images else NULL,
+          element_files = if (length(rv$element_files) > 0) rv$element_files else NULL,
+          timestamp = Sys.time(),
+          version = "1.2"
+        )
+        jsonlite::write_json(grid_data, file, pretty = TRUE, auto_unbox = TRUE)
+      }
+    )
+  }
+  output$save_grid_json <- make_save_grid_handler()
+  for (chart_id in c("biplot", "crossplot", "synopsis", "heatmap",
+                      "dend_elem", "dend_const", "focus")) {
+    output[[paste0("save_grid_", chart_id)]] <- make_save_grid_handler()
+  }
 
   # Email grid to self - show modal with email form
  observeEvent(input$email_grid, {
