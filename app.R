@@ -182,36 +182,47 @@ ui <- fluidPage(
         if (fileInput) fileInput.value = '';
         Shiny.setInputValue('element_file_remove', inputNum, {priority: 'event'});
       }
-      // Replace broken images with paperclip icon using MutationObserver
-      new MutationObserver(function(mutations) {
-        document.querySelectorAll('img.triad-card-img, img.rating-elem-img, img.elem-img-thumb').forEach(function(img) {
-          if (!img._errorHandled) {
-            img._errorHandled = true;
-            img.onerror = function() {
-              var size = this.classList.contains('triad-card-img') ? '40' : '24';
-              var span = document.createElement('span');
-              span.style.cssText = 'font-size:' + size + 'px;display:block;text-align:center;margin:0 auto 6px;color:#999;';
-              span.textContent = '\uD83D\uDCCE';
-              this.parentNode.replaceChild(span, this);
-            };
-            // Check if already broken
-            if (img.complete && img.naturalWidth === 0 && img.src) {
-              img.onerror();
+      // The MutationObserver and lightbox handler below need document.body,
+      // which doesn't exist yet when this <head> script runs. Defer until DOM
+      // ready so the script doesn't throw mid-init (Shiny then discards
+      // pending UI messages, causing a visible blank flash on first load).
+      function initImgHandlers() {
+        // Replace broken images with paperclip icon using MutationObserver
+        new MutationObserver(function(mutations) {
+          document.querySelectorAll('img.triad-card-img, img.rating-elem-img, img.elem-img-thumb').forEach(function(img) {
+            if (!img._errorHandled) {
+              img._errorHandled = true;
+              img.onerror = function() {
+                var size = this.classList.contains('triad-card-img') ? '40' : '24';
+                var span = document.createElement('span');
+                span.style.cssText = 'font-size:' + size + 'px;display:block;text-align:center;margin:0 auto 6px;color:#999;';
+                span.textContent = '\uD83D\uDCCE';
+                this.parentNode.replaceChild(span, this);
+              };
+              // Check if already broken
+              if (img.complete && img.naturalWidth === 0 && img.src) {
+                img.onerror();
+              }
             }
-          }
+          });
+        }).observe(document.body, {childList: true, subtree: true});
+        // Zoom image on click (lightbox)
+        $(document).on('click', '.triad-card-img, .rating-elem-img', function(e) {
+          e.stopPropagation();
+          e.preventDefault();
+          var src = this.src;
+          var overlay = document.createElement('div');
+          overlay.className = 'img-zoom-overlay';
+          overlay.innerHTML = '<img src=' + JSON.stringify(src) + '>';
+          overlay.onclick = function() { document.body.removeChild(overlay); };
+          document.body.appendChild(overlay);
         });
-      }).observe(document.body, {childList: true, subtree: true});
-      // Zoom image on click (lightbox)
-      $(document).on('click', '.triad-card-img, .rating-elem-img', function(e) {
-        e.stopPropagation();
-        e.preventDefault();
-        var src = this.src;
-        var overlay = document.createElement('div');
-        overlay.className = 'img-zoom-overlay';
-        overlay.innerHTML = '<img src=' + JSON.stringify(src) + '>';
-        overlay.onclick = function() { document.body.removeChild(overlay); };
-        document.body.appendChild(overlay);
-      });
+      }
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initImgHandlers);
+      } else {
+        initImgHandlers();
+      }
       // Insert line break and legend before multi-grid tabs
       // Insert tab row breaks - watch for tabs to appear in DOM
     ")),
