@@ -19,11 +19,17 @@ COPY app.R /srv/shiny-server/webgrid/app.R
 COPY R/ /srv/shiny-server/webgrid/R/
 COPY dataExamples/ /srv/shiny-server/webgrid/dataExamples/
 
+# Entrypoint that promotes whitelisted container env vars into R's
+# Renviron.site so R sessions spawned by shiny-server can see them
+# (shiny-server does not propagate env to its R workers).
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 # Set permissions
 RUN chown -R shiny:shiny /srv/shiny-server/webgrid
 
 # Expose port
 EXPOSE 3838
 
-# Run Shiny Server
-CMD ["/usr/bin/shiny-server"]
+# Run Shiny Server via the entrypoint
+CMD ["/usr/local/bin/docker-entrypoint.sh"]
