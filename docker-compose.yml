@@ -13,6 +13,12 @@ services:
       - "172.17.0.1:3838:3838"
     environment:
       - SHINY_LOG_LEVEL=INFO
+      # Pass the host's ANTHROPIC_API_KEY through to the container if set.
+      # Compose substitutes ${ANTHROPIC_API_KEY} from the shell env or a sibling
+      # .env file (which is gitignored — never commit the actual key). Without
+      # the key the in-app "Ask Claude (API)" buttons stay hidden and the
+      # Copy-to-Clipboard fallback is the only chat path.
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
     mem_limit: 1g
     memswap_limit: 1g
     cpus: 1.0

@@ -74,6 +74,14 @@ ui <- fluidPage(
       Shiny.addCustomMessageHandler('resetBuildFile', function(msg) {
         removeElementFile('build');
       });
+      // Reveal/hide every Ask Claude API button. Server sends true once it
+      // confirms ANTHROPIC_API_KEY is present in the environment; otherwise
+      // the buttons stay hidden so users only see the Copy/Claude.ai fallback.
+      Shiny.addCustomMessageHandler('toggleApiButtons', function(show) {
+        document.querySelectorAll('.ask-claude-btn').forEach(function(btn) {
+          btn.style.display = show ? '' : 'none';
+        });
+      });
       Shiny.addCustomMessageHandler('click_analyze', function(msg) {
         var attempts = 0;
         var tryClick = function() {
@@ -839,7 +847,7 @@ ui <- fluidPage(
               h5("Ask Claude about your PCA Biplot"),
               textInput("chat_biplot_question", "Your question:", placeholder = "e.g., Why are elements A and B so close together?"),
               div(class = "btn-group-chat",
-                actionButton("ask_biplot", "Ask Claude (API)", class = "btn-primary", style = "display:none;"),
+                actionButton("ask_biplot", "Ask Claude (API)", class = "btn-primary ask-claude-btn", style = "display:none;"),
                 actionButton("copy_biplot", "Copy to Clipboard", class = "btn-secondary"),
                 tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary btn-sm", "Claude.ai"),
                 tags$a(href = "https://chatgpt.com", target = "_blank", class = "btn btn-outline-secondary btn-sm", "ChatGPT"),
@@ -921,7 +929,7 @@ ui <- fluidPage(
                      h5("Ask Claude about your Crossplot"),
                      textInput("chat_crossplot_question", "Your question:", placeholder = "e.g., Why is element X in that quadrant?"),
                      div(class = "btn-group-chat",
-                       actionButton("ask_crossplot", "Ask Claude (API)", class = "btn-primary", style = "display:none;"),
+                       actionButton("ask_crossplot", "Ask Claude (API)", class = "btn-primary ask-claude-btn", style = "display:none;"),
                        actionButton("copy_crossplot", "Copy to Clipboard", class = "btn-secondary"),
                        tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary btn-sm", "Claude.ai"),
                 tags$a(href = "https://chatgpt.com", target = "_blank", class = "btn btn-outline-secondary btn-sm", "ChatGPT"),
@@ -997,7 +1005,7 @@ ui <- fluidPage(
                      h5("Ask Claude about your Synopsis"),
                      textInput("chat_synopsis_question", "Your question:", placeholder = "e.g., Why is my distribution skewed?"),
                      div(class = "btn-group-chat",
-                       actionButton("ask_synopsis", "Ask Claude (API)", class = "btn-primary", style = "display:none;"),
+                       actionButton("ask_synopsis", "Ask Claude (API)", class = "btn-primary ask-claude-btn", style = "display:none;"),
                        actionButton("copy_synopsis", "Copy to Clipboard", class = "btn-secondary"),
                        tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary btn-sm", "Claude.ai"),
                 tags$a(href = "https://chatgpt.com", target = "_blank", class = "btn btn-outline-secondary btn-sm", "ChatGPT"),
@@ -1064,7 +1072,7 @@ ui <- fluidPage(
                      h5("Ask Claude about your Heatmap"),
                      textInput("chat_heatmap_question", "Your question:", placeholder = "e.g., Why does this row look different?"),
                      div(class = "btn-group-chat",
-                       actionButton("ask_heatmap", "Ask Claude (API)", class = "btn-primary", style = "display:none;"),
+                       actionButton("ask_heatmap", "Ask Claude (API)", class = "btn-primary ask-claude-btn", style = "display:none;"),
                        actionButton("copy_heatmap", "Copy to Clipboard", class = "btn-secondary"),
                        tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary btn-sm", "Claude.ai"),
                 tags$a(href = "https://chatgpt.com", target = "_blank", class = "btn btn-outline-secondary btn-sm", "ChatGPT"),
@@ -1111,7 +1119,7 @@ ui <- fluidPage(
                        h5("Ask Claude about your Element Dendrogram"),
                        textInput("chat_dend_elem_question", "Your question:", placeholder = "e.g., Why do A and B cluster together?"),
                        div(class = "btn-group-chat",
-                         actionButton("ask_dend_elem", "Ask Claude (API)", class = "btn-primary", style = "display:none;"),
+                         actionButton("ask_dend_elem", "Ask Claude (API)", class = "btn-primary ask-claude-btn", style = "display:none;"),
                          actionButton("copy_dend_elem", "Copy to Clipboard", class = "btn-secondary"),
                          tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary btn-sm", "Claude.ai"),
                 tags$a(href = "https://chatgpt.com", target = "_blank", class = "btn btn-outline-secondary btn-sm", "ChatGPT"),
@@ -1156,7 +1164,7 @@ ui <- fluidPage(
                        h5("Ask Claude about your Construct Dendrogram"),
                        textInput("chat_dend_const_question", "Your question:", placeholder = "e.g., Are these constructs redundant?"),
                        div(class = "btn-group-chat",
-                         actionButton("ask_dend_const", "Ask Claude (API)", class = "btn-primary", style = "display:none;"),
+                         actionButton("ask_dend_const", "Ask Claude (API)", class = "btn-primary ask-claude-btn", style = "display:none;"),
                          actionButton("copy_dend_const", "Copy to Clipboard", class = "btn-secondary"),
                          tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary btn-sm", "Claude.ai"),
                 tags$a(href = "https://chatgpt.com", target = "_blank", class = "btn btn-outline-secondary btn-sm", "ChatGPT"),
@@ -1312,7 +1320,7 @@ ui <- fluidPage(
                      h5("Ask Claude about your Focus Cluster Analysis"),
                      textInput("chat_focus_question", "Your question:", placeholder = "e.g., What does this cluster pattern mean?"),
                      div(class = "btn-group-chat",
-                       actionButton("ask_focus", "Ask Claude (API)", class = "btn-primary", style = "display:none;"),
+                       actionButton("ask_focus", "Ask Claude (API)", class = "btn-primary ask-claude-btn", style = "display:none;"),
                        actionButton("copy_focus", "Copy to Clipboard", class = "btn-secondary"),
                        tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary btn-sm", "Claude.ai"),
                 tags$a(href = "https://chatgpt.com", target = "_blank", class = "btn btn-outline-secondary btn-sm", "ChatGPT"),
@@ -1380,7 +1388,7 @@ ui <- fluidPage(
                      h5("Ask Claude about your Statistics"),
                      textInput("chat_stats_question", "Your question:", placeholder = "e.g., Why is this element's SD so high?"),
                      div(class = "btn-group-chat",
-                       actionButton("ask_stats", "Ask Claude (API)", class = "btn-primary", style = "display:none;"),
+                       actionButton("ask_stats", "Ask Claude (API)", class = "btn-primary ask-claude-btn", style = "display:none;"),
                        actionButton("copy_stats", "Copy to Clipboard", class = "btn-secondary"),
                        tags$a(href = "https://claude.ai", target = "_blank", class = "btn btn-outline-secondary btn-sm", "Claude.ai"),
                 tags$a(href = "https://chatgpt.com", target = "_blank", class = "btn btn-outline-secondary btn-sm", "ChatGPT"),
@@ -1954,6 +1962,14 @@ ui <- fluidPage(
 repplus_docs_global <- tryCatch(load_repplus_docs(), error = function(e) list())
 
 server <- function(input, output, session) {
+
+  # Reveal the "Ask Claude (API)" buttons only when ANTHROPIC_API_KEY is set
+  # in the environment. Without this, every Ask button stayed permanently
+  # hidden because no code ever flipped their inline display:none. Users only
+  # saw Copy to Clipboard + the external chat links.
+  if (has_api_key()) {
+    session$sendCustomMessage("toggleApiButtons", TRUE)
+  }
 
   # Per-session rate limit for Claude API calls. Rolling 60-second window.
   chat_call_log <- reactiveVal(numeric(0))

@@ -30,3 +30,8 @@ rsconnect/
 # Deployment docs (contains server credentials)
 DEPLOY_INSTRUCTIONS.md
 
+# Environment files (API keys, secrets — must NEVER be committed)
+.env
+.env.*
+!.env.example
+
