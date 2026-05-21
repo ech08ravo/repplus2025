@@ -2,13 +2,26 @@
 
 ## Eliciting, Rating and Analyzing Repertory Grids
 
-March 2025
+Updated May 2026 (covers v2.2)
 
 Elizabeth Black, with Claude AI assistance
 
 Based on the RepPlus Conceptual Representation Software by Brian R Gaines and Mildred L G Shaw
 
 https://webgrid.online
+
+---
+
+## What's new since the March 2025 manual
+
+- **Default scale is 1–5** (matching Shaw's original WebGrid). Older `.rgrid` and `.json` files using a 1–7 scale are auto-normalised when loaded.
+- **Element attachments** — every element slot (in the wizard, in Build Grid, in any Edit) accepts an image, document, or URL. On phones the picker opens the camera. See section 8.
+- **Save Grid on every chart tab** — the JSON save button now sits next to *Download PNG* on Biplot, Crossplot, Synopsis, Heatmap, both Dendrograms, and Focus, so you don't have to hunt in *Export*.
+- **Guided Tour** — a *Guided Tour (Biscuits!)* button on the landing page walks brand-new users through a worked example with image cues.
+- **Default landing is the full app**. Append `?mode=simple` to the URL to force the wizard for first-time users (Section 1.3).
+- **Built-in rate limit on the AI chat** — max 10 *Ask Claude* calls per session per minute (Section 6.1). Hitting the limit shows a yellow notification; the Copy-to-Clipboard fallback is unaffected.
+- **More multi-grid analyses** — MINUS, CORE, PrinGrid Trajectories, Exchange Grids, and Class Metagrids are all in the bottom row of tabs.
+- **Privacy** — grid data is processed in your browser session and discarded when your tab closes; nothing is stored on the server (Section 9).
 
 ---
 
@@ -104,11 +117,15 @@ New capabilities in WebGrid.Online include:
 
 WebGrid.Online is available at **https://webgrid.online**.
 
-No account or login is required. Grid data is processed locally in the browser session and is not stored on the server.
+No account or login is required. Grid data is processed locally in your browser session and is not stored on the server (see Section 9 for privacy details).
 
-To skip the guided wizard and go directly to the full application, append `?mode=full` to the URL:
+The **full application is the default** when you visit the URL. To force the **guided wizard** (useful for class exercises or first-time users), append `?mode=simple`:
 
-    https://webgrid.online?mode=full
+    https://webgrid.online?mode=simple
+
+There is also a **Simple Start** button in the sidebar of the full app that switches into the wizard from any state.
+
+**Browsers:** Chrome, Edge, Safari, and Firefox are all tested. Mobile Safari and Chrome on Android both work for entering and rating grids; large multi-grid analyses are easier on a desktop because of screen real estate.
 
 ---
 
@@ -118,16 +135,24 @@ The guided wizard walks new users through the complete process of creating and a
 
 ### 2.1 Entering Elements
 
-When you first visit WebGrid.Online, you are presented with the landing page. Enter five items you would like to compare. These should be drawn from the same category — for example:
+When you visit WebGrid.Online with `?mode=simple` (or click *Simple Start* in the sidebar), you are presented with the landing page. There are **six element fields** — enter at least four (you'll see a friendly error if you try to continue with fewer). Pick items from the same category:
 
-- 5 career paths you are considering
-- 5 people you work with
-- 5 cities you have lived in
-- 5 products you use regularly
+- 6 career paths you are considering
+- 6 people you work with
+- 6 cities you have lived in
+- 6 products you use regularly
 
-Type one element per line and click **Continue**.
+Each field accepts plain text, but you can also:
 
-**Tip:** Choose elements that are meaningful to you and that you can meaningfully distinguish from one another. The constructs you generate will depend on the elements you provide.
+- **Paste a URL** (anything starting with `http://` or `https://`) — it will be auto-detected and shown as a clickable link in the triad cards and rating screen, so you can pop open the source while you decide.
+- **Attach an image, document, or take a photo** by clicking the 📎 paperclip button next to the field. On mobile this opens the camera directly via the OS picker. On desktop it opens a file chooser. Images are resized client-side to 800px max edge before upload, so a phone photo is safe.
+- **Paste multiple elements at once** in Build Grid (the full app's data-entry tab) using the "Paste Multiple" textarea. URLs in the pasted text are auto-detected and stored as element links.
+
+Click **Continue** when you're ready.
+
+**Tip:** Choose elements that are meaningful to you and that you can meaningfully distinguish from one another. The constructs you generate will depend entirely on the elements you provide.
+
+**Pseudonym:** The optional name field at the top labels your grid when it's saved or added to a Grid Collection. Leave blank to be assigned a random pseudonym (e.g. *SwiftFalcon42*).
 
 ### 2.2 Using a Preset Grid
 
@@ -135,11 +160,15 @@ If you are completing a structured exercise (e.g., a class assignment), click **
 
 Select a preset to load its elements automatically. You will then proceed to triadic elicitation to generate your own personal constructs for those elements.
 
-Currently available presets:
+Currently shipped presets (in `dataExamples/presets/`):
 
 - **Careers Study** — Scientist, Sociologist, Doctor, Librarian, Artist
+- **School Subjects** — Mathematics, Physics, Chemistry, Biology, Geology, Geography
+- **Learning Situations** — based on the Arthur grid (Gaines & Shaw)
+- **Time Person of the Year** — historical figures with Wikipedia links
+- **Guided Tour: Biscuits!** — a friendly worked example with product images, accessible from the *Guided Tour (Biscuits!)* button on the landing page
 
-Additional presets can be added by your instructor.
+Instructors can drop additional `.json` preset files into `dataExamples/presets/` on the server. A preset file just needs `name` and `elements`; optionally `element_urls` (links shown next to each element) and `element_images` (base64 images).
 
 ### 2.3 Triadic Elicitation of Constructs
 
