@@ -434,7 +434,7 @@ get_elicitation_progress(total, completed)
 
 ### API Configuration
 
-- **Model**: `claude-sonnet-4-20250514` (configurable)
+- **Model**: `claude-sonnet-4-6` (configurable)
 - **API Key**: `ANTHROPIC_API_KEY` environment variable
 - **Endpoint**: `https://api.anthropic.com/v1/messages`
 - **Headers**: `x-api-key`, `anthropic-version`, `content-type`

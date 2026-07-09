@@ -77,7 +77,7 @@ Outputs are interoperable with **RepPlus** (`.rgrid` format).
 - Two modes: Direct API (requires ANTHROPIC_API_KEY) or copy-to-clipboard for manual Claude.ai
 - RAG (Retrieval Augmented Generation) using RepPlus documentation
 - Context-aware prompts with grid data and visualization parameters
-- Model: claude-sonnet-4-20250514 (configurable)
+- Model: claude-sonnet-4-6 (configurable)
 
 ### Imputation
 - Optional missing data imputation (midpoint = 4 for 1-7 scale)
