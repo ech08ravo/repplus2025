@@ -23,7 +23,7 @@ WebGrid.Online/
 │   ├── rgrid_io.R                  # 130 lines: .rgrid parsing (Rep IV / Rep Plus V1.1 / V2.0)
 │   ├── focus_analysis.r            # 506 lines: Shaw FOCUS algorithm + plotting
 │   ├── multigrid_analysis.r        # 1337 lines: Multi-grid analyses (SOCIOGRIDS)
-│   ├── claude_api.R                # 245 lines: Claude API integration
+│   ├── claude_api.R                # 261 lines: Claude API integration
 │   ├── triadic_elicitation.r       # 105 lines: Triadic helpers
 │   └── score_matrix_helper.r       # 17 lines: Utility functions
 ├── dataExamples/

@@ -316,13 +316,13 @@ WebGrid.Online/
 
 WebGrid.Online implements core repertory grid analysis functionality:
 
-**✅ Implemented (v2.3.0):**
+**✅ Implemented (v2.3.1):**
 
 *Single-Grid Analysis:*
 - Interactive grid elicitation (elements, constructs, ratings)
 - Element attachments (images, files, URLs)
 - Triadic elicitation with visual card interface
-- Import/export (.rgrid, .csv, .json)
+- Import/export (.rgrid, .csv, .json) - reads Rep IV, Rep Plus V1.1 and V2.0 grids
 - Rating distributions and scree plot (Synopsis)
 - 2D scatter plot on construct pairs (Crossplot)
 - PCA biplot visualization
