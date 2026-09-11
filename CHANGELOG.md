@@ -25,7 +25,17 @@ All notable changes to WebGrid.Online are documented in this file.
 - Both `.rgrid` import paths (single-grid and multi-grid) now share one parser in
   `R/rgrid_io.R`, replacing two copies of the field-counting logic.
 
+### Fixed
+- **renv.lock could not be read by rsconnect.** The `Matrix` and `lattice`
+  records declared `"Source": "Repository"` with no `Repository` field, which
+  aborts dependency capture with `subscript out of bounds`. Both now carry
+  `"Repository": "CRAN"` like every other record.
+
 ### Documentation
+- Rewrote the ARCHITECTURE deployment section, which named the wrong repo path
+  (a stale clone at `/home/ubuntu/repplus2025`), the wrong base image, a renv
+  restore the Dockerfile does not do, and `localhost:3838` as the upstream when
+  the app binds to the docker bridge. Adds the shinyapps.io procedure.
 - New [RGRID_FORMAT.md](RGRID_FORMAT.md): the three construct-line layouts, the
   rating-offset rule with its truth table and worked calculation, how Rep Plus
   assigns ratings to poles and treats the midpoint, and every place the app uses

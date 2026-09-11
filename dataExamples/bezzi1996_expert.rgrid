@@ -1,0 +1,37 @@
+	Grid	9#	16	9	Bezzi1996expert	expert	3	1996-01-01	00:00:00	literature	Rep Plus V1.1	RepGrid
+C0	R	1	0	1	1	5		extrusive	intrusive	
+C1	R	1	0	1	1	5		undersaturated	saturated	
+C2	R	1	0	1	1	5		saturated	oversaturated	
+C3	R	1	0	1	1	5		definitely acid magmas	acid magmas	
+C4	R	1	0	1	1	5		no phenoxx	with phenoxx	
+C5	R	1	0	1	1	5		plg-rich	mafic-rich	
+C6	R	1	0	1	1	5		mafic-poor	mafic-rich	
+C7	R	1	0	1	1	5		ocean floor	not ocean floor	
+C8	R	1	0	1	1	5		crystalline	glassy	
+C9	R	1	0	1	1	5		leucocratic	melanocratic	
+C10	R	1	0	1	1	5		ocean floor	intraplate	
+C11	R	1	0	1	1	5		plg-rich	alkali-rich	
+C12	R	1	0	1	1	5		melanocratic	leucocratic	
+C13	R	1	0	1	1	5		with qz-phenoxx	no qz-phenoxx	
+C14	R	1	0	1	1	5		from undifferentiated magma	from differentiated magma	
+C15	R	1	0	1	1	5		magmatic arc	not magmatic arc	
+E0	1	0	4	?	4	0	4	?	?	4	0	0	4	4	3	0	4	0	granite	
+E1	1	0	0	4	0	4	0	0	0	0	4	1	3	0	0	4	0	0	basalt	
+E2	1	0	0	4	0	4	0	0	0	1	4	1	4	0	1	4	0	0	andesite	
+E3	1	0	0	?	4	0	0	?	?	4	4	0	?	4	1	4	4	0	rhyolite	
+E4	1	0	4	3	0	0	4	0	?	4	0	1	2	3	1	0	4	0	diorite	
+E5	1	0	4	4	0	4	4	0	0	2	0	1	2	0	2	2	2	0	gabbro	
+E6	1	0	0	2	0	4	0	2	0	2	4	2	2	1	4	4	0	2	syenite	
+E7	1	0	0	0	?	?	0	3	3	2	4	4	0	2	2	4	0	1	trachyte	
+E8	1	0	4	0	?	?	4	4	4	0	0	4	0	2	0	4	0	4	peridotite	
+_UID	bezzi-1996-expert-igneous-rocks
+_Date	1996-01-01
+_Time	00:00:00
+_Place	literature
+_Meta	1
+_Status	3
+_Context	An expert geologist's constructs distinguishing common igneous rock types
+_Name	Bezzi1996expert
+_Note	expert
+_Source	Bezzi 1996 expert
+_Annotation	Bezzi 1996 expert. Transcribed from the published grid display. Cells shown as 0 in the source figure are unrated and stored here as '?'. Constructs 10 and 13 are a reversed-pole pair (leucocratic/melanocratic).

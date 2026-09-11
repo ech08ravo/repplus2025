@@ -542,25 +542,76 @@ list(
 
 ## Deployment
 
-### Docker Stack
-- **Base Image**: `rocker/shiny:latest` (RStudio Shiny Server)
-- **Dockerfile**: Install OpenRepGrid, renv restore, copy app
-- **docker-compose.yml**: Define shiny service (port 3838)
-- **Build**: `docker build -t webgrid-online .`
-- **Run**: `docker run -d -p 3838:3838 --name webgrid webgrid-online`
+### Docker stack (production)
+- **Base image**: `rocker/shiny:4.5.3`
+- **Dockerfile**: installs the R packages straight from CRAN (unpinned - it does
+  *not* use `renv.lock`), then copies `app.R`, `R/`, `dataExamples/` and
+  `RepPlusDocs/*.txt`
+- **Entrypoint**: `docker-entrypoint.sh` promotes `ANTHROPIC_API_KEY` into R's
+  `Renviron.site`, because shiny-server does not pass its environment to the R
+  workers it spawns
+- **Port binding**: `172.17.0.1:3838` - the docker bridge, *not* loopback, so
+  nginx can reach it while the host's public interface cannot. `curl
+  localhost:3838` will always come back empty; use the bridge address
+- **Compose v2 is required** (`docker compose`, with a space). The v1 python
+  client crashes with `KeyError: 'ContainerConfig'` when recreating a container
+  built by a modern daemon, and the two disagree about image names
+  (`repplusapp_repplus` vs `repplusapp-repplus`), so mixing them silently starts
+  a stale image
 
-### Nginx Reverse Proxy
-- **Config**: `/home/ubuntu/nginx/webgrid.conf`
-- **Upstream**: `localhost:3838` (Shiny Server)
-- **SSL**: Let's Encrypt (auto-renewing)
+### Nginx reverse proxy
+- **Config**: `/home/ubuntu/nginx/webgrid.conf`, mounted into the `nginx`
+  container at `/etc/nginx/conf.d/webgrid.conf`
+- **Upstream**: `proxy_pass http://172.17.0.1:3838/webgrid/`
+- **SSL**: Let's Encrypt (`/etc/letsencrypt`, mounted into the container)
 - **URL**: https://webgrid.online
 
 ### Server
-- **Host**: DreamCompute (208.113.135.63)
-- **OS**: Ubuntu 24.04
-- **RAM**: 8GB
-- **Repo**: `/home/ubuntu/repplus2025`
-- **Redeploy**: `git pull && docker build && docker run`
+- **Host**: DreamCompute (208.113.135.63), user `ubuntu`
+- **OS**: Ubuntu 24.04.1 LTS, ~8 GB RAM
+- **Repo**: `/home/ubuntu/RepPlusApp` — note that a stale clone also exists at
+  `/home/ubuntu/repplus2025`; deploying from it ships old code
+- **Redeploy**: `cd ~/RepPlusApp && git pull && ./deploy.sh`
+
+`deploy.sh` builds before touching the running container, so the site stays up
+for the slow part and is interrupted only for the container swap (a few
+seconds - `container_name` is pinned, so there is no rolling replacement). It
+clears a leftover container holding the name, then polls the app and reports the
+version actually being served.
+
+### shinyapps.io (backup deployment)
+https://ech08ravo.shinyapps.io/repplus2025/ - free tier, so it sleeps between
+uses and an initial request returns HTTP 202 while it wakes.
+
+Deployed from a developer machine with `rsconnect`. Three flags matter:
+
+```r
+rsconnect::deployApp(
+  appDir = ".", appName = "repplus2025", account = "ech08ravo",
+  appFiles = c("app.R",
+               list.files("R", pattern = "\\.[Rr]$", full.names = TRUE),
+               list.files("dataExamples", recursive = TRUE, full.names = TRUE),
+               Sys.glob("RepPlusDocs/*.txt")),
+  dependencyResolution = "library",
+  forceUpdate = TRUE
+)
+```
+
+- **`appFiles`** - without it the whole directory is bundled: 21 MB of
+  `RepPlusDocs` PDFs the app never reads, plus `renv/`, `.RData`, `tests/`. The
+  list above is 1.1 MB
+- **`dependencyResolution = "library"`** - by default rsconnect reads
+  `renv.lock` and aborts if the local library has drifted from it. This deploys
+  the versions actually installed and tested locally instead
+- **No `envVars`** - `ANTHROPIC_API_KEY` is deliberately not uploaded, so the
+  "Ask Claude (API)" buttons stay hidden there and Copy-to-Clipboard is the only
+  chat path. shinyapps.io has no `.env` or `Renviron.site`, so the Docker
+  entrypoint mechanism does not apply
+
+Every package in `renv.lock` must also be installed locally for rsconnect to
+read it, even under `dependencyResolution = "library"`, and every `Repository`
+source record needs its `Repository` field - a record missing it fails with
+`subscript out of bounds`.
 
 ---
 

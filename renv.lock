@@ -71,7 +71,8 @@
     "Matrix": {
       "Package": "Matrix",
       "Version": "1.7-4",
-      "Source": "Repository"
+      "Source": "Repository",
+      "Repository": "CRAN"
     },
     "OpenRepGrid": {
       "Package": "OpenRepGrid",
@@ -1494,7 +1495,8 @@
     "lattice": {
       "Package": "lattice",
       "Version": "0.22-9",
-      "Source": "Repository"
+      "Source": "Repository",
+      "Repository": "CRAN"
     },
     "lazyeval": {
       "Package": "lazyeval",
