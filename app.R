@@ -5,7 +5,7 @@ library(uuid)
 library(jsonlite)
 library(igraph)
 
-APP_VERSION <- "2.2.0"
+APP_VERSION <- "2.3.0"
 
 # Security: explicit upload size limit (10MB) and grid limits
 options(shiny.maxRequestSize = 10 * 1024^2)

@@ -2,7 +2,7 @@
 
 All notable changes to WebGrid.Online are documented in this file.
 
-## [Unreleased]
+## [2.3.0] - 2026-09-11
 
 ### Changed
 - **Focus Cluster tab redesigned to the WebGrid display layout**

@@ -1,6 +1,6 @@
 # WebGrid.Online - Architecture Guide
 
-A comprehensive developer guide to WebGrid.Online v2.2.0 architecture, data structures, algorithms, and integration points.
+A comprehensive developer guide to WebGrid.Online v2.3.0 architecture, data structures, algorithms, and integration points.
 
 ## Quick Overview
 
@@ -20,7 +20,7 @@ A comprehensive developer guide to WebGrid.Online v2.2.0 architecture, data stru
 WebGrid.Online/
 ├── app.R                           # 6612 lines: UI + Server (monolithic Shiny app)
 ├── R/
-│   ├── focus_analysis.r            # 381 lines: Shaw FOCUS algorithm + plotting
+│   ├── focus_analysis.r            # 504 lines: Shaw FOCUS algorithm + plotting
 │   ├── multigrid_analysis.r        # 1337 lines: Multi-grid analyses (SOCIOGRIDS)
 │   ├── claude_api.R                # 245 lines: Claude API integration
 │   ├── triadic_elicitation.r       # 105 lines: Triadic helpers
@@ -294,8 +294,13 @@ rv <- reactiveValues(
   2. Compute construct-construct similarity (with construct reversal)
   3. Hierarchical clustering (complete linkage)
   4. Sort matrix by cluster order
-- **Plot**: 4-panel (top dendrogram, left dendrogram, grid, stats)
-- **Variants**: `plot_focus_cluster()` (uniform spacing) or `plot_focus_spaced()` (proportional spacing)
+- **Plot**: single-region display layout - constructs as rows (poles flanking the
+  ratings box), elements as columns with staircased labels below, element dendrogram
+  above the columns, construct dendrogram right of the rows, match caption under the title
+- **Variants**: `plot_focus_cluster()` (uniform spacing), `plot_focus_spaced()`
+  (proportional spacing) or `plot_display_grid()` (grid as entered, no clustering),
+  selected by the `focus_style` radio buttons and drawn through the shared
+  `draw_focus_plot()` server helper
 - **Palette**: `focus_palette`
 
 ### Tab 9: Statistics
@@ -392,15 +397,24 @@ similarity = 100 * (1 - distance / max_distance)
 
 ### Plotting
 
+All three plots share `render_grid_display()`, which draws the box, poles,
+staircased element labels and both dendrograms in one plot region. Cell size is
+capped to the rating digits so the box stays compact; margins are measured in
+inches from the actual label metrics, with the right margin settled over a few
+passes because staircase overflow depends on the cell width it helps determine.
+
 **plot_focus_cluster()**: Uniform cell spacing
-- Layout matrix: 2×3 (top dendro, left dendro, main grid, stats panel)
-- Adaptive margins based on label lengths
 - Optional shading, values, color
 
 **plot_focus_spaced()**: Proportional spacing
-- Cophenetic distances between adjacent items
-- Spacing: `0.5 + (dist/max_dist) * 1.5`
-- Cells drawn at non-uniform positions to show similarity distances
+- Cophenetic distances between adjacent items (`spaced_positions()`)
+- Spacing: `1 + (dist/max_dist) * 1.2` cell units
+- Rows, columns and dendrogram leaves all drawn at the non-uniform positions
+
+**plot_display_grid()**: Grid as entered, no clustering or dendrograms
+
+**dendro_segments()**: Dendrogram geometry for arbitrary leaf positions, so the
+SPACED variant's dendrograms line up with its non-uniform rows and columns
 
 ---
 
@@ -654,7 +668,6 @@ output$newanalysis_plot <- renderPlot({
 
 ## Known Limitations & Future Work
 
-- **Limitation**: Dendrogram rendering generates harmless "horiz" warnings
 - **Limitation**: No 3D PCA visualization (PrinGrid 3D)
 - **Planned**: Image elements from mobile photo library
 - **Planned**: Per-visualization email buttons in main app

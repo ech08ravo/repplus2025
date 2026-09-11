@@ -265,8 +265,10 @@ render_grid_display <- function(scores, left_poles, right_poles, element_labels,
   mai_top <- mar_top
   mai_bottom <- max(0.02, din[2] - mai_top - grid_h)
   if (slack_y > 0) {
-    # Breathe under the title, but never at the cost of the staircase labels.
-    mai_top <- mar_top + min(slack_y * 0.25, 0.4)
+    # Centre the box + staircase in whatever room is left, so a small grid on a
+    # tall panel doesn't sit in the top corner - but never at the cost of the
+    # staircase labels, which must stay on the canvas.
+    mai_top <- mar_top + slack_y * 0.45
     mai_top <- min(mai_top, max(mar_top, din[2] - grid_h - mar_bottom))
     mai_bottom <- max(0.02, din[2] - mai_top - grid_h)
   }

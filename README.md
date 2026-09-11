@@ -3,7 +3,7 @@
 A Shiny web application for eliciting, rating, and analysing repertory grids using the [OpenRepGrid](https://docs.openrepgrid.org/) R package and Personal Construct Theory.
 Outputs are interoperable with **RepPlus** (`.rgrid` format).
 
-**Live**: https://webgrid.online | **Version**: 2.2.0
+**Live**: https://webgrid.online | **Version**: 2.3.0
 
 ---
 
@@ -239,17 +239,20 @@ Navigate through the single-grid analysis tabs:
 
 #### Focus Cluster Tab
 - **Run Focus Analysis** to automatically sort your grid by similarity (Shaw's FOCUS algorithm)
-- Displays sorted grid with dendrograms on top and left
-- Shows element and construct similarity statistics in right panel
+- Displays the sorted grid in the WebGrid display layout: constructs as rows with
+  their poles either side of the ratings box, elements as columns named by
+  staircased labels below, element dendrogram above and construct dendrogram right
+- Shows the closest element and construct matches as a caption under the title
 - Configurable parameters:
   - **Minkowski Power**: 1.0 (city block) or 2.0 (Euclidean distance)
   - **Match Cutoff**: Minimum similarity % to display (default 80%)
   - **Show Rating Values**: Toggle numeric display in cells
   - **Show Shading**: Toggle greyscale/color gradient
-  - **Use SPACED variant**: Toggle between standard and proportionally-spaced dendrograms
+  - **Representation**: FOCUS (sorted with dendrograms), SPACED (rows and columns
+    spaced in proportion to dissimilarity), or Display (grid as entered, no clustering)
   - **Color Palette**: Select from wong, classic, earth, contrast, greyscale
   - **Text Size** and **Cell Size**: Scaling factors for large/small grids
-- Adaptive margins and text sizing for readability
+- Ratings box sized to its contents; margins adapt to label lengths
 - **Download Focus Plot** for high-resolution PNG (1200×900)
 
 See [FOCUS_USER_GUIDE.md](FOCUS_USER_GUIDE.md) for detailed Focus analysis instructions.
@@ -312,7 +315,7 @@ WebGrid.Online/
 
 WebGrid.Online implements core repertory grid analysis functionality:
 
-**✅ Implemented (v2.2.0):**
+**✅ Implemented (v2.3.0):**
 
 *Single-Grid Analysis:*
 - Interactive grid elicitation (elements, constructs, ratings)
@@ -324,7 +327,7 @@ WebGrid.Online implements core repertory grid analysis functionality:
 - PCA biplot visualization
 - Heatmap with row/column clustering
 - Hierarchical dendrograms (elements and constructs)
-- Focus cluster analysis (Shaw's 1980 algorithm + SPACED variant)
+- Focus cluster analysis (Shaw's 1980 algorithm + SPACED and Display variants)
 - Descriptive statistics
 - Missing data imputation
 - Per-visualization color palettes (wong, classic, earth, contrast, greyscale)
