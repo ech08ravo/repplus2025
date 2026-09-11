@@ -105,8 +105,8 @@ call_claude_api <- function(prompt, system_prompt = NULL) {
   )
 
   body <- list(
-    model = "claude-sonnet-4-6",
-    max_tokens = 2000,
+    model = "claude-sonnet-5",
+    max_tokens = 8000,
     messages = messages
   )
 
@@ -122,15 +122,23 @@ call_claude_api <- function(prompt, system_prompt = NULL) {
         "content-type" = "application/json"
       ) |>
       req_body_json(body) |>
-      req_timeout(60) |>
+      req_timeout(120) |>
       req_perform()
 
     result <- resp_body_json(resp)
 
-    if (!is.null(result$content) && length(result$content) > 0) {
+    # Sonnet 5 runs adaptive thinking by default, so the first content block
+    # may be a (text-less) thinking block - take the first actual text block.
+    text_blocks <- Filter(
+      function(b) identical(b$type, "text") && !is.null(b$text),
+      if (is.null(result$content)) list() else result$content
+    )
+
+    if (length(text_blocks) > 0) {
       return(list(
         success = TRUE,
-        response = result$content[[1]]$text
+        response = paste(vapply(text_blocks, function(b) b$text, character(1)),
+                         collapse = "\n\n")
       ))
     } else {
       return(list(
