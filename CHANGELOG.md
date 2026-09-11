@@ -2,6 +2,29 @@
 
 All notable changes to WebGrid.Online are documented in this file.
 
+## [2.3.1] - 2026-09-11
+
+### Fixed
+- **.rgrid import read the wrong construct poles from Rep Plus V2.0 files.**
+  V2.0 annotates each pole with the ratings it covers
+  (`1* 2 Social  4* 5 goal`), so taking the last two tab fields - correct for
+  Rep IV and Rep Plus V1.1 - returned `5` as every left pole. Parsing now uses
+  field 5 of the construct line, which is the token count per pole group, with a
+  fallback for layouts we have not seen.
+- **.rgrid ratings were imported 0-based.** Rep Plus stores ratings 0-based while
+  declaring a 1-based scale: a file reading `3 0 4` is displayed as `4 1 5` by the
+  Rep Plus desktop app. Ratings are now shifted onto the declared scale, and only
+  when they actually fit after shifting, so files that are already 1-based (including
+  this app's own exports) are never shifted twice. This was not only cosmetic -
+  `rv$scale` is never assigned, so 0-4 data was analysed as 1-5: imputation filled
+  the midpoint 3 when the real midpoint was 2, heatmap `zlim` clipped the zeroes,
+  and construct reversal reflected around the wrong centre.
+- The declared scale is now carried through import instead of being assumed to be 1-5.
+
+### Changed
+- Both `.rgrid` import paths (single-grid and multi-grid) now share one parser in
+  `R/rgrid_io.R`, replacing two copies of the field-counting logic.
+
 ## [2.3.0] - 2026-09-11
 
 ### Changed

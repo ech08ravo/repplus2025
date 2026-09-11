@@ -5,7 +5,7 @@ library(uuid)
 library(jsonlite)
 library(igraph)
 
-APP_VERSION <- "2.3.0"
+APP_VERSION <- "2.3.1"
 
 # Security: explicit upload size limit (10MB) and grid limits
 options(shiny.maxRequestSize = 10 * 1024^2)
@@ -53,6 +53,7 @@ safe_triads <- function(items, max_triads = MAX_TRIADS) {
 }
 
 # Source the focus analysis functions
+source("R/rgrid_io.R")
 source("R/focus_analysis.r")
 source("R/claude_api.R")
 source("R/multigrid_analysis.r")
@@ -3813,70 +3814,33 @@ server <- function(input, output, session) {
         session$sendCustomMessage("openAnalysis", TRUE)
 
       } else if (file_ext == "rgrid") {
-        # Import .rgrid format
-        txt <- readLines(file_path, warn = FALSE, encoding = "UTF-8")
+        # Import .rgrid format. R/rgrid_io.R handles the Rep IV / Rep Plus V1.1 /
+        # Rep Plus V2.0 construct-line layouts and the 0-based rating storage.
+        g <- parse_rgrid(file_path)
+        n_e <- length(g$elements)
+        n_c <- length(g$left)
 
-        # Parse constructs (lines starting with C) – take last two non-empty fields
-        c_lines <- grep("^C\\d+\\t", txt, value = TRUE)
-        if (length(c_lines) == 0) {
-          showNotification("Invalid .rgrid file: no constructs found", type = "error")
-          return()
-        }
-        cons_split <- lapply(c_lines, function(l) {
-          toks <- strsplit(l, "\t")[[1]]
-          toks[nzchar(toks)]
-        })
-        left <- vapply(
-          cons_split,
-          function(p) if (length(p) >= 2) p[length(p) - 1] else NA_character_,
-          character(1)
-        )
-        right <- vapply(
-          cons_split,
-          function(p) if (length(p) >= 1) p[length(p)] else NA_character_,
-          character(1)
-        )
-        n_c <- length(left)
-
-        # Parse elements (lines starting with E) – name last; scores are last n_c before name
-        e_lines <- grep("^E\\d+\\t", txt, value = TRUE)
-        if (length(e_lines) == 0) {
-          showNotification("Invalid .rgrid file: no elements found", type = "error")
-          return()
-        }
-        n_e <- length(e_lines)
-        elements <- character(n_e)
-        scores_mat <- matrix(NA_real_, nrow = n_e, ncol = n_c)
-
-        for (i in seq_len(n_e)) {
-          toks <- strsplit(e_lines[i], "\t")[[1]]
-          toks <- toks[nzchar(toks)]
-          if (length(toks) < (n_c + 1)) next
-          elements[i] <- toks[length(toks)]
-          start <- (length(toks) - 1) - n_c + 1
-          end   <- length(toks) - 1
-          if (start >= 1 && end >= start) {
-            sc <- suppressWarnings(as.numeric(toks[start:end]))
-            scores_mat[i, ] <- sc
-          }
-        }
-
-        rv$elements <- elements
+        rv$elements <- g$elements
         rv$constructs <- data.frame(
-          left = left,
-          right = right,
+          left = g$left,
+          right = g$right,
           stringsAsFactors = FALSE
         )
-        labels <- paste(left, "-", right)
+        rv$scale <- g$scale[2]
+        labels <- paste(g$left, "-", g$right)
         rv$ratings <- data.frame(
-          element   = rep(elements, times = n_c),
-          construct = rep(labels,   each  = n_e),
-          rating    = as.vector(scores_mat),
+          element   = rep(g$elements, times = n_c),
+          construct = rep(labels,     each  = n_e),
+          rating    = as.vector(g$scores_mat),
           stringsAsFactors = FALSE
         )
 
         showNotification(
-          paste0("Loaded ", n_e, " elements, ", n_c, " constructs from .rgrid"),
+          paste0("Loaded ", n_e, " elements, ", n_c, " constructs from .rgrid",
+                 if (g$offset_applied != 0) {
+                   paste0(" (", g$source, " stores ratings 0-based; shifted onto its ",
+                          g$scale[1], "-", g$scale[2], " scale)")
+                 } else ""),
           type = "message"
         )
 
@@ -5386,70 +5350,32 @@ server <- function(input, output, session) {
       }
 
     } else if (ext == "rgrid") {
-      # Use same parsing logic as the working single-grid import
-      txt <- readLines(file_path, warn = FALSE, encoding = "UTF-8")
+      # Same parser as the single-grid import (R/rgrid_io.R)
+      g <- parse_rgrid(file_path)
+      n_e <- length(g$elements)
+      n_c <- length(g$left)
 
-      # Parse constructs (lines starting with C) - take last two non-empty fields
-      c_lines <- grep("^C\\d+\\t", txt, value = TRUE)
-      if (length(c_lines) == 0) stop("Invalid .rgrid file: no constructs found")
+      grid_data$constructs <- data.frame(left = g$left, right = g$right,
+                                         stringsAsFactors = FALSE)
+      grid_data$elements <- g$elements
+      grid_data$scores_mat <- g$scores_mat
 
-      cons_split <- lapply(c_lines, function(l) {
-        toks <- strsplit(l, "\t")[[1]]
-        toks[nzchar(toks)]
-      })
-      left <- vapply(
-        cons_split,
-        function(p) if (length(p) >= 2) p[length(p) - 1] else NA_character_,
-        character(1)
-      )
-      right <- vapply(
-        cons_split,
-        function(p) if (length(p) >= 1) p[length(p)] else NA_character_,
-        character(1)
-      )
-      n_c <- length(left)
-
-      grid_data$constructs <- data.frame(left = left, right = right, stringsAsFactors = FALSE)
-
-      # Parse elements (lines starting with E) - name last; scores are last n_c before name
-      e_lines <- grep("^E\\d+\\t", txt, value = TRUE)
-      if (length(e_lines) == 0) stop("Invalid .rgrid file: no elements found")
-
-      n_e <- length(e_lines)
-      elements <- character(n_e)
-      scores_mat <- matrix(NA_real_, nrow = n_e, ncol = n_c)
-
-      for (i in seq_len(n_e)) {
-        toks <- strsplit(e_lines[i], "\t")[[1]]
-        toks <- toks[nzchar(toks)]
-        if (length(toks) < (n_c + 1)) next
-        elements[i] <- toks[length(toks)]
-        start <- (length(toks) - 1) - n_c + 1
-        end   <- length(toks) - 1
-        if (start >= 1 && end >= start) {
-          sc <- suppressWarnings(as.numeric(toks[start:end]))
-          scores_mat[i, ] <- sc
-        }
-      }
-
-      grid_data$elements <- elements
-      grid_data$scores_mat <- scores_mat
-      rownames(grid_data$scores_mat) <- elements
-      colnames(grid_data$scores_mat) <- paste(left, "-", right)
-
-      # Build ratings data frame
-      labels <- paste(left, "-", right)
+      labels <- paste(g$left, "-", g$right)
       grid_data$ratings <- data.frame(
-        element   = rep(elements, times = n_c),
-        construct = rep(labels,   each  = n_e),
-        rating    = as.vector(scores_mat),
+        element   = rep(g$elements, times = n_c),
+        construct = rep(labels,     each  = n_e),
+        rating    = as.vector(g$scores_mat),
         stringsAsFactors = FALSE
       )
 
-      # Try to detect scale from ratings
-      all_ratings <- grid_data$scores_mat[!is.na(grid_data$scores_mat)]
-      if (length(all_ratings) > 0) {
-        grid_data$scale <- c(min(all_ratings), max(all_ratings))
+      # Prefer the scale declared in the file; fall back to the observed range
+      # if the ratings do not fit inside it.
+      vals <- g$scores_mat[!is.na(g$scores_mat)]
+      grid_data$scale <- if (length(vals) &&
+                             (min(vals) < g$scale[1] || max(vals) > g$scale[2])) {
+        c(min(vals), max(vals))
+      } else {
+        g$scale
       }
 
     }

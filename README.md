@@ -3,7 +3,7 @@
 A Shiny web application for eliciting, rating, and analysing repertory grids using the [OpenRepGrid](https://docs.openrepgrid.org/) R package and Personal Construct Theory.
 Outputs are interoperable with **RepPlus** (`.rgrid` format).
 
-**Live**: https://webgrid.online | **Version**: 2.3.0
+**Live**: https://webgrid.online | **Version**: 2.3.1
 
 ---
 

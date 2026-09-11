@@ -1,6 +1,6 @@
 # WebGrid.Online - Architecture Guide
 
-A comprehensive developer guide to WebGrid.Online v2.3.0 architecture, data structures, algorithms, and integration points.
+A comprehensive developer guide to WebGrid.Online v2.3.1 architecture, data structures, algorithms, and integration points.
 
 ## Quick Overview
 
@@ -18,9 +18,10 @@ A comprehensive developer guide to WebGrid.Online v2.3.0 architecture, data stru
 
 ```
 WebGrid.Online/
-├── app.R                           # 6612 lines: UI + Server (monolithic Shiny app)
+├── app.R                           # 6614 lines: UI + Server (monolithic Shiny app)
 ├── R/
-│   ├── focus_analysis.r            # 504 lines: Shaw FOCUS algorithm + plotting
+│   ├── rgrid_io.R                  # 130 lines: .rgrid parsing (Rep IV / Rep Plus V1.1 / V2.0)
+│   ├── focus_analysis.r            # 506 lines: Shaw FOCUS algorithm + plotting
 │   ├── multigrid_analysis.r        # 1337 lines: Multi-grid analyses (SOCIOGRIDS)
 │   ├── claude_api.R                # 245 lines: Claude API integration
 │   ├── triadic_elicitation.r       # 105 lines: Triadic helpers
