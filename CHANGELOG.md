@@ -2,6 +2,23 @@
 
 All notable changes to WebGrid.Online are documented in this file.
 
+## [Unreleased]
+
+### Changed
+- **Focus Cluster tab redesigned to the WebGrid display layout**
+  - Grid transposed: constructs are now rows with their poles either side of the
+    ratings box; elements are columns named by staircased labels below, each
+    joined to its column by a leader line
+  - Ratings box is sized to its contents instead of stretching to fill the panel
+  - Element dendrogram moved above the columns, construct dendrogram to the right
+    of the rows; sorting, shading, values and SPACED spacing unchanged
+  - Top element/construct match now shown as a caption under the title
+
+### Added
+- **Display representation** on the Focus Cluster tab - the grid as entered, with
+  no clustering or dendrograms. Selected via the new Representation radio buttons
+  (FOCUS / SPACED / Display), which replace the SPACED checkbox.
+
 ## [2.2.0] - 2026-04-16
 
 ### Added

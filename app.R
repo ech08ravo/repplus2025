@@ -1188,7 +1188,13 @@ ui <- fluidPage(
                    column(3,
                           actionButton("run_focus", "Run Focus Analysis", class = "btn-primary"),
                           tags$br(), tags$br(),
-                          checkboxInput("focus_spaced", "SPACED: Proportional Spacing", value = FALSE),
+                          radioButtons("focus_style", "Representation",
+                                       choices = c(
+                                         "FOCUS: sorted with dendrograms" = "focus",
+                                         "SPACED: proportional spacing" = "spaced",
+                                         "Display: grid as entered" = "display"
+                                       ),
+                                       selected = "focus"),
                           selectInput("focus_palette", "Color Palette",
                                       choices = c(
                                         "Accessible (Wong)" = "wong",
@@ -1288,10 +1294,16 @@ ui <- fluidPage(
                      p("Focus automatically sorts your grid to reveal patterns. Similar elements appear together, and similar constructs appear together."),
                      h5("The display shows 4 parts"),
                      tags$ul(
-                       tags$li(tags$strong("Top dendrogram"), " - shows how constructs (columns) cluster together"),
-                       tags$li(tags$strong("Left dendrogram"), " - shows how elements (rows) cluster together"),
-                       tags$li(tags$strong("Center grid"), " - your ratings, reordered so similar items are adjacent"),
+                       tags$li(tags$strong("Top dendrogram"), " - shows how elements (columns) cluster together"),
+                       tags$li(tags$strong("Right dendrogram"), " - shows how constructs (rows) cluster together"),
+                       tags$li(tags$strong("Ratings box"), " - your ratings, reordered so similar items are adjacent, with each construct's poles either side of its row and each element named below its column"),
                        tags$li(tags$strong("Match statistics"), " - similarity percentages for elements and constructs")
+                     ),
+                     h5("Three representations"),
+                     tags$ul(
+                       tags$li(tags$strong("FOCUS"), " - sorted grid with both dendrograms"),
+                       tags$li(tags$strong("SPACED"), " - same sorting, but rows and columns are spaced apart in proportion to how dissimilar they are"),
+                       tags$li(tags$strong("Display"), " - the grid in the order you entered it, with no clustering")
                      ),
                      h5("Reading the dendrograms"),
                      tags$ul(
@@ -4343,25 +4355,9 @@ server <- function(input, output, session) {
   output$download_focus_png <- downloadHandler(
     filename = function() paste0("focus-cluster-", Sys.Date(), ".png"),
     content = function(file) {
-      req(focus_result())
-      result <- focus_result()
-      colors <- get_palette_colors(input$focus_palette)
-      txt_size <- input$text_size
-      cell_size <- input$grid_cell_size
-      use_spaced <- isTRUE(input$focus_spaced)
       png(file, width = 1200, height = 900, res = 120)
-      if (use_spaced) {
-        plot_focus_spaced(focus_result = result, title = "SPACED: Focus Cluster Analysis",
-          show_values = input$focus_show_values, show_shading = input$focus_show_shading,
-          use_color = input$focus_use_color, text_size = txt_size, cell_size = cell_size,
-          heat_low = colors$heat_low, heat_high = colors$heat_high)
-      } else {
-        plot_focus_cluster(focus_result = result, title = "Focus Cluster Analysis",
-          show_values = input$focus_show_values, show_shading = input$focus_show_shading,
-          use_color = input$focus_use_color, text_size = txt_size, cell_size = cell_size,
-          heat_low = colors$heat_low, heat_high = colors$heat_high)
-      }
-      dev.off()
+      on.exit(dev.off(), add = TRUE)
+      draw_focus_plot()
     }
   )
 
@@ -4870,46 +4866,51 @@ server <- function(input, output, session) {
     focus_result(result)
   })
 
-  output$focus_plot <- renderPlot({
-    req(focus_result())
-    result <- focus_result()
-
-    # Get colors from focus-specific palette
+  # Shared renderer for the Focus tab - used by the on-screen plot and by both
+  # download buttons so all three stay in step.
+  draw_focus_plot <- function() {
     colors <- get_palette_colors(input$focus_palette)
+    style <- if (is.null(input$focus_style)) "focus" else input$focus_style
 
-    # Explicitly capture reactive inputs to ensure dependency tracking
-    txt_size <- input$text_size
-    cell_size <- input$grid_cell_size
-    show_vals <- input$focus_show_values
-    show_shade <- input$focus_show_shading
-    use_col <- input$focus_use_color
-    use_spaced <- isTRUE(input$focus_spaced)
+    common <- list(
+      show_values = isTRUE(input$focus_show_values),
+      show_shading = isTRUE(input$focus_show_shading),
+      use_color = isTRUE(input$focus_use_color),
+      text_size = input$text_size,
+      cell_size = input$grid_cell_size,
+      heat_low = colors$heat_low,
+      heat_high = colors$heat_high
+    )
 
-    if (use_spaced) {
-      plot_focus_spaced(
-        focus_result = result,
-        title = "SPACED: Focus Cluster Analysis",
-        show_values = show_vals,
-        show_shading = show_shade,
-        use_color = use_col,
-        text_size = txt_size,
-        cell_size = cell_size,
-        heat_low = colors$heat_low,
-        heat_high = colors$heat_high
-      )
+    if (identical(style, "display")) {
+      req(rv$scores_mat_last)
+      do.call(plot_display_grid, c(
+        list(
+          scores_matrix = rv$scores_mat_last,
+          element_names = rv$elements,
+          construct_left = rv$constructs$left,
+          construct_right = rv$constructs$right,
+          title = paste0("Display ", rv$pseudonym)
+        ),
+        common
+      ))
     } else {
-      plot_focus_cluster(
-        focus_result = result,
-        title = "Focus Cluster Analysis",
-        show_values = show_vals,
-        show_shading = show_shade,
-        use_color = use_col,
-        text_size = txt_size,
-        cell_size = cell_size,
-        heat_low = colors$heat_low,
-        heat_high = colors$heat_high
-      )
+      req(focus_result())
+      spaced <- identical(style, "spaced")
+      do.call(if (spaced) plot_focus_spaced else plot_focus_cluster, c(
+        list(
+          focus_result = focus_result(),
+          title = if (spaced) "SPACED: Focus Cluster Analysis" else "Focus Cluster Analysis",
+          construct_left = rv$constructs$left,
+          construct_right = rv$constructs$right
+        ),
+        common
+      ))
     }
+  }
+
+  output$focus_plot <- renderPlot({
+    draw_focus_plot()
   })
 
   output$focus_element_matches <- renderPrint({
@@ -4979,42 +4980,9 @@ server <- function(input, output, session) {
   output$download_focus <- downloadHandler(
     filename = function() paste0("focus-cluster-", Sys.Date(), ".png"),
     content = function(file) {
-      req(focus_result())
-      result <- focus_result()
-
-      # Get colors from focus-specific palette
-      colors <- get_palette_colors(input$focus_palette)
-      txt_size <- input$text_size
-      cell_size <- input$grid_cell_size
-      use_spaced <- isTRUE(input$focus_spaced)
-
       png(file, width = 1200, height = 900, res = 120)
-      if (use_spaced) {
-        plot_focus_spaced(
-          focus_result = result,
-          title = "SPACED: Focus Cluster Analysis",
-          show_values = input$focus_show_values,
-          show_shading = input$focus_show_shading,
-          use_color = input$focus_use_color,
-          text_size = txt_size,
-          cell_size = cell_size,
-          heat_low = colors$heat_low,
-          heat_high = colors$heat_high
-        )
-      } else {
-        plot_focus_cluster(
-          focus_result = result,
-          title = "Focus Cluster Analysis",
-          show_values = input$focus_show_values,
-          show_shading = input$focus_show_shading,
-          use_color = input$focus_use_color,
-          text_size = txt_size,
-          cell_size = cell_size,
-          heat_low = colors$heat_low,
-          heat_high = colors$heat_high
-        )
-      }
-      dev.off()
+      on.exit(dev.off(), add = TRUE)
+      draw_focus_plot()
     }
   )
 
