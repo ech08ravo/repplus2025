@@ -25,6 +25,15 @@ All notable changes to WebGrid.Online are documented in this file.
     invalid" and matched nothing, so retrieval returned zero characters even
     when the files were present. The loader now converts from Mac Roman
 
+### Changed
+- **deploy.sh rewritten** to require compose v2 and verify the result. It builds
+  before touching the running container (so the site stays up for the slow part),
+  recovers from a leftover `repplus` container, waits for the app to answer on the
+  docker bridge address, and fails loudly with the version it ended up serving.
+  The old script called compose v1, which crashes on recreate and tags images
+  under a name v2 does not look for - the two together could leave the site down
+  or silently running a stale image.
+
 ### Added
 - **Display representation** on the Focus Cluster tab - the grid as entered, with
   no clustering or dendrograms. Selected via the new Representation radio buttons

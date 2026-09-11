@@ -1,5 +1,5 @@
-version: '3.8'
-
+# No top-level `version:` - it is obsolete in compose v2 and only prints a
+# warning. deploy.sh requires v2.
 services:
   repplus:
     build: .
