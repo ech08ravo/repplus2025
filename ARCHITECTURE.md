@@ -91,20 +91,27 @@ rv$repgrid_last <- makeRepgrid(
 
 ### File Formats
 
-#### .rgrid (RepPlus Format - Plain Text)
+#### .rgrid (Rep Plus / Rep IV format - tab separated)
+
+A header line, one `C` line per construct, one `E` line per element, then
+`_Key value` metadata. Tabs shown as arrows:
+
 ```
-ELEMENTS
-element1
-element2
-...
-CONSTRUCTS
-left_pole1 | right_pole1
-left_pole2 | right_pole2
-...
-RATINGS
-element1 | construct_label | rating
-...
+→Grid→9#→3→9→yurungi→A→3→2019-04-02→03:29:06→...→Rep Plus V1.1→RepGrid
+C0→R→1→0→1→1→5→→Social→goal
+E0→1→0→3→0→4→Canvas
+_UID→52540087A7DEED4F03702
 ```
+
+Three construct-line layouts exist, distinguished by field 5 (the number of
+tokens per pole group): Rep IV and Rep Plus V1.1 write the label alone, Rep Plus
+V2.0 prefixes each pole with the ratings it covers
+(`1*→2→Social→4*→5→goal`). Rep Plus also stores ratings **0-based**
+while declaring a 1-based scale, so they are shifted on import.
+
+Parsing, the offset rule and how Rep Plus assigns ratings to poles and the
+midpoint are documented in [RGRID_FORMAT.md](RGRID_FORMAT.md); the
+implementation is `R/rgrid_io.R`, shared by both import paths.
 
 #### .json (WebGrid Format)
 ```json

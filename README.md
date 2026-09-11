@@ -298,6 +298,7 @@ WebGrid.Online/
 ├── README.md                          # This documentation
 ├── CLAUDE_PROJECT_DOCS.md             # Developer reference (deployment, reactive values, functions)
 ├── CHANGELOG.md                       # Release notes
+├── RGRID_FORMAT.md                    # .rgrid layouts, rating offset, midpoints
 ├── FOCUS_USER_GUIDE.md                # Guide to Focus cluster analysis
 ├── FOCUS_IMPLEMENTATION.md            # Technical Focus algorithm details
 ├── LICENCE.md                         # License information

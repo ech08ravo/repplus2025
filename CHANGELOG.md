@@ -25,6 +25,18 @@ All notable changes to WebGrid.Online are documented in this file.
 - Both `.rgrid` import paths (single-grid and multi-grid) now share one parser in
   `R/rgrid_io.R`, replacing two copies of the field-counting logic.
 
+### Documentation
+- New [RGRID_FORMAT.md](RGRID_FORMAT.md): the three construct-line layouts, the
+  rating-offset rule with its truth table and worked calculation, how Rep Plus
+  assigns ratings to poles and treats the midpoint, and every place the app uses
+  a midpoint. Marks which statements are verified against the Rep Plus desktop
+  display and which are inferred.
+- Corrected the `.rgrid` description in ARCHITECTURE.md, which documented an
+  `ELEMENTS`/`CONSTRUCTS`/`RATINGS` block format that no `.rgrid` file uses.
+- Documented two unfixed midpoint inconsistencies: imputation fills `4` and the
+  crossplot draws its midpoint gridline at `4`, both 1-7 midpoints in an app
+  whose scale, axes and help text are 1-5.
+
 ## [2.3.0] - 2026-09-11
 
 ### Changed
