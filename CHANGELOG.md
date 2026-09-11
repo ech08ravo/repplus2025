@@ -14,6 +14,17 @@ All notable changes to WebGrid.Online are documented in this file.
     of the rows; sorting, shading, values and SPACED spacing unchanged
   - Top element/construct match now shown as a caption under the title
 
+### Fixed
+- **Ask Claude had no manual context in production** - two stacked bugs:
+  - The Dockerfile never copied `RepPlusDocs/`, so `load_repplus_docs()` found
+    nothing and the `tryCatch` in app.R silently fell back to an empty list.
+    The image now includes the eight `.txt` manuals (672K; the PDFs are not read)
+  - The manuals are Mac Roman, but `readLines(..., encoding = "UTF-8")` only
+    tags strings as UTF-8 without converting them, leaving every doc invalid
+    UTF-8. `grepl()` in `get_relevant_docs()` then warned "input string is
+    invalid" and matched nothing, so retrieval returned zero characters even
+    when the files were present. The loader now converts from Mac Roman
+
 ### Added
 - **Display representation** on the Focus Cluster tab - the grid as entered, with
   no clustering or dendrograms. Selected via the new Representation radio buttons

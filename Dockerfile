@@ -19,6 +19,12 @@ COPY app.R /srv/shiny-server/webgrid/app.R
 COPY R/ /srv/shiny-server/webgrid/R/
 COPY dataExamples/ /srv/shiny-server/webgrid/dataExamples/
 
+# Manual text used as RAG context for the Ask Claude buttons. Without these,
+# load_repplus_docs() (R/claude_api.R) finds nothing and the tryCatch in app.R
+# silently falls back to an empty list, so questions go to the API with no
+# manual context. Only the .txt files are read - the PDFs are not needed.
+COPY RepPlusDocs/*.txt /srv/shiny-server/webgrid/RepPlusDocs/
+
 # Entrypoint that promotes whitelisted container env vars into R's
 # Renviron.site so R sessions spawned by shiny-server can see them
 # (shiny-server does not propagate env to its R workers).

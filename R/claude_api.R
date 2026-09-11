@@ -11,7 +11,15 @@ load_repplus_docs <- function() {
   docs <- list()
   for (f in txt_files) {
     doc_name <- tools::file_path_sans_ext(basename(f))
-    docs[[doc_name]] <- paste(readLines(f, warn = FALSE, encoding = "UTF-8"), collapse = "\n")
+    # The manuals were extracted from PDFs on a Mac and are Mac Roman, not
+    # UTF-8 - em dashes arrive as 0xD1, section marks as 0xA4. readLines(...,
+    # encoding = "UTF-8") only *tags* the strings as UTF-8, it never converts
+    # them, so every doc stayed invalid UTF-8: grepl() in get_relevant_docs()
+    # then warned "input string is invalid" and matched nothing, leaving the
+    # retrieved context empty.
+    txt <- rawToChar(readBin(f, "raw", file.info(f)$size))
+    if (!validUTF8(txt)) txt <- iconv(txt, from = "macintosh", to = "UTF-8", sub = "")
+    docs[[doc_name]] <- txt
   }
 
   docs
