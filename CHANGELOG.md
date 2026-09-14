@@ -18,6 +18,10 @@ All notable changes to WebGrid.Online are documented in this file.
     multi-grid), which read `rv$scores_mat_last` directly.
 
 ### Added
+- [MIDPOINT_DECISIONS.md](MIDPOINT_DECISIONS.md) - written record of the rating-scale
+  midpoint decisions: what the Rep Plus format itself declares, the six places the
+  app uses a midpoint and the three different answers they gave, and why the
+  imputation question is deferred pending the literature.
 - `tests/test_grid_integrity.R` - regression tests from `.rgrid` file through to
   the OpenRepGrid object: pole labels, rating offset, cell-for-cell agreement
   with the file, and a round trip over every sample grid.
