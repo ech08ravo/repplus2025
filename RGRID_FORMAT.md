@@ -102,53 +102,59 @@ The giveaway is that a stored `0` is not a legal rating on a 1–5 scale. It als
 makes sense semantically: `Canvas` stores `0` on *LMS – Collaboration*, i.e.
 rating 1, the pure "LMS" pole — exactly right for a learning management system.
 
-### The offset rule
+### Where the ratings start
 
-`rgrid_rating_offset()` decides whether to shift, and by how much:
+Systems differ in where their ratings begin, and a file does not say which it
+used. Rep Plus writes them **0-based**: the file holds 0-4 for a 1-5 scale, so a
+stored `0` is the pure left pole and displays as 1. Other systems write them
+**1-based** and need no adjustment.
 
-```r
-offset = 0                            if max(ratings) + scale_min > scale_max
-       = scale_min                    if min(ratings) < scale_min
-       = scale_min                    if the header says "Rep Plus"
-       = 0                            otherwise
-```
+Which one applies is inferred from the ratings themselves. A grid written on its
+declared scale **reaches the top of it** - somewhere an element sits at the
+maximum, at one pole or the other, which elicited grids almost always contain. A
+0-based grid stops one step short:
 
-| Case | Stored | Scale | Offset | Why |
-|---|---|---|---|---|
-| Rep Plus grid | 0–4 | 1–5 | **+1** | 4+1 ≤ 5, and 0 is not a legal rating |
-| Rep Plus grid not using the bottom rating | 1–3 | 1–5 | **+1** | fits after shifting; source says Rep Plus |
-| This app's own export | 1–5 | 1–5 | **0** | 5+1 > 5, so it cannot be 0-based |
-| `contact_lens.rgrid` | 1–7 | 1–5 | **0** | 7+1 > 5 |
+| Ratings in the file | Reading | Applied |
+|---|---|---|
+| reach the declared maximum (a 5 on a 1-5 scale) | already 1-based | nothing |
+| stop a step short (top out at 4) | 0-based | add the scale minimum |
+| fall below the declared minimum (a 0 on a 1-5 scale) | 0-based | add the scale minimum |
 
-The first test is what prevents a double shift: a grid already occupying the top
-of its scale cannot be 0-based, so re-importing a file this app exported leaves
-it untouched. There is one ambiguity the rule cannot resolve from the data
-alone — stored `1–3` could be 1-based or 0-based — which is why the source
-string is consulted.
+The inference needs at least one element at a pole. Where a grid has none -
+nobody used the extreme of any construct - the file's own source string decides,
+since Rep Plus files are always 0-based. Worked examples:
+
+| Source | Ratings | Reading | Result |
+|---|---|---|---|
+| Rep Plus | 0-4 | 0-based | 1-5 |
+| Rep Plus | 1-4, no 5 | 0-based (source) | 2-5 |
+| other system | 1-5 | 1-based | unchanged |
+| other system | 1-4, no 5 | 1-based (no evidence of 0-basing) | unchanged |
+| this app's own export | 1-5 | 1-based | unchanged |
+
+That last row is what stops a grid being shifted twice on a round trip.
 
 ### When 0 means "does not apply"
 
-The two conventions collide. Rep Plus *stores* ratings 0-based, so `0` is the
-pure left pole - `bezzi1996_expert.rgrid` contains 56 of them. But Bezzi (1996)
-*printed* that same grid with `0` marking "construct does not apply", and its 12
-such cells are written `?` in the file. A transcription that kept the printed
-convention would therefore hold ratings 1-5 alongside `0` for not-applicable,
-and reading it 0-based would be wrong.
+Separately from where the ratings start, `0` may not be a rating at all. Bezzi
+(1996) printed his grid with ratings 1-5 and `0` marking "this construct does
+not apply to this element" - 12 such cells, which the `.rgrid` transcription
+writes as `?`.
 
-No rule can settle this from the data alone, so it is the importer's choice:
-**Treat 0 as "does not apply"** on the File Operations panel, unticked by
-default.
+Nothing in a file distinguishes that from Rep Plus's 0-based storage, where `0`
+is the left pole (`bezzi1996_expert.rgrid` holds 56 of those). So it is a
+checkbox on import - **0 = N/A** - unticked by default:
 
-| Checkbox | `0` is read as | Shift applied |
-|---|---|---|
-| unticked (default) | a rating - the pure left pole | yes, for Rep Plus files |
-| ticked | not applicable (`NA`) | none - values are already 1-based |
+| | `0` is | 
+|---|---|
+| unticked (Rep Plus) | a rating |
+| ticked (Bezzi) | not applicable, becomes `NA` |
 
-Ticking it for a genuine Rep Plus file is destructive: Bezzi would go from 12
-not-applicable cells to 68, discarding 56 real ratings. The import notification
-reports what was actually done - the shift applied, how many cells were read as
-not applicable, and how many are unrated - so the reading is visible rather than
-assumed.
+**The two questions are independent.** Ticking the box only removes the zeros;
+where the remaining ratings start is still inferred from them, as above. A grid
+that uses `0` for "does not apply" and writes ratings 1-5 is left alone; one
+that does both - zeros for N/A on 0-based ratings - has the zeros dropped and
+the rest shifted. The import notification reports what was done either way.
 
 ### Why it is not merely cosmetic
 

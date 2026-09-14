@@ -54,10 +54,22 @@ extract_scale <- function(toks) {
 
 #' How much to add to stored ratings to put them on the declared scale
 #'
-#' Rep Plus stores ratings 0-based - a file reading "3 0 4" is displayed as
-#' "4 1 5" by the Rep Plus desktop app - while declaring a 1-based scale. The
-#' offset is only applied when the data actually fits after shifting, so a file
-#' that is already 1-based is never shifted twice.
+#' Systems differ in where their ratings start. Rep Plus stores them 0-based - a
+#' file reading "3 0 4" is displayed as "4 1 5" by the Rep Plus desktop app -
+#' while systems that write 1-based ratings need no adjustment.
+#'
+#' Which one a file uses is inferred from the ratings themselves. A grid written
+#' on its declared scale reaches the top of it: somewhere an element sits at the
+#' maximum, at one pole or the other. A 0-based grid stops one step short. So:
+#'
+#'   ratings reach the declared maximum   -> already 1-based, no shift
+#'   ratings stop a step short            -> 0-based, add the scale minimum
+#'   a rating below the declared minimum  -> 0-based, add the scale minimum
+#'
+#' The inference needs at least one element at a pole, which elicited grids
+#' almost always have. Where they do not - nobody used the extreme of any
+#' construct - the file's own source string decides, since Rep Plus files are
+#' always 0-based.
 rgrid_rating_offset <- function(scores, scale, source_tag = "") {
   vals <- scores[!is.na(scores)]
   if (!length(vals)) return(0)
@@ -73,13 +85,14 @@ rgrid_rating_offset <- function(scores, scale, source_tag = "") {
 #' constructs, shifted onto the declared scale), the scale itself, and the
 #' source application string from the header.
 #'
-#' @param zero_is_na What a stored `0` means. FALSE (default) reads it as a
-#'   rating: Rep Plus stores ratings 0-based, so `0` is the pure left pole and
-#'   the grid is shifted onto its declared scale. TRUE reads `0` as "does not
-#'   apply" - the convention Bezzi (1996) used in print - in which case the
-#'   remaining values are already 1-based and no shift is applied. The two
-#'   conventions collide (a Rep Plus grid can hold dozens of legitimate zeros),
-#'   so this is the caller's decision, not a guess.
+#' @param zero_is_na TRUE if `0` marks "does not apply" rather than being a
+#'   rating, as Bezzi (1996) printed it. Those cells become NA. This is the
+#'   caller's decision because nothing in the file distinguishes it from Rep
+#'   Plus's 0-based storage, where `0` is the left pole.
+#'
+#' Whether the grid is 0-based is inferred separately, from the ratings that
+#' remain - see rgrid_rating_offset(). The two questions are independent: a
+#' grid can use `0` for "does not apply" and still be written on either base.
 parse_rgrid <- function(file_path, zero_is_na = FALSE) {
   txt <- readLines(file_path, warn = FALSE)
 
@@ -120,15 +133,15 @@ parse_rgrid <- function(file_path, zero_is_na = FALSE) {
     }
   }
 
+  # "Does not apply" first, so the base is inferred from actual ratings only.
+  zeros <- 0
   if (zero_is_na) {
     zeros <- sum(scores_mat == 0, na.rm = TRUE)
     scores_mat[!is.na(scores_mat) & scores_mat == 0] <- NA
-    offset <- 0
-  } else {
-    zeros <- 0
-    offset <- rgrid_rating_offset(scores_mat, scale, source_tag)
-    if (offset != 0) scores_mat <- scores_mat + offset
   }
+
+  offset <- rgrid_rating_offset(scores_mat, scale, source_tag)
+  if (offset != 0) scores_mat <- scores_mat + offset
 
   rownames(scores_mat) <- elements
   colnames(scores_mat) <- paste(left, "-", right)

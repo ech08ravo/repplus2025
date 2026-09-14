@@ -94,6 +94,35 @@ check("a grid with N/A cells still clusters",
                                   method = "focus", scale = bz$scale),
                     silent = TRUE), "try-error"))
 
+# --- where ratings start, and what 0 means (independent questions) ----------
+mk_tmp <- function(rows, source = "Rep Plus V1.1", scale = c(1, 5)) {
+  f <- tempfile(fileext = ".rgrid"); con <- file(f, open = "w", encoding = "UTF-8")
+  writeLines(paste("", "Grid", length(rows), length(rows[[1]]), 0, "t", "", "1",
+                   "01-Jan-2026", "00:00", "x", source, "RepGrid", sep = "\t"), con)
+  for (i in seq_along(rows[[1]]))
+    writeLines(sprintf("C%d\tR\t1\t0\t1\t%s\t%s\t\tL%d\tR%d\t", i - 1,
+                       scale[1], scale[2], i, i), con)
+  for (i in seq_along(rows))
+    writeLines(paste0("E", i - 1, "\t1\t0\t", paste(rows[[i]], collapse = "\t"),
+                      "\tel", i), con)
+  close(con); f
+}
+
+check("0-based file reaching 4 is read as 1-5",
+      parse_rgrid(mk_tmp(list(c(0,4,2), c(4,0,3))))$offset_applied == 1)
+check("1-based file reaching 5 is left alone",
+      parse_rgrid(mk_tmp(list(c(1,5,3), c(5,1,4)), source = "Other 1.0"))$offset_applied == 0)
+check("no element at a pole: source decides (non-Rep Plus)",
+      parse_rgrid(mk_tmp(list(c(1,4,3), c(4,1,2)), source = "Other 1.0"))$offset_applied == 0)
+check("no element at a pole: source decides (Rep Plus)",
+      parse_rgrid(mk_tmp(list(c(1,4,3), c(4,1,2))))$offset_applied == 1)
+check("0 = N/A leaves 1-based ratings untouched", {
+  r <- parse_rgrid(mk_tmp(list(c(0,5,3), c(1,0,4)), source = "Other 1.0"), zero_is_na = TRUE)
+  sum(is.na(r$scores_mat)) == 2 && r$offset_applied == 0 })
+check("0 = N/A and 0-based are handled independently", {
+  r <- parse_rgrid(mk_tmp(list(c(0,4,2), c(4,0,3))), zero_is_na = TRUE)
+  sum(is.na(r$scores_mat)) == 2 && r$offset_applied == 1 })
+
 # --- every sample grid survives the round trip -----------------------------
 for (f in Sys.glob("dataExamples/*.rgrid")) {
   gg <- try(parse_rgrid(f), silent = TRUE)
