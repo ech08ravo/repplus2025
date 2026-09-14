@@ -1,19 +1,33 @@
 # Focus clustering analysis functions
 # Based on Shaw (1980) FOCUS algorithm from RepGrid manual
 
+#' Rating range to measure matches against
+#'
+#' Prefer the scale the grid declares: percentages are then comparable across
+#' grids, and a participant who never uses the ends of the scale does not have
+#' their matches quietly rescaled. Falls back to the observed range.
+match_scale_range <- function(scores_matrix, scale = NULL) {
+  if (!is.null(scale) && length(scale) == 2 && diff(scale) > 0) return(diff(scale))
+  rng <- range(scores_matrix, na.rm = TRUE)
+  if (!is.finite(diff(rng)) || diff(rng) == 0) 1 else diff(rng)
+}
+
 #' Compute element-element similarity matrix (vectorised)
-compute_element_similarities <- function(scores_matrix, power = 1.0) {
+#'
+#' Missing ratings are excluded pairwise: a construct counts towards a
+#' comparison only when both elements are rated on it, and the denominator
+#' shrinks to match. Treating an absent rating as zero difference - which is
+#' what this did previously - scored it as perfect agreement, so elements looked
+#' more alike the less was known about them.
+compute_element_similarities <- function(scores_matrix, power = 1.0, scale = NULL) {
   n_elements <- nrow(scores_matrix)
   sim_matrix <- matrix(0, nrow = n_elements, ncol = n_elements)
 
   # Diagonal = 100 (perfect match with self)
   diag(sim_matrix) <- 100
 
-  # Vectorised computation of pairwise Minkowski distances
-  # For each element i, compute distance to all other elements j
-  scale_range <- max(scores_matrix, na.rm = TRUE) - min(scores_matrix, na.rm = TRUE)
-  n_constructs <- ncol(scores_matrix)
-  max_distance <- n_constructs * scale_range
+  scale_range <- match_scale_range(scores_matrix, scale)
+  present <- !is.na(scores_matrix)
 
   # Pairwise comparison using sweep so the broadcast is well-defined when
   # n_elements != n_constructs (matrix - matrix with mismatched row counts
@@ -21,49 +35,62 @@ compute_element_similarities <- function(scores_matrix, power = 1.0) {
   # along the column margin of the full matrix).
   for (i in 1:n_elements) {
     diff_mat <- abs(sweep(scores_matrix, 2, scores_matrix[i, ], "-"))
-    # Remove NAs for distance calculation
-    diff_mat[is.na(diff_mat)] <- 0
-    # Per-element Minkowski distance: sum across constructs (the column
-    # axis), one distance per element row.
+    shared <- sweep(present, 2, present[i, ], "&")
+    diff_mat[!shared] <- 0
     distances <- rowSums(diff_mat^power)^(1/power)
-    # Convert to similarity (0-100)
-    sim_matrix[i, -i] <- pmax(0, 100 * (1 - distances[-i] / max_distance))
+    n_shared <- rowSums(shared)
+    max_distance <- n_shared * scale_range
+    sims <- pmax(0, 100 * (1 - distances / max_distance))
+    # No construct rated on both: nothing to compare, so claim no similarity
+    # rather than inventing one.
+    sims[n_shared == 0] <- 0
+    sim_matrix[i, -i] <- sims[-i]
   }
 
   sim_matrix
 }
 
 #' Compute construct-construct similarity matrix (vectorised)
-compute_construct_similarities <- function(scores_matrix, power = 1.0) {
+compute_construct_similarities <- function(scores_matrix, power = 1.0, scale = NULL) {
   n_constructs <- ncol(scores_matrix)
   sim_matrix <- matrix(0, nrow = n_constructs, ncol = n_constructs)
 
   # Diagonal = 100 (perfect match with self)
   diag(sim_matrix) <- 100
 
-  # Vectorised computation: construct i vs all other constructs j
-  scale_range <- max(scores_matrix, na.rm = TRUE) - min(scores_matrix, na.rm = TRUE)
-  scale_mid <- (max(scores_matrix, na.rm = TRUE) + min(scores_matrix, na.rm = TRUE)) / 2
-  n_elements <- nrow(scores_matrix)
-  max_distance <- n_elements * scale_range
+  scale_range <- match_scale_range(scores_matrix, scale)
+  # Reverse around the declared centre of the scale where we know it, so a
+  # construct the participant used only one half of is still reflected
+  # correctly.
+  scale_mid <- if (!is.null(scale) && length(scale) == 2 && diff(scale) > 0) {
+    sum(scale) / 2
+  } else {
+    (max(scores_matrix, na.rm = TRUE) + min(scores_matrix, na.rm = TRUE)) / 2
+  }
+  present <- !is.na(scores_matrix)
 
   for (i in 1:n_constructs) {
     construct_i <- scores_matrix[, i]
+    shared <- present & present[, i]
+    n_shared <- colSums(shared)
+
     # Normal orientation: direct differences
     diff_normal <- abs(construct_i - scores_matrix)
-    diff_normal[is.na(diff_normal)] <- 0
+    diff_normal[!shared] <- 0
     dist_normal <- colSums(diff_normal^power)^(1/power)
 
     # Reversed orientation: flip construct around midpoint
     construct_i_rev <- 2 * scale_mid - construct_i
     diff_reversed <- abs(construct_i_rev - scores_matrix)
-    diff_reversed[is.na(diff_reversed)] <- 0
+    diff_reversed[!shared] <- 0
     dist_reversed <- colSums(diff_reversed^power)^(1/power)
 
     # Use the better match (lower distance) for each pair
     distances <- pmin(dist_normal, dist_reversed)
-    # Convert to similarity (0-100), preserving diagonal
-    sim_matrix[i, -i] <- pmax(0, 100 * (1 - distances[-i] / max_distance))
+    max_distance <- n_shared * scale_range
+    sims <- pmax(0, 100 * (1 - distances / max_distance))
+    sims[n_shared == 0] <- 0
+    sim_matrix[i, -i] <- sims[-i]
   }
 
   sim_matrix
@@ -164,12 +191,13 @@ edges <- function(run) unique(c(run[1], run[length(run)]))
 #' Perform Focus clustering and sorting
 focus_cluster <- function(scores_matrix, element_names, construct_names, power = 1.0,
                           method = c("focus", "focus-interior", "complete",
-                                     "single", "average", "ward.D2")) {
+                                     "single", "average", "ward.D2"),
+                          scale = NULL) {
   method <- match.arg(method)
 
   # Compute similarities
-  elem_sim <- compute_element_similarities(scores_matrix, power)
-  const_sim <- compute_construct_similarities(scores_matrix, power)
+  elem_sim <- compute_element_similarities(scores_matrix, power, scale)
+  const_sim <- compute_construct_similarities(scores_matrix, power, scale)
 
   cluster_one <- function(sim, labels) {
     if (method %in% c("focus", "focus-interior")) {

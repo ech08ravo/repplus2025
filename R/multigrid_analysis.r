@@ -78,24 +78,35 @@ compute_directional_match <- function(mat_a, mat_b, power, max_distance) {
 
   best_matches <- numeric(n_constructs_a)
 
+  # max_distance is quoted for a fully rated construct; rescale it per pair to
+  # the elements actually rated on both. Treating an unrated element as zero
+  # difference - as this did previously - scored it as agreement, so sparser
+  # grids matched better.
+  present_b <- !is.na(mat_b)
+  n_elements <- nrow(mat_b)
+
   for (i in seq_len(n_constructs_a)) {
     construct_a <- mat_a[, i]
+    shared <- present_b & !is.na(construct_a)
+    n_shared <- colSums(shared)
 
     # Normal orientation: distance between construct_a and each construct in B
     diff_normal <- abs(construct_a - mat_b)
-    diff_normal[is.na(diff_normal)] <- 0
+    diff_normal[!shared] <- 0
     dist_normal <- colSums(diff_normal^power)^(1/power)
 
     # Reversed orientation: flip constructs in B around midpoint
     mat_b_rev <- 2 * scale_mid - mat_b
     diff_reversed <- abs(construct_a - mat_b_rev)
-    diff_reversed[is.na(diff_reversed)] <- 0
+    diff_reversed[!shared] <- 0
     dist_reversed <- colSums(diff_reversed^power)^(1/power)
 
     # Use better match (lower distance) for each pair
     distances <- pmin(dist_normal, dist_reversed)
     # Convert distances to similarities and find best
-    similarities <- pmax(0, 100 * (1 - distances / max_distance))
+    pair_max <- max_distance * n_shared / n_elements
+    similarities <- pmax(0, 100 * (1 - distances / pair_max))
+    similarities[n_shared == 0] <- 0
     best_matches[i] <- max(similarities)
   }
 
@@ -181,24 +192,31 @@ find_similar_constructs <- function(grid_a, grid_b, common_elements,
   # Vectorised: for each construct in A, compute distances to all constructs in B
   results_list <- list()
 
+  # Elements rated on both constructs only - see compute_directional_match()
+  present_b <- !is.na(mat_b)
+
   for (i in seq_len(ncol(mat_a))) {
     construct_a <- mat_a[, i]
+    shared <- present_b & !is.na(construct_a)
+    n_shared <- colSums(shared)
 
     # Normal orientation
     diff_normal <- abs(construct_a - mat_b)
-    diff_normal[is.na(diff_normal)] <- 0
+    diff_normal[!shared] <- 0
     dist_normal <- colSums(diff_normal^power)^(1/power)
 
     # Reversed orientation
     mat_b_rev <- 2 * scale_mid - mat_b
     diff_reversed <- abs(construct_a - mat_b_rev)
-    diff_reversed[is.na(diff_reversed)] <- 0
+    diff_reversed[!shared] <- 0
     dist_reversed <- colSums(diff_reversed^power)^(1/power)
 
     # Choose better match and compute similarities
     reversed_vec <- dist_reversed < dist_normal
     distances <- pmin(dist_normal, dist_reversed)
-    similarities <- pmax(0, 100 * (1 - distances / max_distance))
+    pair_max <- n_shared * scale_range
+    similarities <- pmax(0, 100 * (1 - distances / pair_max))
+    similarities[n_shared == 0] <- 0
 
     # Filter by cutoff and collect results
     above_cutoff <- which(similarities >= cutoff)

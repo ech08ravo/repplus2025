@@ -81,8 +81,11 @@ pulls it toward the centre of any subsequent principal-components or cluster
 solution, so the imputation choice propagates into exactly the structures the
 analysis is meant to reveal. The alternatives — dropping incomplete elements,
 carrying missingness through the distance computation, or model-based imputation
-from the rest of the grid — each carry their own commitments. The next step is
-to establish how the grid literature has handled this, particularly whether
+from the rest of the grid — each carry their own commitments. Two of these commitments have since been narrowed rather than chosen: unrated
+cells are now excluded from every match rather than counted as agreement, and
+the scale a grid declares is carried through instead of being re-derived from
+the values present. What remains to impute is only the genuinely unknown. The
+next step is to establish how the grid literature has handled this, particularly whether
 there is a settled convention for the meaning of the midpoint in elicited grids
 and for imputation in small grids, and then to make the choice explicit and
 configurable in the application rather than fixed in the code, reporting
@@ -99,7 +102,11 @@ alongside any analysis which convention produced it.
 | Document Rep Plus's pole banding and midpoint treatment | Done — see [RGRID_FORMAT.md](RGRID_FORMAT.md) §3 |
 | Imputation value (currently `4`; help text says `3`) | **Deferred** — pending literature |
 | Crossplot midpoint gridline (currently `4` on a 1–5 axis) | **Deferred** — pending literature |
-| Construct reversal to use the declared rather than observed midpoint | Open |
+| Construct reversal to use the declared rather than observed midpoint | Done (v2.5.0) |
+| Exclude unrated cells from matches instead of scoring them as agreement | Done (v2.5.0) |
+| Rating scale as a property of the grid, carried through import and export | Done (v2.5.0) |
+| Distinct "does not apply" cell state in elicitation (`-` / `0`) | Proposed |
+| Scale length (4- or 5-point) chosen per grid at elicitation | Proposed |
 | Make the imputation convention explicit and configurable | Proposed |
 
 Evidence for the figures quoted above: `dataExamples/*.rgrid`, ten elicited

@@ -2,6 +2,32 @@
 
 All notable changes to WebGrid.Online are documented in this file.
 
+## [2.5.0] - 2026-09-14
+
+### Changed
+- **Unrated cells are excluded from matches instead of counting as agreement.**
+  Element, construct and multi-grid matching all set a missing difference to zero
+  while keeping the full denominator, so an absent rating scored as perfect
+  agreement and elements looked more alike the less was known about them. A
+  construct now counts towards a comparison only when both items are rated on it,
+  with the denominator shrinking to match; items sharing nothing rated score 0.
+  Grids with no missing data are unaffected - across the sample grids, pairs
+  containing unrated cells had been matching 7-8 percentage points too high.
+- **Match percentages and construct reversal use the scale the grid declares**,
+  not the range of values that happen to be present. A grid using only 2-4 of a
+  1-5 scale previously had its matches rescaled to that narrower range.
+- **The rating scale is a property of the grid** (`rv$scale`, as min/max), set
+  from the `.rgrid` C-line or a JSON `scale` field and defaulting to 1-5, rather
+  than assumed at each point of use. It is carried into `.rgrid` export, so a
+  grid keeps its scale across a round trip.
+- `.rgrid` export writes `?` for unrated cells, the marker Rep Plus uses;
+  previously it wrote `NA`, producing a file that could not be read back.
+
+### Added
+- Regression tests for match semantics and for the Bezzi (1996) published grid,
+  which the importer reproduces cell for cell including its 12 not-applicable
+  cells.
+
 ## [2.4.1] - 2026-09-14
 
 ### Fixed

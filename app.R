@@ -5,7 +5,7 @@ library(uuid)
 library(jsonlite)
 library(igraph)
 
-APP_VERSION <- "2.4.1"
+APP_VERSION <- "2.5.0"
 
 # Security: explicit upload size limit (10MB) and grid limits
 options(shiny.maxRequestSize = 10 * 1024^2)
@@ -2105,6 +2105,12 @@ server <- function(input, output, session) {
       rating = numeric(),
       stringsAsFactors = FALSE
     ),
+    # Rating scale for this grid, as c(min, max). Set from the .rgrid or JSON
+    # being imported; otherwise the 1-5 scale the wizard elicits on. Consulted
+    # wherever the scale's absolute position matters - match percentages,
+    # construct reversal, export - rather than being re-derived from whatever
+    # values happen to be present.
+    scale = c(1, 5),
     scores_mat_last = NULL,
     repgrid_last = NULL,
     imputed_last = FALSE,
@@ -2646,7 +2652,7 @@ server <- function(input, output, session) {
              construct = rv$ratings$construct[i],
              rating = rv$ratings$rating[i])
       }),
-      scale = c(1, rv$scale %||% 5)
+      scale = rv$scale
     ), auto_unbox = TRUE, pretty = TRUE)
     body_text <- paste(c("My Repertory Grid Ratings - WebGrid.Online", "",
       "Save the JSON below as a .json file to import into WebGrid.", "",
@@ -3776,6 +3782,10 @@ server <- function(input, output, session) {
 
         rv$elements <- as.character(grid_data$elements)
 
+        if (!is.null(grid_data$scale) && length(unlist(grid_data$scale)) == 2) {
+          rv$scale <- as.numeric(unlist(grid_data$scale))
+        }
+
         # Handle constructs - could be list or data frame
         if (is.data.frame(grid_data$constructs)) {
           rv$constructs <- grid_data$constructs
@@ -3841,7 +3851,7 @@ server <- function(input, output, session) {
           right = g$right,
           stringsAsFactors = FALSE
         )
-        rv$scale <- g$scale[2]
+        rv$scale <- g$scale
         labels <- paste(g$left, "-", g$right)
         rv$ratings <- data.frame(
           element   = rep(g$elements, times = n_c),
@@ -4839,7 +4849,8 @@ server <- function(input, output, session) {
       element_names = rv$elements,
       construct_names = construct_labels,
       power = input$focus_power,
-      method = if (is.null(input$focus_method)) "focus" else input$focus_method
+      method = if (is.null(input$focus_method)) "focus" else input$focus_method,
+      scale = rv$scale
     ))
   }
 
@@ -5001,7 +5012,7 @@ server <- function(input, output, session) {
         L <- rv$constructs$left[i]
         R <- rv$constructs$right[i]
         writeLines(paste0(
-          "C", i - 1, "\tR\t100\t0\t1\t1\t5\t", L, "\t", R, "\t"
+          "C", i - 1, "\tR\t100\t0\t1\t", rv$scale[1], "\t", rv$scale[2], "\t", L, "\t", R, "\t"
         ), con)
       }
 
@@ -5018,7 +5029,7 @@ server <- function(input, output, session) {
       for (e in seq_len(nE)) {
         row <- paste0(
           "E", e - 1, "\t100\t0\t1\t1\t4\t",
-          paste(scores_mat[e, ], collapse = "\t"), "\t",
+          paste(ifelse(is.na(scores_mat[e, ]), "?", scores_mat[e, ]), collapse = "\t"), "\t",
           rv$elements[e]
         )
         writeLines(row, con)

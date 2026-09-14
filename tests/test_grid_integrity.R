@@ -76,6 +76,24 @@ check("Bezzi: all 144 cells match the published figure",
       isTRUE(all.equal(pub, unname(t(bz$scores_mat)))))
 check("Bezzi: 12 cells marked not-applicable", sum(is.na(bz$scores_mat)) == 12)
 
+# --- similarity semantics --------------------------------------------------
+source("R/focus_analysis.r")
+sim2 <- function(m) compute_element_similarities(m, scale = c(1, 5))[1, 2]
+
+check("identical elements match 100%",
+      sim2(matrix(c(1,5,3, 1,5,3), 2, byrow = TRUE)) == 100)
+check("an unrated cell is excluded, not scored as agreement",
+      round(sim2(matrix(c(1,5,3, 5,NA,3), 2, byrow = TRUE))) == 50)
+check("elements sharing no rated construct match 0%",
+      sim2(matrix(c(1,NA, NA,5), 2, byrow = TRUE)) == 0)
+check("matches use the declared scale, not the observed range",
+      round(sim2(matrix(c(2,4,2, 4,2,4), 2, byrow = TRUE))) == 50)
+check("a grid with N/A cells still clusters",
+      !inherits(try(focus_cluster(bz$scores_mat, bz$elements,
+                                  paste(bz$left, "-", bz$right),
+                                  method = "focus", scale = bz$scale),
+                    silent = TRUE), "try-error"))
+
 # --- every sample grid survives the round trip -----------------------------
 for (f in Sys.glob("dataExamples/*.rgrid")) {
   gg <- try(parse_rgrid(f), silent = TRUE)

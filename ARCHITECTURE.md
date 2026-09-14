@@ -1,6 +1,6 @@
 # WebGrid.Online - Architecture Guide
 
-A comprehensive developer guide to WebGrid.Online v2.4.1 architecture, data structures, algorithms, and integration points.
+A comprehensive developer guide to WebGrid.Online v2.5.0 architecture, data structures, algorithms, and integration points.
 
 ## Quick Overview
 
@@ -380,11 +380,24 @@ All multi-grid functions normalize ratings to c(1,7) scale before comparison.
 
 ### Similarity Computation
 
-**Elements** (Minkowski distance):
+**Elements** (Minkowski distance, pairwise complete):
 ```r
-distance(e_i, e_j) = (sum(|r_ik - r_jk|^p))^(1/p)
-similarity = 100 * (1 - distance / max_distance)
+shared      = constructs on which BOTH elements are rated
+distance    = (sum over shared of |r_ik - r_jk|^p)^(1/p)
+max_distance = n_shared * scale_range        # shrinks with the comparison
+similarity  = 100 * (1 - distance / max_distance)
 ```
+An unrated cell is excluded from the comparison rather than contributing zero
+difference - which is what it did before v2.5.0, scoring absent data as perfect
+agreement, so elements looked more alike the less was known about them. Grids
+with no missing data are unaffected; across the sample grids, pairs containing
+unrated cells were matching 7-8 percentage points too high. Elements sharing no
+rated construct score 0.
+
+`scale_range` comes from the scale the grid declares (`rv$scale`, from the
+`.rgrid` C-line or the JSON), not from the range of values that happen to be
+present, so percentages are comparable across grids and a participant who never
+uses the ends of the scale is not silently rescaled.
 - **p=1**: City block (Manhattan)
 - **p=2**: Euclidean
 
