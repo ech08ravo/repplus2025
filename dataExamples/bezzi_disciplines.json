@@ -1,0 +1,78 @@
+{
+  "name": "BezziDisciplines",
+  "elements": [
+    "Mathematics",
+    "Physics",
+    "Chemistry",
+    "Biology",
+    "Geology",
+    "Geography"
+  ],
+  "constructs": [
+    {
+      "left": "laboratory",
+      "right": "fieldwork"
+    },
+    {
+      "left": "axioms",
+      "right": "observation data"
+    },
+    {
+      "left": "applied",
+      "right": "basic"
+    },
+    {
+      "left": "synthesis",
+      "right": "analysis"
+    },
+    {
+      "left": "modifies reality",
+      "right": "preserves reality"
+    },
+    {
+      "left": "calculations",
+      "right": "descriptions"
+    },
+    {
+      "left": "rigorous",
+      "right": "approximate"
+    },
+    {
+      "left": "concerned with real",
+      "right": "concerned with abstract"
+    },
+    {
+      "left": "formulas",
+      "right": "concepts"
+    },
+    {
+      "left": "inductive",
+      "right": "deductive"
+    },
+    {
+      "left": "analyze the effects",
+      "right": "analyze the causes"
+    },
+    {
+      "left": "study the matter",
+      "right": "study the territory"
+    },
+    {
+      "left": "objective",
+      "right": "subjective"
+    },
+    {
+      "left": "use of maps",
+      "right": "use of substances"
+    },
+    {
+      "left": "experimental",
+      "right": "theoretical"
+    }
+  ],
+  "ratings": [],
+  "scale": [
+    1,
+    5
+  ]
+}

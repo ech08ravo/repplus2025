@@ -93,6 +93,22 @@ alongside any analysis which convention produced it.
 
 ---
 
+## The decision taken
+
+The midpoint is a rating a participant gives: on a five-point scale it says both
+poles apply equally. That is a judgement, and it is not available as a way of
+recording that no judgement was made. Nor was the value the app had been using -
+4 is neither the midpoint nor a "don't know"; on Rep Plus's own banding it sits
+inside the right pole's band, so every filled cell leaned right.
+
+So unrated cells are left blank, and each study keeps its original scale and
+intent. Analyses work from the ratings present: a construct counts towards a
+comparison when both items are rated on it. The single exception is the PCA
+biplot, which cannot decompose an incomplete matrix - elements with unrated
+cells are left out of that plot and named beneath it, rather than being given
+invented ratings to make the arithmetic work. A grid whose source marked "does
+not apply" with 0, as Bezzi printed it, carries those cells as blanks too.
+
 ## Status
 
 | Decision | Status |
@@ -100,12 +116,13 @@ alongside any analysis which convention produced it.
 | Shift Rep Plus ratings onto the scale declared in the file | Done (v2.3.1) |
 | Carry the declared scale through import instead of assuming 1–5 | Done (v2.3.1) |
 | Document Rep Plus's pole banding and midpoint treatment | Done — see [RGRID_FORMAT.md](RGRID_FORMAT.md) §3 |
-| Imputation value (currently `4`; help text says `3`) | **Deferred** — pending literature |
+| Imputation of unrated cells | **Decided** — none. Blanks stay blank (v2.6.0) |
 | Crossplot midpoint gridline (currently `4` on a 1–5 axis) | **Deferred** — pending literature |
 | Construct reversal to use the declared rather than observed midpoint | Done (v2.5.0) |
 | Exclude unrated cells from matches instead of scoring them as agreement | Done (v2.5.0) |
 | Rating scale as a property of the grid, carried through import and export | Done (v2.5.0) |
-| Distinct "does not apply" cell state in elicitation (`-` / `0`) | Proposed |
+| `0 = N/A` on import, for sources using Bezzi's convention | Done (v2.5.0) |
+| Distinct "does not apply" cell state during elicitation | Proposed |
 | Scale length (4- or 5-point) chosen per grid at elicitation | Proposed |
 | Make the imputation convention explicit and configurable | Proposed |
 

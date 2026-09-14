@@ -1,0 +1,33 @@
+	Grid	6#	15	6	BezziDisciplines	expert	3	1996-01-01	00:00:00	literature	Rep Plus V1.1	RepGrid
+C0	R	1	0	1	1	5		laboratory	fieldwork	
+C1	R	1	0	1	1	5		axioms	observation data	
+C2	R	1	0	1	1	5		applied	basic	
+C3	R	1	0	1	1	5		synthesis	analysis	
+C4	R	1	0	1	1	5		modifies reality	preserves reality	
+C5	R	1	0	1	1	5		calculations	descriptions	
+C6	R	1	0	1	1	5		rigorous	approximate	
+C7	R	1	0	1	1	5		concerned with real	concerned with abstract	
+C8	R	1	0	1	1	5		formulas	concepts	
+C9	R	1	0	1	1	5		inductive	deductive	
+C10	R	1	0	1	1	5		analyze the effects	analyze the causes	
+C11	R	1	0	1	1	5		study the matter	study the territory	
+C12	R	1	0	1	1	5		objective	subjective	
+C13	R	1	0	1	1	5		use of maps	use of substances	
+C14	R	1	0	1	1	5		experimental	theoretical	
+E0	1	0	?	?	?	?	?	?	?	?	?	?	?	?	?	?	?	Mathematics	
+E1	1	0	?	?	?	?	?	?	?	?	?	?	?	?	?	?	?	Physics	
+E2	1	0	?	?	?	?	?	?	?	?	?	?	?	?	?	?	?	Chemistry	
+E3	1	0	?	?	?	?	?	?	?	?	?	?	?	?	?	?	?	Biology	
+E4	1	0	?	?	?	?	?	?	?	?	?	?	?	?	?	?	?	Geology	
+E5	1	0	?	?	?	?	?	?	?	?	?	?	?	?	?	?	?	Geography	
+_UID	bezzi-disciplines
+_Date	1996-01-01
+_Time	00:00:00
+_Place	literature
+_Meta	1
+_Status	3
+_Context	Constructs distinguishing scientific disciplines
+_Name	BezziDisciplines
+_Note	expert
+_Source	Bezzi - disciplines grid
+_Annotation	Bezzi - disciplines grid. Constructs and elements transcribed from the published table; the rating matrix was not included, so all 90 cells are unrated ('?') and await entry.

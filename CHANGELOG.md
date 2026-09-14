@@ -2,6 +2,24 @@
 
 All notable changes to WebGrid.Online are documented in this file.
 
+## [2.6.0] - 2026-09-14
+
+### Changed
+- **Unrated cells are no longer imputed.** Analysis previously refused to run on
+  an incomplete grid unless "Impute missing" was ticked, which filled every blank
+  with `4` - neither the midpoint of the 1-5 scale nor a "don't know", but a
+  rating inside the right pole's band, so each filled cell leaned right. The
+  wizard's auto-analysis filled `3`. Blanks now stay blank, and analysis runs.
+  A rating is a judgement the participant made; the midpoint is also a judgement
+  ("both poles apply equally"), so no value on the scale can stand for "not
+  answered".
+- Focus, matches, dendrograms and statistics work from the ratings present,
+  matching pairwise. **The PCA biplot** is the one analysis that needs a complete
+  matrix: elements with unrated cells are omitted from that plot and named
+  beneath it, instead of being given invented ratings.
+- The "Impute missing" control is replaced by a note explaining how blanks are
+  handled in each analysis.
+
 ## [2.5.0] - 2026-09-14
 
 ### Changed

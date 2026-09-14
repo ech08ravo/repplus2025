@@ -5,7 +5,7 @@ library(uuid)
 library(jsonlite)
 library(igraph)
 
-APP_VERSION <- "2.5.0"
+APP_VERSION <- "2.6.0"
 
 # Security: explicit upload size limit (10MB) and grid limits
 options(shiny.maxRequestSize = 10 * 1024^2)
@@ -700,17 +700,22 @@ ui <- fluidPage(
         tags$div(class = "sidebar-content",
           uiOutput("analyse_button_ui"),
           div(style = "display: flex; align-items: center; gap: 6px; margin-top: 8px;",
-            checkboxInput("impute_missing", "Impute missing", value = FALSE),
-            actionButton("info_impute", "?", class = "btn-info",
-                         style = "width: 18px; height: 18px; padding: 0; font-size: 11px; line-height: 18px; border-radius: 50%; margin-top: -20px;")
+            tags$small(class = "text-muted", "Unrated cells stay blank"),
+            actionButton("info_blank", "?", class = "btn-info",
+                         style = "width: 18px; height: 18px; padding: 0; font-size: 11px; line-height: 18px; border-radius: 50%;")
           ),
           conditionalPanel(
-            condition = "input.info_impute % 2 == 1",
+            condition = "input.info_blank % 2 == 1",
             div(class = "info-popup", style = "font-size: 11px;",
-              tags$strong("Impute Missing Ratings"), tags$br(),
-              "When checked, any missing ratings will be replaced with the midpoint value (3 on a 1-5 scale) before analysis.",
+              tags$strong("Unrated cells are left blank"), tags$br(),
+              "A rating is a judgement the participant made. Filling a blank in would invent one, and on a 1-5 scale no value reads as \u201Cnot answered\u201D - the midpoint means ", tags$em("both poles apply equally"), ", which is itself a judgement.",
               tags$br(), tags$br(),
-              tags$em("Use this when: "), "You have incomplete ratings but want to run analysis anyway. The imputed values are neutral and won't strongly influence results."
+              tags$strong("What this means for each analysis:"),
+              tags$ul(style = "margin: 4px 0; padding-left: 16px;",
+                tags$li("Focus, matches, dendrograms and statistics use the ratings actually present: a construct counts towards a comparison when both items are rated on it."),
+                tags$li("The PCA biplot needs a complete grid, so elements with blanks are left out of that plot and named beneath it.")
+              ),
+              "A grid whose source marked \u201Cdoes not apply\u201D with 0 keeps those cells blank too - tick ", tags$strong("0 = N/A"), " when loading it."
             )
           )
         )
@@ -2137,7 +2142,7 @@ server <- function(input, output, session) {
     scale = c(1, 5),
     scores_mat_last = NULL,
     repgrid_last = NULL,
-    imputed_last = FALSE,
+    n_blank_last = 0,
     elicitation_active = FALSE,
     show_constructs = FALSE,
     manual_mode = FALSE,
@@ -2756,7 +2761,6 @@ server <- function(input, output, session) {
     if (length(rv$elements) >= 2 &&
         is.data.frame(rv$constructs) && nrow(rv$constructs) >= 2 &&
         is.data.frame(rv$ratings) && nrow(rv$ratings) > 0) {
-      updateCheckboxInput(session, "impute_missing", value = TRUE)
       # Build scores matrix and run analysis inline
       tryCatch({
         construct_labels <- paste(rv$constructs$left, "-", rv$constructs$right)
@@ -2770,10 +2774,7 @@ server <- function(input, output, session) {
             scores_mat[i, j] <- rv$ratings$rating[match_idx][1]
           }
         }
-        # Impute missing
-        if (any(is.na(scores_mat))) {
-          scores_mat[is.na(scores_mat)] <- 3
-        }
+        # Unrated cells stay unrated - see the note in the Analyse handler.
         rv$scores_mat_last <- scores_mat
         # makeRepgrid() fills matrix(scores, ncol = n_elements, byrow = TRUE),
         # so it needs the ratings construct-major: construct 1 across every
@@ -2788,7 +2789,7 @@ server <- function(input, output, session) {
           r.name = rv$constructs$right,
           scores = scores_vec
         ))
-        rv$imputed_last <- any(is.na(scores_mat))
+        rv$n_blank_last <- sum(is.na(scores_mat))
         showNotification("Analysis complete!", type = "message", duration = 2)
       }, error = function(e) {
         showNotification(paste("Auto-analysis error:", e$message), type = "error")
@@ -3945,21 +3946,12 @@ server <- function(input, output, session) {
       }
     }
 
-    # Handle missing values: abort (strict) or impute midpoint
-    if (any(is.na(scores_mat))) {
-      if (!isTRUE(input$impute_missing)) {
-        showNotification(
-          "Analysis aborted: some ratings are missing. Tick 'Impute missing ratings' or complete all ratings.",
-          type = "error"
-        )
-        return()
-      } else {
-        scores_mat[is.na(scores_mat)] <- 4
-        imputed <- TRUE
-      }
-    } else {
-      imputed <- FALSE
-    }
+    # Unrated cells stay unrated. A rating is a judgement the participant made;
+    # filling one in invents a judgement they did not make, and on a 1-5 scale
+    # there is no value that reads as "not answered" - the midpoint means both
+    # poles apply equally, which is itself a judgement. Every analysis except
+    # the PCA biplot works from the ratings actually present, matching pairwise.
+    n_blank <- sum(is.na(scores_mat))
 
     rv$scores_mat_last <- scores_mat
 
@@ -3974,9 +3966,12 @@ server <- function(input, output, session) {
     ))
 
     rv$repgrid_last <- repgrid_obj
-    rv$imputed_last <- imputed
+    rv$n_blank_last <- n_blank
 
-    showNotification("Analysis complete!", type = "message", duration = 2)
+    showNotification(
+      paste0("Analysis complete!",
+             if (n_blank > 0) paste0(" ", n_blank, " unrated cells kept blank.") else ""),
+      type = "message", duration = 4)
     updateTabsetPanel(session, "main_tabs", selected = "Biplot")
     }, error = function(e) {
       showNotification(paste("Analysis error:", e$message), type = "error")
@@ -3987,8 +3982,9 @@ server <- function(input, output, session) {
 
   output$analysis_summary <- renderPrint({
     req(rv$repgrid_last)
-    if (isTRUE(rv$imputed_last)) {
-      cat("Note: Missing ratings were imputed with 4 (midpoint).\n\n")
+    if (isTRUE(rv$n_blank_last > 0)) {
+      cat("Note:", rv$n_blank_last, "ratings are blank and were left blank.",
+          "Matches are computed over the constructs rated on both items.\n\n")
     }
     print(summary(rv$repgrid_last))
   })
@@ -3998,6 +3994,23 @@ server <- function(input, output, session) {
     if (is.null(sm)) return()
     if (nrow(sm) < 2 || ncol(sm) < 2) {
       plot.new(); text(0.5, 0.5, "Need at least 2 elements and 2 constructs for biplot.", cex = 1.2); return()
+    }
+    # The PCA is the one analysis that cannot work around a blank: prcomp needs a
+    # complete matrix, and we do not invent ratings. So elements with unrated
+    # cells sit this plot out and are named beneath it; every other tab still
+    # uses them.
+    omitted_elements <- rownames(sm)[!complete.cases(sm)]
+    if (length(omitted_elements)) {
+      sm <- sm[complete.cases(sm), , drop = FALSE]
+      if (nrow(sm) < 2) {
+        plot.new()
+        text(0.5, 0.55, "Not enough fully rated elements for the biplot.", cex = 1.2)
+        text(0.5, 0.42, paste0(length(omitted_elements), " of ",
+                               length(omitted_elements) + nrow(sm),
+                               " elements have unrated cells."), cex = 0.9, col = "gray30")
+        text(0.5, 0.32, "The other tabs use every rating that is present.", cex = 0.85, col = "gray40")
+        return()
+      }
     }
     # Check for zero-variance columns (prcomp scale fails)
     col_vars <- apply(sm, 2, var, na.rm = TRUE)
@@ -4083,6 +4096,12 @@ server <- function(input, output, session) {
          pos = c_pos_l, col = colors$construct, cex = txt_size * label_scale, font = 3, xpd = TRUE)
 
     abline(h = 0, v = 0, lty = 3, col = "gray50")
+
+    # Say which elements this plot could not include, and why
+    if (length(omitted_elements)) {
+      mtext(paste0("Not shown (unrated cells): ", paste(omitted_elements, collapse = ", ")),
+            side = 1, line = 3.2, cex = txt_size * 0.75, col = "#8a6d3b", adj = 0)
+    }
   })
 
   output$heatmap_plot <- renderPlot({
