@@ -1,6 +1,6 @@
 # WebGrid.Online - Architecture Guide
 
-A comprehensive developer guide to WebGrid.Online v2.3.1 architecture, data structures, algorithms, and integration points.
+A comprehensive developer guide to WebGrid.Online v2.4.0 architecture, data structures, algorithms, and integration points.
 
 ## Quick Overview
 
@@ -18,10 +18,10 @@ A comprehensive developer guide to WebGrid.Online v2.3.1 architecture, data stru
 
 ```
 WebGrid.Online/
-├── app.R                           # 6614 lines: UI + Server (monolithic Shiny app)
+├── app.R                           # 6627 lines: UI + Server (monolithic Shiny app)
 ├── R/
 │   ├── rgrid_io.R                  # 130 lines: .rgrid parsing (Rep IV / Rep Plus V1.1 / V2.0)
-│   ├── focus_analysis.r            # 506 lines: Shaw FOCUS algorithm + plotting
+│   ├── focus_analysis.r            # 607 lines: Shaw FOCUS algorithm + plotting
 │   ├── multigrid_analysis.r        # 1337 lines: Multi-grid analyses (SOCIOGRIDS)
 │   ├── claude_api.R                # 261 lines: Claude API integration
 │   ├── triadic_elicitation.r       # 105 lines: Triadic helpers
@@ -398,10 +398,44 @@ similarity = 100 * (1 - distance / max_distance)
 
 ### Clustering & Sorting
 
-1. Convert similarity matrix to distance matrix: `dist = 100 - similarity`
-2. Hierarchical clustering: `hclust(dist, method="complete")`
-3. Extract order from dendrogram
-4. Reorder rows (elements) and columns (constructs) by cluster order
+`focus_seriate()` implements Shaw's FOCUS sort, which is **not** a linkage rule
+fed to `hclust`. It builds a single linear sequence:
+
+1. Every item starts as a run of one.
+2. Score each pair of runs by the best match between their **edges** (ends) -
+   the RepGrid manual (section 5.3): *"items are matched only against the items
+   at the edges of existing clusters"*. The `focus-interior` strategy scores
+   against interior items too, then still places the join at the best-matching
+   edge.
+3. Join the best-scoring pair, reversing either run so the two matching ends
+   butt together; the joined run keeps its order.
+4. Repeat until one run remains - that run is the display order.
+
+Heights are `100 - match`, so the tree is drawn in match units and is
+monotonic (available matches can only shrink as edges become interior). The
+result is returned as an `hclust`-compatible object, so `cophenetic()` and the
+SPACED spacing work unchanged.
+
+**Tie-breaking**: with few constructs the distances take few distinct values, so
+several pairs routinely share the top match (the 9x3 yurungi grid ties at 6 of
+its 8 steps). The manual does not say how Rep Plus resolves them; we break ties
+on the earliest item in the original grid order, which is deterministic but will
+not always reproduce Rep Plus's exact arrangement - see below.
+
+`method` also accepts `complete`, `single`, `average` and `ward.D2`, which route
+to `hclust` as before. Complete linkage scores cluster pairs by their *worst*
+member, which is why it used to place strongly dissimilar elements adjacent:
+across the 11 sample grids it averaged 78.1% similarity between neighbouring
+columns against FOCUS's 84.4%, with seams as low as 8%.
+
+### Agreement with Rep Plus
+
+Verified against a Rep Plus desktop Focus plot of the yurungi grid: FOCUS
+reproduces its adjacency quality exactly (81.2%) and the same cluster content,
+but not its precise arrangement, because the tied joins are resolved
+differently. Dendrogram branch rotation is also arbitrary, so plots may appear
+mirrored. Resolving the tie-break exactly would need Rep Plus's own Focus
+*Data* output (Matches / Links / Sort tables, section 5.3.2 of the manual).
 
 ### Plotting
 

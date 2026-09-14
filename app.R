@@ -5,7 +5,7 @@ library(uuid)
 library(jsonlite)
 library(igraph)
 
-APP_VERSION <- "2.3.1"
+APP_VERSION <- "2.4.0"
 
 # Security: explicit upload size limit (10MB) and grid limits
 options(shiny.maxRequestSize = 10 * 1024^2)
@@ -1189,6 +1189,15 @@ ui <- fluidPage(
                    column(3,
                           actionButton("run_focus", "Run Focus Analysis", class = "btn-primary"),
                           tags$br(), tags$br(),
+                          selectInput("focus_method", "Sort strategy",
+                                      choices = c(
+                                        "FOCUS - Shaw's edge matching" = "focus",
+                                        "FOCUS - interior matching" = "focus-interior",
+                                        "Complete linkage (hclust)" = "complete",
+                                        "Single linkage (hclust)" = "single",
+                                        "Average linkage (hclust)" = "average"
+                                      ),
+                                      selected = "focus"),
                           radioButtons("focus_style", "Representation",
                                        choices = c(
                                          "FOCUS: sorted with dendrograms" = "focus",
@@ -4814,21 +4823,25 @@ server <- function(input, output, session) {
   # Focus Cluster Analysis
   focus_result <- reactiveVal(NULL)
 
-  observeEvent(input$run_focus, {
+  run_focus_analysis <- function() {
     req(rv$scores_mat_last)
-    sm <- rv$scores_mat_last
-
     construct_labels <- paste(rv$constructs$left, "-", rv$constructs$right)
-
-    result <- focus_cluster(
-      scores_matrix = sm,
+    focus_result(focus_cluster(
+      scores_matrix = rv$scores_mat_last,
       element_names = rv$elements,
       construct_names = construct_labels,
-      power = input$focus_power
-    )
+      power = input$focus_power,
+      method = if (is.null(input$focus_method)) "focus" else input$focus_method
+    ))
+  }
 
-    focus_result(result)
-  })
+  observeEvent(input$run_focus, { run_focus_analysis() })
+
+  # Re-sort in place when the strategy changes, rather than making the user
+  # click Run again - the sort is the whole point of the control.
+  observeEvent(input$focus_method, {
+    if (!is.null(focus_result())) run_focus_analysis()
+  }, ignoreInit = TRUE)
 
   # Shared renderer for the Focus tab - used by the on-screen plot and by both
   # download buttons so all three stay in step.

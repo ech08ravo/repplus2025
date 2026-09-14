@@ -3,7 +3,7 @@
 A Shiny web application for eliciting, rating, and analysing repertory grids using the [OpenRepGrid](https://docs.openrepgrid.org/) R package and Personal Construct Theory.
 Outputs are interoperable with **RepPlus** (`.rgrid` format).
 
-**Live**: https://webgrid.online | **Version**: 2.3.1
+**Live**: https://webgrid.online | **Version**: 2.4.0
 
 ---
 
@@ -248,6 +248,8 @@ Navigate through the single-grid analysis tabs:
   - **Match Cutoff**: Minimum similarity % to display (default 80%)
   - **Show Rating Values**: Toggle numeric display in cells
   - **Show Shading**: Toggle greyscale/color gradient
+  - **Sort strategy**: Shaw's FOCUS edge matching (default), FOCUS interior matching,
+    or hclust linkages (complete, single, average) for comparison
   - **Representation**: FOCUS (sorted with dendrograms), SPACED (rows and columns
     spaced in proportion to dissimilarity), or Display (grid as entered, no clustering)
   - **Color Palette**: Select from wong, classic, earth, contrast, greyscale
@@ -316,7 +318,7 @@ WebGrid.Online/
 
 WebGrid.Online implements core repertory grid analysis functionality:
 
-**✅ Implemented (v2.3.1):**
+**✅ Implemented (v2.4.0):**
 
 *Single-Grid Analysis:*
 - Interactive grid elicitation (elements, constructs, ratings)

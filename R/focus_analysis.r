@@ -69,18 +69,118 @@ compute_construct_similarities <- function(scores_matrix, power = 1.0) {
   sim_matrix
 }
 
+#' Shaw's FOCUS sort: seriation by edge matching
+#'
+#' FOCUS is not a linkage rule fed to hclust - it builds a single linear
+#' sequence. Each cluster is an ordered run of items, and two clusters are
+#' joined by butting together the two ends ("edges") that match best, so the
+#' result reads as one ordering with similar items adjacent. The RepGrid manual
+#' (section 5.3) describes the two strategies:
+#'
+#'   standard  - "items are matched only against the items at the edges of
+#'                existing clusters"
+#'   interior  - "allows Focus to match against interior items in an existing
+#'                cluster; it then displays the interior match and places the
+#'                item at the edge of that cluster that has highest match"
+#'
+#' hclust's complete linkage, used here previously, scores a pair of clusters by
+#' their *worst* pair, which orders items differently and leaves dissimilar
+#' items adjacent in the display.
+#'
+#' @param sim Square similarity matrix (0-100).
+#' @param interior Use the interior matching strategy.
+#' @return An hclust-compatible list: `merge`, `height` (100 - match), `order`.
+focus_seriate <- function(sim, interior = FALSE, labels = NULL) {
+  n <- nrow(sim)
+  if (n < 2) {
+    return(structure(list(
+      merge = matrix(integer(0), ncol = 2), height = numeric(0),
+      order = seq_len(n), labels = labels, method = "focus",
+      dist.method = "match"
+    ), class = "hclust"))
+  }
+
+  runs <- lapply(seq_len(n), function(i) i)   # ordered item runs
+  ids <- -seq_len(n)                          # hclust ids: -i singleton, +k merge k
+  merge <- matrix(0L, nrow = n - 1, ncol = 2)
+  height <- numeric(n - 1)
+
+  # Match between two runs under the active strategy
+  pair_match <- function(a, b) {
+    if (interior) return(max(sim[a, b, drop = FALSE]))
+    max(sim[edges(a), edges(b), drop = FALSE])
+  }
+
+  for (step in seq_len(n - 1)) {
+    k <- length(runs)
+    best <- -Inf; bi <- 1L; bj <- 2L; best_key <- Inf
+    for (i in seq_len(k - 1)) {
+      for (j in seq(i + 1, k)) {
+        m <- pair_match(runs[[i]], runs[[j]])
+        # Ties are common: with few constructs the distances take few distinct
+        # values, so several pairs share the top match. The manual does not say
+        # how Rep Plus breaks them, so we break them on the earliest item in the
+        # original grid order - deterministic and reproducible across runs.
+        key <- min(runs[[i]], runs[[j]])
+        if (m > best || (m == best && key < best_key)) {
+          best <- m; bi <- i; bj <- j; best_key <- key
+        }
+      }
+    }
+
+    A <- runs[[bi]]; B <- runs[[bj]]
+
+    # Orient both runs so the best-matching ends face each other. Under the
+    # interior strategy this is the "place it at the edge with the highest
+    # match" rule: the match that scored the join may be to an interior item,
+    # but placement is still decided by the ends.
+    best_join <- -Inf; oriented <- list(A, B)
+    for (ra in c(FALSE, TRUE)) {
+      for (rb in c(FALSE, TRUE)) {
+        Ao <- if (ra) rev(A) else A
+        Bo <- if (rb) rev(B) else B
+        m <- sim[Ao[length(Ao)], Bo[1]]
+        if (m > best_join) { best_join <- m; oriented <- list(Ao, Bo) }
+      }
+    }
+
+    runs[[bi]] <- c(oriented[[1]], oriented[[2]])
+    merge[step, ] <- c(ids[bi], ids[bj])
+    height[step] <- 100 - best
+    ids[bi] <- step
+    runs <- runs[-bj]; ids <- ids[-bj]
+  }
+
+  structure(list(
+    merge = merge, height = height, order = runs[[1]],
+    labels = labels, method = if (interior) "focus-interior" else "focus",
+    dist.method = "match"
+  ), class = "hclust")
+}
+
+#' The two end items of a run (one item if the run is a singleton)
+edges <- function(run) unique(c(run[1], run[length(run)]))
+
 #' Perform Focus clustering and sorting
-focus_cluster <- function(scores_matrix, element_names, construct_names, power = 1.0) {
+focus_cluster <- function(scores_matrix, element_names, construct_names, power = 1.0,
+                          method = c("focus", "focus-interior", "complete",
+                                     "single", "average", "ward.D2")) {
+  method <- match.arg(method)
+
   # Compute similarities
   elem_sim <- compute_element_similarities(scores_matrix, power)
   const_sim <- compute_construct_similarities(scores_matrix, power)
-  
-  # Hierarchical clustering
-  elem_dist <- as.dist(100 - elem_sim)
-  const_dist <- as.dist(100 - const_sim)
-  
-  elem_hclust <- hclust(elem_dist, method = "complete")
-  const_hclust <- hclust(const_dist, method = "complete")
+
+  cluster_one <- function(sim, labels) {
+    if (method %in% c("focus", "focus-interior")) {
+      focus_seriate(sim, interior = identical(method, "focus-interior"), labels = labels)
+    } else {
+      hclust(as.dist(100 - sim), method = method)
+    }
+  }
+
+  elem_hclust <- cluster_one(elem_sim, element_names)
+  const_hclust <- cluster_one(const_sim, construct_names)
   
   # Sort according to clustering
   elem_order <- elem_hclust$order
@@ -100,7 +200,8 @@ focus_cluster <- function(scores_matrix, element_names, construct_names, power =
     element_similarities = elem_sim,
     construct_similarities = const_sim,
     element_order = elem_order,
-    construct_order = const_order
+    construct_order = const_order,
+    method = method
   )
 }
 

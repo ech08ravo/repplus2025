@@ -36,9 +36,21 @@ Successfully implemented Shaw's (1980) Focus algorithm for RepPlusApp. The Focus
 - Automatically finds best match (normal or reversed)
 - Returns similarity as percentage (0-100%)
 
-#### `focus_cluster(scores_matrix, element_names, construct_names, power = 1.0)`
+#### `focus_seriate(sim, interior = FALSE)`
+- Shaw's FOCUS sort: builds one linear sequence by joining runs of items at
+  their best-matching **ends**, rather than applying a linkage rule
+- `interior = TRUE` implements the manual's Interior strategy (match against
+  interior items, place at the best-matching edge)
+- Returns an `hclust`-compatible object, so the dendrogram drawing and the
+  SPACED cophenetic spacing work unchanged
+- Ties are broken on the earliest item in grid order (the manual does not
+  specify Rep Plus's rule)
+
+#### `focus_cluster(scores_matrix, element_names, construct_names, power = 1.0, method = "focus")`
 - Main clustering function
-- Performs hierarchical clustering on elements and constructs
+- `method`: `focus` (default), `focus-interior`, or any `hclust` method
+  (`complete`, `single`, `average`, `ward.D2`)
+- Performs the FOCUS sort, or hierarchical clustering, on elements and constructs
 - Sorts matrix rows and columns by cluster order
 - Returns complete result object with:
   - Sorted matrix

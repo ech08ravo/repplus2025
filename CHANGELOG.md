@@ -2,6 +2,33 @@
 
 All notable changes to WebGrid.Online are documented in this file.
 
+## [2.4.0] - 2026-09-14
+
+### Changed
+- **Focus now runs Shaw's FOCUS sort instead of hclust complete linkage.** FOCUS
+  is a seriation, not a linkage rule: each cluster is an ordered run of items, and
+  two runs are joined by butting together the ends that match best, per the
+  RepGrid manual section 5.3 ("items are matched only against the items at the
+  edges of existing clusters"). Complete linkage scores cluster pairs by their
+  *worst* member, which placed strongly dissimilar elements side by side - across
+  the 11 sample grids it averaged 78.1% similarity between neighbouring columns
+  against FOCUS's 84.4%, with seams as low as 8%.
+- New **Sort strategy** control on the Focus tab: FOCUS edge matching (default),
+  FOCUS interior matching (the manual's Interior option), or complete / single /
+  average linkage for comparison. Changing it re-sorts immediately.
+
+### Added
+- `focus_seriate()` implementing both FOCUS matching strategies, returning an
+  `hclust`-compatible object so the dendrograms and SPACED spacing work unchanged.
+
+### Known limitation
+- Ties are frequent (the 9x3 yurungi grid ties at 6 of its 8 joins) and the manual
+  does not specify how Rep Plus resolves them. Ours breaks ties on the earliest
+  item in grid order. Against a Rep Plus desktop plot of the same grid this
+  reproduces the adjacency quality exactly (81.2%) and the same clusters, but not
+  the identical arrangement. Branch rotation is also arbitrary, so plots may
+  appear mirrored.
+
 ## [2.3.1] - 2026-09-11
 
 ### Fixed
