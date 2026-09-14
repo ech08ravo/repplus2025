@@ -2,6 +2,26 @@
 
 All notable changes to WebGrid.Online are documented in this file.
 
+## [2.4.1] - 2026-09-14
+
+### Fixed
+- **The Statistics tab reported scrambled numbers.** `makeRepgrid()` fills
+  `matrix(scores, ncol = n_elements, byrow = TRUE)`, so it needs ratings
+  construct-major; the app passed `as.vector(t(scores_mat))`, which is
+  element-major. Every rating landed in the wrong cell. The value count is the
+  same either way, so nothing errored and the totals looked plausible - on the
+  yurungi grid, Canvas (rated 4, 1, 5) was reported with mean 4.33, min 4.
+  Now `as.vector(scores_mat)`, verified cell for cell against the file.
+  - Affected: the Statistics tab (element and construct statistics) and the
+    analysis summary - the only three consumers of the repgrid object.
+  - Not affected: every plot (biplot, crossplot, heatmap, Focus, dendrograms,
+    multi-grid), which read `rv$scores_mat_last` directly.
+
+### Added
+- `tests/test_grid_integrity.R` - regression tests from `.rgrid` file through to
+  the OpenRepGrid object: pole labels, rating offset, cell-for-cell agreement
+  with the file, and a round trip over every sample grid.
+
 ## [2.4.0] - 2026-09-14
 
 ### Changed

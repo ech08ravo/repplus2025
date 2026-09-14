@@ -1,6 +1,6 @@
 # WebGrid.Online - Architecture Guide
 
-A comprehensive developer guide to WebGrid.Online v2.4.0 architecture, data structures, algorithms, and integration points.
+A comprehensive developer guide to WebGrid.Online v2.4.1 architecture, data structures, algorithms, and integration points.
 
 ## Quick Overview
 

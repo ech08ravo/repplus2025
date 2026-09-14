@@ -5,7 +5,7 @@ library(uuid)
 library(jsonlite)
 library(igraph)
 
-APP_VERSION <- "2.4.0"
+APP_VERSION <- "2.4.1"
 
 # Security: explicit upload size limit (10MB) and grid limits
 options(shiny.maxRequestSize = 10 * 1024^2)
@@ -2745,7 +2745,13 @@ server <- function(input, output, session) {
           scores_mat[is.na(scores_mat)] <- 3
         }
         rv$scores_mat_last <- scores_mat
-        scores_vec <- as.vector(t(scores_mat))
+        # makeRepgrid() fills matrix(scores, ncol = n_elements, byrow = TRUE),
+        # so it needs the ratings construct-major: construct 1 across every
+        # element, then construct 2, and so on. scores_mat is elements x
+        # constructs, so as.vector() (column-major) is already that order.
+        # as.vector(t(scores_mat)) is element-major and silently scrambles the
+        # grid - no error, since the value count is the same either way.
+        scores_vec <- as.vector(scores_mat)
         rv$repgrid_last <- makeRepgrid(list(
           name = rv$elements,
           l.name = rv$constructs$left,
@@ -3915,7 +3921,9 @@ server <- function(input, output, session) {
 
     rv$scores_mat_last <- scores_mat
 
-    scores_vec <- as.vector(t(scores_mat))
+    # Construct-major, to match makeRepgrid's byrow fill - see the note in the
+    # auto-analysis handler above.
+    scores_vec <- as.vector(scores_mat)
     repgrid_obj <- makeRepgrid(list(
       name = rv$elements,
       l.name = rv$constructs$left,
