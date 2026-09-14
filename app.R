@@ -654,6 +654,12 @@ ui <- fluidPage(
           div(style = "margin-top: -20px;",
             actionButton("import_grid", "Load to Editor", class = "btn-secondary btn-sm")
           ),
+          checkboxInput("rgrid_zero_na",
+                        tags$span("Treat 0 as \u201Cdoes not apply\u201D",
+                                  tags$br(),
+                                  tags$small(class = "text-muted",
+                                    "Leave unticked for Rep Plus files, which store ratings 0-based so 0 is a real rating.")),
+                        value = FALSE),
           tags$small(class = "text-muted", "Accepts .rgrid or .json files"),
           actionButton("load_sample", "Load Sample Data", class = "btn-outline-info btn-sm", style = "margin-top: 8px;"),
           div(style = "margin-top: 12px; padding-top: 8px; border-top: 1px dashed #ccc;",
@@ -3841,7 +3847,7 @@ server <- function(input, output, session) {
       } else if (file_ext == "rgrid") {
         # Import .rgrid format. R/rgrid_io.R handles the Rep IV / Rep Plus V1.1 /
         # Rep Plus V2.0 construct-line layouts and the 0-based rating storage.
-        g <- parse_rgrid(file_path)
+        g <- parse_rgrid(file_path, zero_is_na = isTRUE(input$rgrid_zero_na))
         n_e <- length(g$elements)
         n_c <- length(g$left)
 
@@ -3860,13 +3866,21 @@ server <- function(input, output, session) {
           stringsAsFactors = FALSE
         )
 
+        notes <- character(0)
+        if (g$offset_applied != 0) {
+          notes <- c(notes, paste0(g$source, " stores ratings 0-based; shifted onto its ",
+                                   g$scale[1], "-", g$scale[2], " scale"))
+        }
+        if (isTRUE(g$zero_is_na) && g$n_zero_as_na > 0) {
+          notes <- c(notes, paste0(g$n_zero_as_na, " cells read as \u201Cdoes not apply\u201D (0)"))
+        }
+        if (g$n_not_rated > 0) {
+          notes <- c(notes, paste0(g$n_not_rated, " cells not rated"))
+        }
         showNotification(
           paste0("Loaded ", n_e, " elements, ", n_c, " constructs from .rgrid",
-                 if (g$offset_applied != 0) {
-                   paste0(" (", g$source, " stores ratings 0-based; shifted onto its ",
-                          g$scale[1], "-", g$scale[2], " scale)")
-                 } else ""),
-          type = "message"
+                 if (length(notes)) paste0(" - ", paste(notes, collapse = "; ")) else ""),
+          type = "message", duration = 8
         )
 
       } else {
@@ -5383,7 +5397,7 @@ server <- function(input, output, session) {
 
     } else if (ext == "rgrid") {
       # Same parser as the single-grid import (R/rgrid_io.R)
-      g <- parse_rgrid(file_path)
+      g <- parse_rgrid(file_path, zero_is_na = isTRUE(input$rgrid_zero_na))
       n_e <- length(g$elements)
       n_c <- length(g$left)
 

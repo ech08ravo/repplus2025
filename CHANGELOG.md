@@ -24,6 +24,13 @@ All notable changes to WebGrid.Online are documented in this file.
   previously it wrote `NA`, producing a file that could not be read back.
 
 ### Added
+- **"Treat 0 as \u201Cdoes not apply\u201D" checkbox** on the File Operations panel,
+  unticked by default. Rep Plus stores ratings 0-based, so a stored `0` is normally
+  the pure left pole; but a grid transcribed the way Bezzi (1996) printed it uses
+  `0` for "construct does not apply" alongside 1-5 ratings. Nothing in the data
+  distinguishes the two, so the importer now asks rather than guesses, and the
+  import notification reports which reading was used, how many cells became
+  not-applicable, and how many are unrated.
 - Regression tests for match semantics and for the Bezzi (1996) published grid,
   which the importer reproduces cell for cell including its 12 not-applicable
   cells.

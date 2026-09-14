@@ -126,6 +126,30 @@ it untouched. There is one ambiguity the rule cannot resolve from the data
 alone — stored `1–3` could be 1-based or 0-based — which is why the source
 string is consulted.
 
+### When 0 means "does not apply"
+
+The two conventions collide. Rep Plus *stores* ratings 0-based, so `0` is the
+pure left pole - `bezzi1996_expert.rgrid` contains 56 of them. But Bezzi (1996)
+*printed* that same grid with `0` marking "construct does not apply", and its 12
+such cells are written `?` in the file. A transcription that kept the printed
+convention would therefore hold ratings 1-5 alongside `0` for not-applicable,
+and reading it 0-based would be wrong.
+
+No rule can settle this from the data alone, so it is the importer's choice:
+**Treat 0 as "does not apply"** on the File Operations panel, unticked by
+default.
+
+| Checkbox | `0` is read as | Shift applied |
+|---|---|---|
+| unticked (default) | a rating - the pure left pole | yes, for Rep Plus files |
+| ticked | not applicable (`NA`) | none - values are already 1-based |
+
+Ticking it for a genuine Rep Plus file is destructive: Bezzi would go from 12
+not-applicable cells to 68, discarding 56 real ratings. The import notification
+reports what was actually done - the shift applied, how many cells were read as
+not applicable, and how many are unrated - so the reading is visible rather than
+assumed.
+
 ### Why it is not merely cosmetic
 
 A constant shift leaves correlations and distances unchanged, so cluster

@@ -72,7 +72,15 @@ rgrid_rating_offset <- function(scores, scale, source_tag = "") {
 #' Returns elements, construct poles, the ratings matrix (elements x
 #' constructs, shifted onto the declared scale), the scale itself, and the
 #' source application string from the header.
-parse_rgrid <- function(file_path) {
+#'
+#' @param zero_is_na What a stored `0` means. FALSE (default) reads it as a
+#'   rating: Rep Plus stores ratings 0-based, so `0` is the pure left pole and
+#'   the grid is shifted onto its declared scale. TRUE reads `0` as "does not
+#'   apply" - the convention Bezzi (1996) used in print - in which case the
+#'   remaining values are already 1-based and no shift is applied. The two
+#'   conventions collide (a Rep Plus grid can hold dozens of legitimate zeros),
+#'   so this is the caller's decision, not a guess.
+parse_rgrid <- function(file_path, zero_is_na = FALSE) {
   txt <- readLines(file_path, warn = FALSE)
 
   header <- if (length(txt)) strsplit(txt[1], "\t")[[1]] else character(0)
@@ -112,8 +120,15 @@ parse_rgrid <- function(file_path) {
     }
   }
 
-  offset <- rgrid_rating_offset(scores_mat, scale, source_tag)
-  if (offset != 0) scores_mat <- scores_mat + offset
+  if (zero_is_na) {
+    zeros <- sum(scores_mat == 0, na.rm = TRUE)
+    scores_mat[!is.na(scores_mat) & scores_mat == 0] <- NA
+    offset <- 0
+  } else {
+    zeros <- 0
+    offset <- rgrid_rating_offset(scores_mat, scale, source_tag)
+    if (offset != 0) scores_mat <- scores_mat + offset
+  }
 
   rownames(scores_mat) <- elements
   colnames(scores_mat) <- paste(left, "-", right)
@@ -125,6 +140,9 @@ parse_rgrid <- function(file_path) {
     scores_mat = scores_mat,
     scale = scale,
     source = source_tag,
-    offset_applied = offset
+    offset_applied = offset,
+    zero_is_na = zero_is_na,
+    n_zero_as_na = zeros,
+    n_not_rated = sum(is.na(scores_mat))
   )
 }
