@@ -54,6 +54,28 @@ wrong <- makeRepgrid(list(name = g$elements, l.name = g$left, r.name = g$right,
 check("element-major ordering really does differ",
       !isTRUE(all.equal(unname(getRatingLayer(wrong)), unname(layer))))
 
+# --- published-source check ------------------------------------------------
+# Bezzi (1996) Figure 1 as printed. The paper marks "construct does not apply"
+# with 0 and rates 1-5; the .rgrid transcription uses "?" for those cells and
+# stores ratings 0-based. Reproducing the printed figure exactly exercises pole
+# parsing, the rating offset and N/A handling together.
+pub <- matrix(c(
+  5,1,1,1,5,5,1,1,5,      NA,5,5,NA,4,5,3,1,1,
+  5,1,1,5,1,1,1,NA,NA,    1,5,5,1,1,5,5,NA,NA,
+  5,1,1,1,5,5,1,1,5,      NA,1,1,NA,1,1,3,4,5,
+  NA,1,1,NA,NA,1,1,4,5,   5,1,2,5,5,3,3,3,1,
+  1,5,5,5,1,1,5,5,1,      1,2,2,1,2,2,3,5,5,
+  5,4,5,NA,3,3,3,1,1,     5,1,1,5,4,1,2,3,3,
+  4,1,2,2,2,3,5,3,1,      1,5,5,5,1,3,5,5,5,
+  5,1,1,5,5,3,1,1,1,      1,1,1,1,1,1,3,2,5), nrow = 16, byrow = TRUE)
+
+bz <- parse_rgrid("dataExamples/bezzi1996_expert.rgrid")
+check("Bezzi: N/A cells match the published figure",
+      identical(is.na(pub), unname(is.na(t(bz$scores_mat)))))
+check("Bezzi: all 144 cells match the published figure",
+      isTRUE(all.equal(pub, unname(t(bz$scores_mat)))))
+check("Bezzi: 12 cells marked not-applicable", sum(is.na(bz$scores_mat)) == 12)
+
 # --- every sample grid survives the round trip -----------------------------
 for (f in Sys.glob("dataExamples/*.rgrid")) {
   gg <- try(parse_rgrid(f), silent = TRUE)
