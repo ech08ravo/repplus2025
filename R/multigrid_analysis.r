@@ -746,64 +746,25 @@ plot_minus_grid <- function(minus_result, title = NULL, text_size = 1.2,
     title <- paste0("MINUS: ", minus_result$grid_a_name, " - ", minus_result$grid_b_name)
   }
 
-  n_elem <- nrow(mat)
-  n_const <- ncol(mat)
-
-  # Set up layout: main heatmap + color legend
-  layout(matrix(c(1, 2), nrow = 1), widths = c(5, 1))
-
-  # Diverging color palette: blue (negative) - white (zero) - orange (positive)
+  # Diverging palette: blue (negative) - white (zero) - orange (positive),
+  # symmetric around zero
   colors <- colorRampPalette(c("#0072B2", "#FFFFFF", "#D55E00"))(100)
-
-  # Determine symmetric zlim around zero
   max_abs <- max(abs(mat), na.rm = TRUE)
   if (max_abs == 0) max_abs <- 1
   zlim <- c(-max_abs, max_abs)
 
-  # Main heatmap
-  par(mar = c(10, 12, 5, 1), family = "sans")
-
-  image(1:n_const, 1:n_elem, t(mat[n_elem:1, , drop = FALSE]),
-        col = colors, axes = FALSE, xlab = "", ylab = "",
-        main = title, cex.main = text_size * 1.1,
-        zlim = zlim)
-
-  # Add values
-  if (show_values) {
-    for (i in 1:n_elem) {
-      for (j in 1:n_const) {
-        val <- mat[i, j]
-        if (!is.na(val)) {
-          fmt <- if (show_pct) sprintf("%.0f%%", val) else sprintf("%.1f", val)
-          text(j, n_elem - i + 1, fmt, cex = 0.8 * text_size, family = "sans")
-        }
-      }
-    }
-  }
-
-  # Axes
-  axis(1, at = 1:n_const, labels = minus_result$construct_labels, las = 2,
-       cex.axis = 0.7 * text_size, family = "sans")
-  axis(2, at = 1:n_elem, labels = rev(minus_result$elements), las = 2,
-       cex.axis = 0.8 * text_size, family = "sans")
-  box()
-
   label_suffix <- if (show_pct) " (percentage)" else " (raw)"
-  mtext(paste0("Blue = A < B   White = no difference   Orange = A > B", label_suffix),
-        side = 1, line = 8, cex = 0.8 * text_size, family = "sans")
-
-  # Color legend
-  par(mar = c(10, 0.5, 5, 3), family = "sans")
-  legend_vals <- seq(zlim[1], zlim[2], length.out = 100)
-  image(1, legend_vals, t(as.matrix(legend_vals)), col = colors,
-        axes = FALSE, xlab = "", ylab = "")
-  axis(4, at = c(zlim[1], 0, zlim[2]),
-       labels = round(c(zlim[1], 0, zlim[2]), 1),
-       las = 2, cex.axis = 0.8 * text_size, family = "sans")
-  mtext("Diff", side = 3, line = 0.5, cex = 0.8 * text_size, family = "sans")
-  box()
-
-  layout(1)
+  draw_grid_heatmap(
+    mat, elements = minus_result$elements,
+    left_poles = minus_result$constructs$left,
+    right_poles = minus_result$constructs$right,
+    colors = colors, zlim = zlim, title = title, text_size = text_size,
+    show_values = show_values,
+    value_fmt = function(v) if (show_pct) sprintf("%.0f%%", v) else sprintf("%.1f", v),
+    note = paste0("Blue = A < B   White = no difference   Orange = A > B", label_suffix),
+    legend_title = "Diff", legend_at = c(zlim[1], 0, zlim[2]),
+    legend_labels = round(c(zlim[1], 0, zlim[2]), 1)
+  )
 }
 
 # ============================================================================
@@ -1000,34 +961,15 @@ plot_core_analysis <- function(core_result, title = "CORE Analysis", text_size =
        pos = 4, cex = 0.7 * text_size, col = "gray40", family = "sans")
 
   # Panel 2: Core grid heatmap (average of A and B)
-  par(mar = c(8, 8, 4, 3), family = "sans")
   core_avg <- (core_result$core_mat_a + core_result$core_mat_b) / 2
-  n_elem <- nrow(core_avg)
-  n_const <- ncol(core_avg)
-
+  poles <- split_construct_labels(core_result$core_constructs)
   colors <- colorRampPalette(c("#0072B2", "#FFFFFF", "#D55E00"))(100)
-
-  image(1:n_const, 1:n_elem, t(core_avg[n_elem:1, , drop = FALSE]),
-        col = colors, axes = FALSE, xlab = "", ylab = "",
-        main = "Core Grid (average)", cex.main = text_size * 0.9,
-        zlim = c(1, 7))
-
-  # Add values
-  for (i in 1:n_elem) {
-    for (j in 1:n_const) {
-      val <- core_avg[i, j]
-      if (!is.na(val)) {
-        text(j, n_elem - i + 1, sprintf("%.1f", val),
-             cex = 0.7 * text_size, family = "sans")
-      }
-    }
-  }
-
-  axis(1, at = 1:n_const, labels = core_result$core_constructs, las = 2,
-       cex.axis = 0.6 * text_size, family = "sans")
-  axis(2, at = 1:n_elem, labels = rev(core_result$core_elements), las = 2,
-       cex.axis = 0.7 * text_size, family = "sans")
-  box()
+  draw_grid_heatmap(
+    core_avg, elements = core_result$core_elements,
+    left_poles = poles$left, right_poles = poles$right,
+    colors = colors, zlim = c(1, 7), title = "Core Grid (average)",
+    text_size = 0.8 * text_size, value_fmt = function(v) sprintf("%.1f", v)
+  )
 
   layout(1)
 }

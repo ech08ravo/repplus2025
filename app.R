@@ -101,6 +101,7 @@ source("R/rgrid_io.R")
 source("R/focus_analysis.r")
 source("R/claude_api.R")
 source("R/multigrid_analysis.r")
+source("R/grid_heatmap.R")
 
 ui <- fluidPage(
   lang = "en",
@@ -4215,43 +4216,19 @@ server <- function(input, output, session) {
       # 5-step greyscale: 90%, 70%, 50%, 30%, 10% grey
       pal <- colorRampPalette(c("#E6E6E6", "#B3B3B3", "#808080", "#4D4D4D", "#1A1A1A"))(100)
     }
-    # sm is elements (rows) × constructs (cols)
-    n_elem <- nrow(sm)
-    n_cons <- ncol(sm)
-    # Flip elements so first appears at top
-    z <- sm[n_elem:1, ]
-
-    # Set margins to accommodate labels - scale with text size
-    par(mar = c(8 * txt_size, 14 * txt_size, 2, 2))
-
-    # Draw heatmap
-    image(
-      x = 1:n_elem, y = 1:n_cons, z = z,
-      col = pal, axes = FALSE, xlab = "", ylab = ""
-    )
-
-    # Add rating values as text in each cell - scale with cell_size
-    for (i in 1:n_elem) {
-      for (j in 1:n_cons) {
-        val <- z[i, j]
-        if (!is.na(val)) {
-          # Choose text color based on value for readability
-          text_col <- if (val > 4) "white" else "black"
-          text(i, j, sprintf("%.0f", val), col = text_col, cex = cell_size * 1.2, font = 2)
-        }
-      }
-    }
-
-    # Add axes with labels - scale with text_size
-    axis(1, at = 1:n_elem, labels = rev(rv$elements), las = 2, cex.axis = txt_size)
-    labs <- paste(rv$constructs$left, "-", rv$constructs$right)
-    axis(2, at = 1:n_cons, labels = labs, las = 1, cex.axis = txt_size)
-    box()
-
-    # Add axis titles at ends - scale with text_size
-    mtext("Elements", side = 1, line = 6 * txt_size, cex = txt_size * 1.1, adj = 1)
-    mtext("Constructs", side = 2, line = 11 * txt_size, cex = txt_size * 1.1, adj = 1)
+    draw_single_heatmap(sm, pal, txt_size, cell_size)
   })
+
+  # sm is elements (rows) x constructs (cols); shared by the plot and its PNG
+  draw_single_heatmap <- function(sm, pal, txt_size, cell_size) {
+    draw_grid_heatmap(
+      sm, elements = rv$elements,
+      left_poles = rv$constructs$left, right_poles = rv$constructs$right,
+      colors = pal, zlim = range(sm, na.rm = TRUE), text_size = txt_size,
+      value_cex = cell_size * 1.2,
+      value_col = function(v) if (v > 4) "white" else "black"
+    )
+  }
 
   output$dend_elements <- renderPlot({
     sm <- rv$scores_mat_last
@@ -4427,22 +4404,8 @@ server <- function(input, output, session) {
         # 5-step greyscale: 90%, 70%, 50%, 30%, 10% grey
         pal <- colorRampPalette(c("#E6E6E6", "#B3B3B3", "#808080", "#4D4D4D", "#1A1A1A"))(100)
       }
-      n_elem <- nrow(sm); n_cons <- ncol(sm)
-      z <- sm[n_elem:1, ]
       png(file, width = 1200, height = 900, res = 120)
-      par(mar = c(8 * txt_size, 14 * txt_size, 2, 2))
-      image(x = 1:n_elem, y = 1:n_cons, z = z, col = pal, axes = FALSE, xlab = "", ylab = "")
-      for (i in 1:n_elem) for (j in 1:n_cons) {
-        val <- z[i, j]
-        if (!is.na(val)) {
-          text_col <- if (val > 4) "white" else "black"
-          text(i, j, sprintf("%.0f", val), col = text_col, cex = cell_size * 1.2, font = 2)
-        }
-      }
-      axis(1, at = 1:n_elem, labels = rev(rv$elements), las = 2, cex.axis = txt_size)
-      labs <- paste(rv$constructs$left, "-", rv$constructs$right)
-      axis(2, at = 1:n_cons, labels = labs, las = 1, cex.axis = txt_size)
-      box()
+      draw_single_heatmap(sm, pal, txt_size, cell_size)
       dev.off()
     }
   )
@@ -5967,88 +5930,36 @@ server <- function(input, output, session) {
   })
 
   # Mode grid heatmap
-  output$mode_grid_heatmap <- renderPlot({
-    req(rv$mode_grid)
-    g <- rv$mode_grid
-
+  # Shared by the Mode Grid plot and its PNG download
+  draw_mode_heatmap <- function(g) {
     text_size <- if (!is.null(input$mode_text_size)) input$mode_text_size else 1.2
     show_values <- if (!is.null(input$mode_show_values)) input$mode_show_values else TRUE
-
-    n_elem <- nrow(g$scores_mat)
-    n_const <- ncol(g$scores_mat)
-
-    # Get scale range
     scale_min <- g$scale[1]
     scale_max <- g$scale[2]
-
-    # Set up layout: main heatmap + color legend
-    layout(matrix(c(1, 2), nrow = 1), widths = c(5, 1))
-
-    # Dynamic margins and label sizing based on content
-    max_left_len <- max(nchar(as.character(g$constructs$left)), na.rm = TRUE)
-    max_right_len <- max(nchar(as.character(g$constructs$right)), na.rm = TRUE)
-    max_elem_len <- max(nchar(as.character(g$elements)), na.rm = TRUE)
-
-    # Scale label text down for long labels
-    label_cex <- min(0.7, 12 / max(max_left_len, max_right_len, 12)) * text_size
-
-    # Generous margins: bottom for left poles, top for right poles, left for elements
-    bottom_mar <- max(12, max_left_len * 0.65)
-    top_mar <- max(8, max_right_len * 0.6)
-    left_mar <- max(10, max_elem_len * 0.65)
-    par(mar = c(bottom_mar, left_mar, top_mar, 1), family = "sans")
     mode_colors <- get_palette_colors(input$mode_palette)
     colors <- colorRampPalette(c(mode_colors$heat_low, "#FFFFFF", mode_colors$heat_high))(100)
+    draw_grid_heatmap(
+      g$scores_mat, elements = g$elements,
+      left_poles = g$constructs$left, right_poles = g$constructs$right,
+      colors = colors, zlim = c(scale_min, scale_max),
+      title = paste("Mode Grid:", g$name), text_size = text_size,
+      show_values = show_values,
+      value_fmt = function(v) round(v),
+      value_col = function(v) {
+        pct <- (v - scale_min) / (scale_max - scale_min)
+        if (pct > 0.75 || pct < 0.15) "white" else "black"
+      },
+      note = paste0("Blue = low (", scale_min, ", left pole)    White = mid    Orange = high (",
+                    scale_max, ", right pole)"),
+      legend_title = "Rating",
+      legend_at = c(scale_min, (scale_min + scale_max) / 2, scale_max),
+      legend_labels = c(scale_min, round((scale_min + scale_max) / 2, 1), scale_max)
+    )
+  }
 
-    image(1:n_const, 1:n_elem,
-          t(g$scores_mat[n_elem:1, , drop = FALSE]),
-          col = colors,
-          axes = FALSE, xlab = "", ylab = "",
-          main = paste("Mode Grid:", g$name),
-          cex.main = text_size * 1.1,
-          zlim = c(scale_min, scale_max))
-
-    # Add rating values if requested
-    if (show_values) {
-      scale_range <- scale_max - scale_min
-      for (i in 1:n_elem) {
-        for (j in 1:n_const) {
-          val <- g$scores_mat[i, j]
-          if (!is.na(val)) {
-            pct <- (val - scale_min) / scale_range
-            txt_col <- if (pct > 0.75 || pct < 0.15) "white" else "black"
-            text(j, n_elem - i + 1, round(val),
-                 cex = 0.8 * text_size, family = "sans", col = txt_col)
-          }
-        }
-      }
-    }
-
-    # Bottom axis: left poles (low rating end)
-    axis(1, at = 1:n_const, labels = g$constructs$left, las = 2,
-         cex.axis = label_cex, family = "sans")
-    # Top axis: right poles (high rating end)
-    axis(3, at = 1:n_const, labels = g$constructs$right, las = 2,
-         cex.axis = label_cex, family = "sans", tick = FALSE, line = -0.5)
-    # Left axis: elements
-    axis(2, at = 1:n_elem, labels = rev(g$elements), las = 2,
-         cex.axis = 0.8 * text_size, family = "sans")
-    box()
-
-    # Add scale indicator below bottom labels
-    mtext(paste0("Blue = low (", scale_min, ", left pole)    White = mid    Orange = high (", scale_max, ", right pole)"),
-          side = 1, line = bottom_mar - 2, cex = 0.7 * text_size, family = "sans")
-
-    # Color legend
-    par(mar = c(bottom_mar, 0.5, top_mar, 3), family = "sans")
-    legend_vals <- seq(scale_min, scale_max, length.out = 100)
-    image(1, legend_vals, t(as.matrix(legend_vals)), col = colors,
-          axes = FALSE, xlab = "", ylab = "")
-    axis(4, at = c(scale_min, (scale_min + scale_max) / 2, scale_max),
-         labels = c(scale_min, round((scale_min + scale_max) / 2, 1), scale_max),
-         las = 2, cex.axis = 0.8 * text_size, family = "sans")
-    mtext("Rating", side = 3, line = 0.5, cex = 0.8 * text_size, family = "sans")
-    box()
+  output$mode_grid_heatmap <- renderPlot({
+    req(rv$mode_grid)
+    draw_mode_heatmap(rv$mode_grid)
   })
 
   # Use mode grid as current
@@ -6070,52 +5981,8 @@ server <- function(input, output, session) {
     filename = function() paste0("mode-grid-", Sys.Date(), ".png"),
     content = function(file) {
       req(rv$mode_grid)
-      g <- rv$mode_grid
-      text_size <- if (!is.null(input$mode_text_size)) input$mode_text_size else 1.2
-      show_values <- if (!is.null(input$mode_show_values)) input$mode_show_values else TRUE
-      n_elem <- nrow(g$scores_mat); n_const <- ncol(g$scores_mat)
-      scale_min <- g$scale[1]; scale_max <- g$scale[2]
-      max_left_len <- max(nchar(as.character(g$constructs$left)), na.rm = TRUE)
-      max_right_len <- max(nchar(as.character(g$constructs$right)), na.rm = TRUE)
-      max_elem_len <- max(nchar(as.character(g$elements)), na.rm = TRUE)
-      label_cex <- min(0.7, 12 / max(max_left_len, max_right_len, 12)) * text_size
-      bottom_mar <- max(12, max_left_len * 0.65)
-      top_mar <- max(8, max_right_len * 0.6)
-      left_mar <- max(10, max_elem_len * 0.65)
-      mode_colors <- get_palette_colors(input$mode_palette)
-      colors <- colorRampPalette(c(mode_colors$heat_low, "#FFFFFF", mode_colors$heat_high))(100)
       png(file, width = 1200, height = 900, res = 120)
-      layout(matrix(c(1, 2), nrow = 1), widths = c(5, 1))
-      par(mar = c(bottom_mar, left_mar, top_mar, 1), family = "sans")
-      image(1:n_const, 1:n_elem, t(g$scores_mat[n_elem:1, , drop = FALSE]),
-            col = colors, axes = FALSE, xlab = "", ylab = "",
-            main = paste("Mode Grid:", g$name), cex.main = text_size * 1.1,
-            zlim = c(scale_min, scale_max))
-      if (show_values) {
-        scale_range <- scale_max - scale_min
-        for (i in 1:n_elem) for (j in 1:n_const) {
-          val <- g$scores_mat[i, j]
-          if (!is.na(val)) {
-            pct <- (val - scale_min) / scale_range
-            txt_col <- if (pct > 0.75 || pct < 0.15) "white" else "black"
-            text(j, n_elem - i + 1, round(val), cex = 0.8 * text_size, family = "sans", col = txt_col)
-          }
-        }
-      }
-      axis(1, at = 1:n_const, labels = g$constructs$left, las = 2, cex.axis = label_cex, family = "sans")
-      axis(3, at = 1:n_const, labels = g$constructs$right, las = 2, cex.axis = label_cex, family = "sans", tick = FALSE, line = -0.5)
-      axis(2, at = 1:n_elem, labels = rev(g$elements), las = 2, cex.axis = 0.8 * text_size, family = "sans")
-      box()
-      mtext(paste0("Blue = low (", scale_min, ", left pole)    White = mid    Orange = high (", scale_max, ", right pole)"),
-            side = 1, line = bottom_mar - 2, cex = 0.7 * text_size, family = "sans")
-      par(mar = c(bottom_mar, 0.5, top_mar, 3), family = "sans")
-      legend_vals <- seq(scale_min, scale_max, length.out = 100)
-      image(1, legend_vals, t(as.matrix(legend_vals)), col = colors, axes = FALSE, xlab = "", ylab = "")
-      axis(4, at = c(scale_min, (scale_min + scale_max) / 2, scale_max),
-           labels = c(scale_min, round((scale_min + scale_max) / 2, 1), scale_max),
-           las = 2, cex.axis = 0.8 * text_size, family = "sans")
-      mtext("Rating", side = 3, line = 0.5, cex = 0.8 * text_size, family = "sans")
-      box()
+      draw_mode_heatmap(rv$mode_grid)
       dev.off()
     }
   )
