@@ -6271,12 +6271,18 @@ server <- function(input, output, session) {
     cat("Mean absolute difference:", round(r$mean_abs_diff, 2), "\n")
     cat("Maximum absolute difference:", round(r$max_diff, 2), "\n\n")
 
-    # Find location of max difference
-    max_idx <- which(abs(r$diff_mat) == r$max_diff, arr.ind = TRUE)[1, ]
-    cat("Largest difference at:\n")
-    cat("  Element:", r$elements[max_idx[1]], "\n")
-    cat("  Construct:", r$construct_labels[max_idx[2]], "\n")
-    cat("  Difference:", round(r$diff_mat[max_idx[1], max_idx[2]], 1), "\n")
+    # Report every cell at the max, not just the first: ties are common
+    # (e.g. +4.5 and -4.5) and reporting one hides the other
+    max_idx <- which(abs(r$diff_mat) == r$max_diff, arr.ind = TRUE)
+    max_idx <- max_idx[order(max_idx[, 1], max_idx[, 2]), , drop = FALSE]
+    cat(if (nrow(max_idx) > 1) paste0("Largest difference (", nrow(max_idx), " cells tied) at:\n")
+        else "Largest difference at:\n")
+    for (k in seq_len(nrow(max_idx))) {
+      cat("  Element:", r$elements[max_idx[k, 1]], "\n")
+      cat("  Construct:", r$construct_labels[max_idx[k, 2]], "\n")
+      cat("  Difference:", round(r$diff_mat[max_idx[k, 1], max_idx[k, 2]], 1), "\n")
+      if (k < nrow(max_idx)) cat("\n")
+    }
   })
 
   output$download_minus_plot <- downloadHandler(
