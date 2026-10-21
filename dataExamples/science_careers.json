@@ -1,0 +1,299 @@
+{
+  "name": "Science Careers",
+  "elements": ["Lab Technician", "Science Teacher", "Field Ranger", "Sustainability Consultant", "Climate Educator"],
+  "constructs": [
+    {
+      "left": "work in lab",
+      "right": "work outside"
+    },
+    {
+      "left": "public communication",
+      "right": "organisational communication"
+    },
+    {
+      "left": "creating change",
+      "right": "collecting evidence"
+    },
+    {
+      "left": "natural world foregrounded",
+      "right": "lab investigation foregrounded"
+    },
+    {
+      "left": "designs interventions",
+      "right": "communicates evidence"
+    },
+    {
+      "left": "broad environmental focus",
+      "right": "narrow research focus"
+    },
+    {
+      "left": "public organisations",
+      "right": "private organisations"
+    },
+    {
+      "left": "education focus",
+      "right": "conservation focus"
+    },
+    {
+      "left": "education focus",
+      "right": "conservation focus"
+    },
+    {
+      "left": "Emphasis on climate",
+      "right": "Emphasis on climate + waste etc"
+    }
+  ],
+  "ratings": [
+    {
+      "element": "Lab Technician",
+      "construct": "work in lab - work outside",
+      "rating": 1
+    },
+    {
+      "element": "Science Teacher",
+      "construct": "work in lab - work outside",
+      "rating": 2
+    },
+    {
+      "element": "Field Ranger",
+      "construct": "work in lab - work outside",
+      "rating": 5
+    },
+    {
+      "element": "Sustainability Consultant",
+      "construct": "work in lab - work outside",
+      "rating": 3
+    },
+    {
+      "element": "Climate Educator",
+      "construct": "work in lab - work outside",
+      "rating": 3
+    },
+    {
+      "element": "Lab Technician",
+      "construct": "public communication - organisational communication",
+      "rating": 5
+    },
+    {
+      "element": "Science Teacher",
+      "construct": "public communication - organisational communication",
+      "rating": 3
+    },
+    {
+      "element": "Field Ranger",
+      "construct": "public communication - organisational communication",
+      "rating": 3
+    },
+    {
+      "element": "Sustainability Consultant",
+      "construct": "public communication - organisational communication",
+      "rating": 1
+    },
+    {
+      "element": "Climate Educator",
+      "construct": "public communication - organisational communication",
+      "rating": 1
+    },
+    {
+      "element": "Lab Technician",
+      "construct": "creating change - collecting evidence",
+      "rating": 5
+    },
+    {
+      "element": "Science Teacher",
+      "construct": "creating change - collecting evidence",
+      "rating": 2
+    },
+    {
+      "element": "Field Ranger",
+      "construct": "creating change - collecting evidence",
+      "rating": 2
+    },
+    {
+      "element": "Sustainability Consultant",
+      "construct": "creating change - collecting evidence",
+      "rating": 3
+    },
+    {
+      "element": "Climate Educator",
+      "construct": "creating change - collecting evidence",
+      "rating": 2
+    },
+    {
+      "element": "Lab Technician",
+      "construct": "natural world foregrounded - lab investigation foregrounded",
+      "rating": 5
+    },
+    {
+      "element": "Science Teacher",
+      "construct": "natural world foregrounded - lab investigation foregrounded",
+      "rating": 3
+    },
+    {
+      "element": "Field Ranger",
+      "construct": "natural world foregrounded - lab investigation foregrounded",
+      "rating": 1
+    },
+    {
+      "element": "Sustainability Consultant",
+      "construct": "natural world foregrounded - lab investigation foregrounded",
+      "rating": 2
+    },
+    {
+      "element": "Climate Educator",
+      "construct": "natural world foregrounded - lab investigation foregrounded",
+      "rating": 1
+    },
+    {
+      "element": "Lab Technician",
+      "construct": "designs interventions - communicates evidence",
+      "rating": 3
+    },
+    {
+      "element": "Science Teacher",
+      "construct": "designs interventions - communicates evidence",
+      "rating": 4
+    },
+    {
+      "element": "Field Ranger",
+      "construct": "designs interventions - communicates evidence",
+      "rating": 3
+    },
+    {
+      "element": "Sustainability Consultant",
+      "construct": "designs interventions - communicates evidence",
+      "rating": 2
+    },
+    {
+      "element": "Climate Educator",
+      "construct": "designs interventions - communicates evidence",
+      "rating": 4
+    },
+    {
+      "element": "Lab Technician",
+      "construct": "broad environmental focus - narrow research focus",
+      "rating": 5
+    },
+    {
+      "element": "Science Teacher",
+      "construct": "broad environmental focus - narrow research focus",
+      "rating": 3
+    },
+    {
+      "element": "Field Ranger",
+      "construct": "broad environmental focus - narrow research focus",
+      "rating": 1
+    },
+    {
+      "element": "Sustainability Consultant",
+      "construct": "broad environmental focus - narrow research focus",
+      "rating": 1
+    },
+    {
+      "element": "Climate Educator",
+      "construct": "broad environmental focus - narrow research focus",
+      "rating": 1
+    },
+    {
+      "element": "Lab Technician",
+      "construct": "public organisations - private organisations",
+      "rating": 2
+    },
+    {
+      "element": "Science Teacher",
+      "construct": "public organisations - private organisations",
+      "rating": 1
+    },
+    {
+      "element": "Field Ranger",
+      "construct": "public organisations - private organisations",
+      "rating": 1
+    },
+    {
+      "element": "Sustainability Consultant",
+      "construct": "public organisations - private organisations",
+      "rating": 4
+    },
+    {
+      "element": "Climate Educator",
+      "construct": "public organisations - private organisations",
+      "rating": 4
+    },
+    {
+      "element": "Lab Technician",
+      "construct": "education focus - conservation focus",
+      "rating": 3
+    },
+    {
+      "element": "Science Teacher",
+      "construct": "education focus - conservation focus",
+      "rating": 1
+    },
+    {
+      "element": "Field Ranger",
+      "construct": "education focus - conservation focus",
+      "rating": 3
+    },
+    {
+      "element": "Sustainability Consultant",
+      "construct": "education focus - conservation focus",
+      "rating": 5
+    },
+    {
+      "element": "Climate Educator",
+      "construct": "education focus - conservation focus",
+      "rating": 3
+    },
+    {
+      "element": "Lab Technician",
+      "construct": "education focus - conservation focus",
+      "rating": 3
+    },
+    {
+      "element": "Science Teacher",
+      "construct": "education focus - conservation focus",
+      "rating": 1
+    },
+    {
+      "element": "Field Ranger",
+      "construct": "education focus - conservation focus",
+      "rating": 3
+    },
+    {
+      "element": "Sustainability Consultant",
+      "construct": "education focus - conservation focus",
+      "rating": 5
+    },
+    {
+      "element": "Climate Educator",
+      "construct": "education focus - conservation focus",
+      "rating": 5
+    },
+    {
+      "element": "Lab Technician",
+      "construct": "Emphasis on climate - Emphasis on climate + waste etc",
+      "rating": 5
+    },
+    {
+      "element": "Science Teacher",
+      "construct": "Emphasis on climate - Emphasis on climate + waste etc",
+      "rating": 3
+    },
+    {
+      "element": "Field Ranger",
+      "construct": "Emphasis on climate - Emphasis on climate + waste etc",
+      "rating": 3
+    },
+    {
+      "element": "Sustainability Consultant",
+      "construct": "Emphasis on climate - Emphasis on climate + waste etc",
+      "rating": 4
+    },
+    {
+      "element": "Climate Educator",
+      "construct": "Emphasis on climate - Emphasis on climate + waste etc",
+      "rating": 2
+    }
+  ],
+  "scale": [1, 5]
+}

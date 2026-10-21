@@ -1,4 +1,4 @@
-	Grid	9#	16	9	Bezzi1996expert	expert	3	1996-01-01	00:00:00	literature	Rep Plus V1.1	RepGrid
+	Grid	9#	16	9	Bezzi1996Nick	Nick	3	1996-01-01	00:00:00	literature	Rep Plus V1.1	RepGrid
 C0	R	1	0	1	1	5		extrusive	intrusive	
 C1	R	1	0	1	1	5		undersaturated	saturated	
 C2	R	1	0	1	1	5		saturated	oversaturated	
@@ -24,14 +24,14 @@ E5	1	0	4	4	0	4	4	0	0	2	0	1	2	0	2	2	2	0	gabbro
 E6	1	0	0	2	0	4	0	2	0	2	4	2	2	1	4	4	0	2	syenite	
 E7	1	0	0	0	?	?	0	3	3	2	4	4	0	2	2	4	0	1	trachyte	
 E8	1	0	4	0	?	?	4	4	4	0	0	4	0	2	0	4	0	4	peridotite	
-_UID	bezzi-1996-expert-igneous-rocks
+_UID	bezzi-1996-nick-igneous-rocks
 _Date	1996-01-01
 _Time	00:00:00
 _Place	literature
 _Meta	1
 _Status	3
 _Context	An expert geologist's constructs distinguishing common igneous rock types
-_Name	Bezzi1996expert
-_Note	expert
-_Source	Bezzi 1996 expert
-_Annotation	Bezzi 1996 expert. Transcribed from the published grid display. Cells shown as 0 in the source figure are unrated and stored here as '?'. Constructs 10 and 13 are a reversed-pole pair (leucocratic/melanocratic).
+_Name	Bezzi1996Nick
+_Note	Nick
+_Source	Bezzi 1996 - participant Nick
+_Annotation	Bezzi 1996, participant Nick. Transcribed from the published grid display. Cells shown as 0 in the source figure are unrated and stored here as '?'. Constructs 10 and 13 are a reversed-pole pair (leucocratic/melanocratic).
