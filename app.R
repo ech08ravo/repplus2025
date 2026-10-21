@@ -52,6 +52,50 @@ safe_triads <- function(items, max_triads = MAX_TRIADS) {
   all_triads[sample(length(all_triads), max_triads)]
 }
 
+# Tidy a typed or pasted element name: drop list numbering or a bullet
+# ("6.", "6)", "-", "*", "•") and turn tabs and runs of spaces into one
+# space, so a pasted "6.<tab>Geography" becomes "Geography"
+clean_element_name <- function(x) {
+  x <- gsub("[\t\r\n]+", " ", x)
+  x <- sub("^\\s*([0-9]+[.)]|[-*•])\\s+", "", x)
+  trimws(gsub(" {2,}", " ", x))
+}
+
+# Drop repeated element names (ignoring case), keeping the first
+unique_elements <- function(x) x[!duplicated(tolower(x))]
+
+# Key for spotting a repeated construct: the same two poles either way
+# round, ignoring case and spacing
+construct_key <- function(left, right) {
+  l <- tolower(trimws(gsub("\\s+", " ", left)))
+  r <- tolower(trimws(gsub("\\s+", " ", right)))
+  ifelse(l < r, paste(l, r, sep = "\r"), paste(r, l, sep = "\r"))
+}
+
+# Ratings are stored against the "left - right" label, so a second copy of
+# a construct silently loses its ratings. Refuse duplicates on entry.
+construct_exists <- function(constructs, left, right) {
+  is.data.frame(constructs) && nrow(constructs) > 0 &&
+    construct_key(left, right) %in% construct_key(constructs$left, constructs$right)
+}
+
+duplicate_construct_message <- function(left, right) {
+  paste0("You already have the construct \"", left, " - ", right,
+         "\" (or the same poles the other way round). Each construct can only be used once.")
+}
+
+# Warn (without changing the data) when a loaded grid repeats a construct
+warn_duplicate_constructs <- function(left, right) {
+  dup <- duplicated(construct_key(left, right))
+  if (any(dup)) {
+    showNotification(
+      paste0("This grid has the same construct more than once: ",
+             paste(unique(paste(left[dup], "-", right[dup])), collapse = "; "),
+             ". Ratings for the repeated copy may be missing or wrong."),
+      type = "warning", duration = NULL)
+  }
+}
+
 # Source the focus analysis functions
 source("R/rgrid_io.R")
 source("R/focus_analysis.r")
@@ -2299,8 +2343,14 @@ server <- function(input, output, session) {
     items <- c(input$landing_item1, input$landing_item2,
                input$landing_item3, input$landing_item4,
                input$landing_item5, input$landing_item6)
-    items <- trimws(items)
+    items <- clean_element_name(items)
     items <- items[items != ""]
+    if (any(duplicated(tolower(items)))) {
+      showNotification(paste0("\"", items[duplicated(tolower(items))][1],
+                              "\" is listed twice. Each item can only be used once."),
+                       type = "error")
+      return()
+    }
     if (length(items) >= 3 && length(items) < 4) {
       showNotification("Please enter at least 4 items. With only 3 you'll get just 1 construct, which isn't enough for analysis.", type = "error")
       return()
@@ -2317,7 +2367,7 @@ server <- function(input, output, session) {
       all_items <- c(input$landing_item1, input$landing_item2,
                      input$landing_item3, input$landing_item4,
                      input$landing_item5, input$landing_item6)
-      all_items <- trimws(all_items)
+      all_items <- clean_element_name(all_items)
       img_list <- list()
       url_list <- list()
       file_list <- list()
@@ -2460,31 +2510,31 @@ server <- function(input, output, session) {
       showNotification("Enter both poles.", type = "warning")
       return()
     }
+    if (construct_exists(rv$constructs, left, right)) {
+      showNotification(duplicate_construct_message(left, right), type = "warning")
+      return()
+    }
     rv$constructs <- rbind(rv$constructs,
       data.frame(left = left, right = right,
                  stringsAsFactors = FALSE))
     updateTextInput(session, "wizard_left_pole", value = "")
     updateTextInput(session, "wizard_right_pole", value = "")
-    if (rv$current_triad_idx < length(rv$all_triads)) {
-      rv$current_triad_idx <- rv$current_triad_idx + 1
-      rv$triad_similar <- character()
-      rv$triad_different <- NULL
-    } else {
-      landing$step <- "results"
-    }
+    # Move past this triad even when it was the last, so "Go Back to Triads"
+    # cannot show it a second time
+    rv$current_triad_idx <- rv$current_triad_idx + 1
+    rv$triad_similar <- character()
+    rv$triad_different <- NULL
+    if (rv$current_triad_idx > length(rv$all_triads)) landing$step <- "results"
   })
 
   # Wizard: Skip button
   observeEvent(input$wizard_skip, {
-    if (rv$current_triad_idx < length(rv$all_triads)) {
-      rv$current_triad_idx <- rv$current_triad_idx + 1
-      rv$triad_similar <- character()
-      rv$triad_different <- NULL
-      updateTextInput(session, "wizard_left_pole", value = "")
-      updateTextInput(session, "wizard_right_pole", value = "")
-    } else {
-      landing$step <- "results"
-    }
+    rv$current_triad_idx <- rv$current_triad_idx + 1
+    rv$triad_similar <- character()
+    rv$triad_different <- NULL
+    updateTextInput(session, "wizard_left_pole", value = "")
+    updateTextInput(session, "wizard_right_pole", value = "")
+    if (rv$current_triad_idx > length(rv$all_triads)) landing$step <- "results"
   })
 
   # Wizard: Finish early button
@@ -2634,6 +2684,11 @@ server <- function(input, output, session) {
 
   # Results page: go back to add more constructs
   observeEvent(input$results_back, {
+    if (rv$current_triad_idx > length(rv$all_triads)) {
+      showNotification(paste0("You have already worked through all ", length(rv$all_triads),
+                              " triads, so there are none left to show."), type = "message")
+      return()
+    }
     landing$step <- "triads"
   })
 
@@ -2990,7 +3045,12 @@ server <- function(input, output, session) {
   # Add element / construct / rating
   observeEvent(input$add_element, {
     req(input$element_name)
-    elem_name <- input$element_name
+    elem_name <- clean_element_name(input$element_name)
+    req(elem_name != "")
+    if (tolower(elem_name) %in% tolower(rv$elements)) {
+      showNotification(paste0("\"", elem_name, "\" is already an element."), type = "warning")
+      return()
+    }
     rv$elements <- c(rv$elements, elem_name)
     # Capture any attached file/URL from build page
     build_file <- landing_files[["build"]]
@@ -3151,6 +3211,12 @@ server <- function(input, output, session) {
     }
     if (is.null(rv$triad_different)) {
       showNotification("Please select 1 DIFFERENT element", type = "warning")
+      return()
+    }
+
+    if (construct_exists(rv$constructs, input$elicit_left, input$elicit_right)) {
+      showNotification(duplicate_construct_message(input$elicit_left, input$elicit_right),
+                       type = "warning")
       return()
     }
 
@@ -3469,6 +3535,11 @@ server <- function(input, output, session) {
 
   observeEvent(input$add_construct, {
     req(input$construct_left, input$construct_right)
+    if (construct_exists(rv$constructs, input$construct_left, input$construct_right)) {
+      showNotification(duplicate_construct_message(input$construct_left, input$construct_right),
+                       type = "warning")
+      return()
+    }
     new_construct_label <- paste(input$construct_left, "-", input$construct_right)
     rv$constructs <- rbind(
       rv$constructs,
@@ -3496,9 +3567,17 @@ server <- function(input, output, session) {
     # First split by newlines, then by commas if needed
     elements <- unlist(strsplit(raw_text, "[\n\r]+"))
     elements <- unlist(strsplit(elements, ","))
-    # Trim whitespace and filter empty strings
-    elements <- trimws(elements)
+    # Tidy names, filter empty strings, and drop repeats (within the paste
+    # and against elements already in the grid)
+    elements <- clean_element_name(elements)
     elements <- elements[elements != ""]
+    n_pasted <- length(elements)
+    elements <- unique_elements(elements)
+    elements <- elements[!tolower(elements) %in% tolower(rv$elements)]
+    if (length(elements) < n_pasted) {
+      showNotification(paste0("Skipped ", n_pasted - length(elements), " repeated element(s)."),
+                       type = "warning")
+    }
     if (length(elements) > 0) {
       total <- length(rv$elements) + length(elements)
       if (total > MAX_ELEMENTS) {
@@ -3532,6 +3611,7 @@ server <- function(input, output, session) {
     lines <- trimws(lines)
     lines <- lines[lines != ""]
 
+    skipped <- character()
     for (line in lines) {
       # Try splitting by " - " first, then by ","
       if (grepl(" - ", line)) {
@@ -3546,12 +3626,20 @@ server <- function(input, output, session) {
         left_pole <- trimws(parts[1])
         right_pole <- trimws(parts[2])
         if (left_pole != "" && right_pole != "") {
+          if (construct_exists(rv$constructs, left_pole, right_pole)) {
+            skipped <- c(skipped, paste(left_pole, "-", right_pole))
+            next
+          }
           rv$constructs <- rbind(
             rv$constructs,
             data.frame(left = left_pole, right = right_pole, stringsAsFactors = FALSE)
           )
         }
       }
+    }
+    if (length(skipped) > 0) {
+      showNotification(paste0("Skipped ", length(skipped), " repeated construct(s): ",
+                              paste(skipped, collapse = "; ")), type = "warning")
     }
     # Clear the textarea using JavaScript
     session$sendCustomMessage("clearTextarea", "constructs_bulk")
@@ -3825,6 +3913,7 @@ server <- function(input, output, session) {
             stringsAsFactors = FALSE
           )
         }
+        warn_duplicate_constructs(rv$constructs$left, rv$constructs$right)
 
         # Handle ratings
         if (!is.null(grid_data$ratings) && length(grid_data$ratings) > 0) {
@@ -3880,6 +3969,7 @@ server <- function(input, output, session) {
           right = g$right,
           stringsAsFactors = FALSE
         )
+        warn_duplicate_constructs(g$left, g$right)
         rv$scale <- g$scale
         labels <- paste(g$left, "-", g$right)
         rv$ratings <- data.frame(
