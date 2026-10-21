@@ -6165,7 +6165,9 @@ server <- function(input, output, session) {
                  "Trajectories" = "PrinGrid Trajectories",
                  "Exchange" = "Exchange Grids",
                  "Class Metagrids" = "Class Metagrids")
-    updateTabsetPanel(session, "main_tabs", selected = tab_map[input$goto_analysis])
+    # unname(): a named value is sent to the browser as a JSON object, not a
+    # string, so the tab never matches and the button silently does nothing
+    updateTabsetPanel(session, "main_tabs", selected = unname(tab_map[input$goto_analysis]))
   })
 
   # ===== FOCI: Interpretive FOCUS =====

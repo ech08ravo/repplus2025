@@ -1,0 +1,24 @@
+Grid	6#	6	6	SalespersonCompetency	Sales manager	3	2026-10-20	00:00:00	literature	Rep Plus V1.1	RepGrid
+C0	R	1	0	1	1	5		Learns the new models quickly	Takes a while to learn the features of new lines	
+C1	R	1	0	1	1	5		Too forward in pushing a sale: tends to put customers off	Good balance between active selling and just being helpful	
+C2	R	1	0	1	1	5		Could be more interested in after sales	After sales (alterations, other bespoke elements) well handled	
+C3	R	1	0	1	1	5		Awareness of sizes, colours, availability	Availability and choice knowledge poor	
+C4	R	1	0	1	1	5		Pleasant and easy-going	Takes it all very seriously	
+C5	R	1	0	1	1	5		Overall, an effective salesperson	Overall, a less effective salesperson	
+E0	1	0	4	2	0	4	2	4	Jane	
+E1	1	0	0	3	4	0	0	0	Ann	
+E2	1	0	0	2	3	1	1	1	Billie	
+E3	1	0	0	0	3	0	4	3	Ian	
+E4	1	0	3	1	0	3	3	3	Alma	
+E5	1	0	1	0	2	1	2	1	May	
+_UID	salesperson-competency-system
+_Date	2026-10-20
+_Time	00:00:00
+_Place	literature
+_Meta	1
+_Status	3
+_Context	A sales manager construing six salespeople, toward the development of a competency system
+_Name	SalespersonCompetency
+_Note	Sales manager
+_Source	Jankowicz, "Analysing Relationships Within a Single Grid", p. 105, Table 6.4
+_Annotation	Transcribed from a published table: elements across the top, constructs down the sides, 1-5 scale (1 = left pole).
