@@ -112,7 +112,9 @@ ui <- fluidPage(
         // producing a SyntaxError and breaking the entire inline script.
         w.document.write('<html><head><title>' + title + '<' + '/title>');
         w.document.write('<style>body{margin:20px;background:#fff;text-align:center;} img{max-width:100%;height:auto;}<' + '/style>');
-        w.document.write('<' + '/head><body>');
+        // Split '<body>' too: shinyapps.io injects its scripts after the
+        // first literal '<body>' in the page, which would land inside this string
+        w.document.write('<' + '/head><' + 'body>');
         w.document.write('<h2>' + title + '<' + '/h2>');
         w.document.write('<img src=' + JSON.stringify(img.src) + '/>');
         w.document.write('<' + '/body><' + '/html>');
