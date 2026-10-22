@@ -14,6 +14,11 @@ MAX_CONSTRUCTS <- 100
 MAX_GRIDS <- 50
 MAX_TRIADS <- 30  # Sample triads when elements > threshold
 MAX_CHATS_PER_MIN <- 10  # Per-session cap on Claude API calls
+# Site-wide cap: a script can dodge the per-session cap by opening new
+# sessions. Shiny-server runs all sessions of the app in one R process, so
+# this log is shared by every visitor.
+MAX_CHATS_PER_HOUR_GLOBAL <- 200
+chat_global_log <- numeric()
 
 # Reject URLs that aren't http(s) or mailto. Returns NA for anything else
 # (javascript:, data:, file:, vbscript:, etc.) so ingest paths can drop them.
@@ -276,7 +281,9 @@ ui <- fluidPage(
           var src = this.src;
           var overlay = document.createElement('div');
           overlay.className = 'img-zoom-overlay';
-          overlay.innerHTML = '<img src=' + JSON.stringify(src) + '>';
+          var zoomed = document.createElement('img');
+          zoomed.src = src;
+          overlay.appendChild(zoomed);
           overlay.onclick = function() { document.body.removeChild(overlay); };
           document.body.appendChild(overlay);
         });
@@ -2085,6 +2092,15 @@ server <- function(input, output, session) {
       )
       return(FALSE)
     }
+    chat_global_log <<- chat_global_log[chat_global_log > now - 3600]
+    if (length(chat_global_log) >= MAX_CHATS_PER_HOUR_GLOBAL) {
+      showNotification(
+        "Ask Claude is busy right now. Please try again later, or use Copy to Clipboard.",
+        type = "warning", duration = 8
+      )
+      return(FALSE)
+    }
+    chat_global_log <<- c(chat_global_log, now)
     chat_call_log(c(recent, now))
     TRUE
   }
@@ -2465,7 +2481,8 @@ server <- function(input, output, session) {
       }
       if (!is.null(rv$element_urls[[elem]])) {
         link_tag <- tags$a(href = "#",
-          onclick = sprintf("event.stopPropagation(); event.preventDefault(); window.open('%s','_blank','width=1000,height=700,scrollbars=yes,resizable=yes');", gsub("'", "\\\\'", rv$element_urls[[elem]])),
+          `data-url` = rv$element_urls[[elem]],
+          onclick = "event.stopPropagation(); event.preventDefault(); window.open(this.dataset.url,'_blank','width=1000,height=700,scrollbars=yes,resizable=yes');",
           style = "font-size: 14px; text-decoration: none; cursor: pointer; margin-left: 4px;",
           "\U0001F517")
       }
@@ -2917,7 +2934,8 @@ server <- function(input, output, session) {
       }
       if (!is.null(rv$element_urls[[elements[ei]]])) {
         link_tag <- tags$a(href = "#",
-          onclick = sprintf("event.preventDefault(); window.open('%s','_blank','width=1000,height=700,scrollbars=yes,resizable=yes');", gsub("'", "\\\\'", rv$element_urls[[elements[ei]]])),
+          `data-url` = rv$element_urls[[elements[ei]]],
+          onclick = "event.preventDefault(); window.open(this.dataset.url,'_blank','width=1000,height=700,scrollbars=yes,resizable=yes');",
           style = "font-size: 14px; margin-left: 4px; text-decoration: none; cursor: pointer;",
           "\U0001F517")
       }
@@ -3592,9 +3610,10 @@ server <- function(input, output, session) {
       }
       # Detect URLs and store them separately
       for (elem in elements) {
-        if (grepl("^https?://", elem)) {
-          rv$element_urls[[elem]] <- elem
-          rv$element_files[[elem]] <- list(data = elem, name = elem, type = "url")
+        su <- safe_url(elem)
+        if (!is.na(su) && grepl("^https?://", su)) {
+          rv$element_urls[[elem]] <- su
+          rv$element_files[[elem]] <- list(data = su, name = elem, type = "url")
         }
       }
       rv$elements <- c(rv$elements, elements)
@@ -3939,7 +3958,11 @@ server <- function(input, output, session) {
 
         # Restore element images and files if present
         if (!is.null(grid_data$element_images)) {
-          rv$element_images <- as.list(grid_data$element_images)
+          # Only inline images - an imported file could otherwise point
+          # the src anywhere
+          imgs <- as.list(grid_data$element_images)
+          rv$element_images <- imgs[vapply(imgs, function(x)
+            is.character(x) && length(x) == 1 && grepl("^data:image/", x), logical(1))]
         } else {
           rv$element_images <- list()
         }
