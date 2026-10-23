@@ -59,14 +59,24 @@ done
 
 VERSION="$(curl -s --max-time 5 "$APP_URL" | grep -o 'v[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1 || true)"
 
+# Compare against what this checkout actually says, not just "some version
+# appeared". A stale container answers perfectly well with the old number, so
+# accepting any version at all let a failed swap look like a successful deploy.
+EXPECTED="v$(grep -m1 '^APP_VERSION <-' app.R | sed -E 's/.*"([^"]+)".*/\1/')"
+
 echo
 docker ps --filter name=repplus --format "  {{.Names}} | {{.Image}} | {{.Status}}"
 echo
-if [ -n "$VERSION" ]; then
-  echo "=== Deployment Complete - serving $VERSION ==="
-else
+if [ -z "$VERSION" ]; then
   echo "=== WARNING: the app did not answer on $APP_URL ==="
   echo "Check the logs with:  docker logs --tail 50 repplus"
   exit 1
+elif [ "$VERSION" != "$EXPECTED" ]; then
+  echo "=== WARNING: serving $VERSION but this checkout is $EXPECTED ==="
+  echo "The container may not have been replaced, or the pull did not land."
+  echo "Check the logs with:  docker logs --tail 50 repplus"
+  exit 1
+else
+  echo "=== Deployment Complete - serving $VERSION ==="
 fi
 echo "Public URL: https://webgrid.online/"

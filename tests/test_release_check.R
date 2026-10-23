@@ -294,6 +294,27 @@ check("reimported grid keeps its ratings",
       near(rt$scores_mat, rbind(c(1, 5), c(5, 1), c(3, 3))))
 unlink(tmp)
 
+# ===========================================================================
+section("Version and changelog agree")
+# ===========================================================================
+# APP_VERSION is what the title bar shows and what deploy.sh compares the live
+# site against, so if it is not bumped the version check stops meaning
+# anything - it sat at 2.6.0 across eleven commits once, for exactly that
+# reason. ./bump_version.sh moves both of these together.
+app_version <- sub('.*"(.*)".*', "\\1",
+                   grep("^APP_VERSION <-", readLines("app.R"), value = TRUE)[1])
+changelog_version <- sub("^## \\[([0-9.]+)\\].*", "\\1",
+                         grep("^## \\[[0-9]", readLines("CHANGELOG.md"), value = TRUE)[1])
+
+check("APP_VERSION looks like a version",
+      grepl("^[0-9]+\\.[0-9]+\\.[0-9]+$", app_version), app_version)
+check("APP_VERSION matches the newest CHANGELOG entry",
+      identical(app_version, changelog_version),
+      paste0("app.R ", app_version, " vs CHANGELOG ", changelog_version))
+check("the CHANGELOG entry has been written",
+      !any(grepl("TODO: describe this release",
+                 utils::head(readLines("CHANGELOG.md"), 12))))
+
 cat(sprintf("\n%s\n", if (failures == 0) "All release checks passed."
                       else paste(failures, "RELEASE CHECK(S) FAILED")))
 if (failures > 0) quit(status = 1)

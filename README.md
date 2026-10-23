@@ -86,6 +86,22 @@ Outputs are interoperable with **RepPlus** (`.rgrid` format).
 ---
 
 
+## Releasing
+
+```bash
+./bump_version.sh 2.12.0    # if the version needs raising
+./release.sh                # test, deploy to both sites, verify, tag
+```
+
+`release.sh` is the only supported way to release. It stops unless the version
+and changelog agree, the tree is clean and pushed, and every test passes; then
+it deploys to webgrid.online and shinyapps.io, polls both until they serve the
+expected version, and tags the commit. `./release.sh --dry-run` runs the checks
+without deploying.
+
+Host-specific details and credentials live in `DEPLOY_INSTRUCTIONS.md`, which is
+gitignored.
+
 ## Testing
 
 Before releasing, run every check from the project root:

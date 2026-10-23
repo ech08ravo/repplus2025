@@ -2,6 +2,36 @@
 
 All notable changes to WebGrid.Online are documented in this file.
 
+## [2.12.0] - 2026-10-23
+
+### Added
+- **`./release.sh` is now the way to release.** It refuses to continue unless
+  the version in `app.R` matches the newest changelog entry and that entry has
+  been written, the version has not already been tagged, the tree is clean and
+  level with `origin/master`, and `./tests/run_all.sh` passes. Only then does it
+  deploy to webgrid.online and shinyapps.io, poll both until they actually serve
+  the expected version, and tag the commit. `--dry-run` runs every check and
+  deploys nothing. Tagging had lapsed after v2.2.0; it resumes here.
+- **`./bump_version.sh <version>`** raises `APP_VERSION` and opens a changelog
+  section for it, refusing a downgrade or a malformed version.
+- **`deploy_shinyapps.R`** pins the shinyapps `appId`. `rsconnect/` is
+  gitignored, so the record of which app to update existed only on the machine
+  that first deployed; a deploy from a fresh clone or the server would have
+  created a second app at a new URL rather than updating this one.
+
+### Fixed
+- **A deploy can no longer look successful while serving old code.** `deploy.sh`
+  accepted any version string from the live site, and a stale container answers
+  happily with the old number. It now compares what is served against
+  `APP_VERSION` in the checkout and fails if they differ.
+- **A forgotten version bump now fails the tests** rather than shipping a
+  version string that lies. The release check asserts `app.R` and `CHANGELOG.md`
+  agree and that the entry is not still the placeholder.
+- Rewrote `DEPLOY_INSTRUCTIONS.md`, which had drifted far enough to name a
+  container and image that have not existed for months. It no longer repeats
+  what the scripts do - that duplication is why it drifted - and covers only
+  access, topology and troubleshooting.
+
 ## [2.11.1] - 2026-10-23
 
 ### Added
