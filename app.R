@@ -5,7 +5,7 @@ library(uuid)
 library(jsonlite)
 library(igraph)
 
-APP_VERSION <- "2.15.0"
+APP_VERSION <- "2.16.0"
 
 # Security: explicit upload size limit (10MB) and grid limits
 options(shiny.maxRequestSize = 10 * 1024^2)
@@ -1825,6 +1825,12 @@ ui <- fluidPage(
                                         value = TRUE),
                           checkboxInput("mode_focus_sort",
                                         "Sort by FOCUS match", value = FALSE),
+                          conditionalPanel(
+                            condition = "input.mode_focus_sort",
+                            checkboxInput("mode_show_match_pct",
+                                          "Show match % on dendrograms",
+                                          value = FALSE)
+                          ),
                           sliderInput("mode_text_size", "Text Size",
                                       min = 0.8, max = 2.0, value = 1.2, step = 0.1),
                           actionButton("generate_mode_grid", "Generate Mode Grid", class = "btn-primary"),
@@ -6317,7 +6323,8 @@ server <- function(input, output, session) {
       # and the construct dendrogram both want.
       note = note,
       element_hclust = g$element_hclust,
-      construct_hclust = g$construct_hclust
+      construct_hclust = g$construct_hclust,
+      show_match_pct = isTRUE(input$mode_show_match_pct)
     )
 
     # Which colour means which grid. Drawn after the heatmap so it sits over

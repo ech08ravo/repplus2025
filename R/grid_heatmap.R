@@ -46,6 +46,9 @@ palette_index <- function(v, zlim, n) {
 #'   leaf k across is element k, leaf k down is construct k - which is what
 #'   reordering by hc$order gives you. A colour bar cannot be shown at the same
 #'   time: it splits the device, and the construct tree needs that same strip.
+#' @param show_match_pct Label each dendrogram join with the percentage at
+#'   which those two clusters merged. FOCUS stores a join's height as
+#'   100 - match, so the figure is the one the sort used, not a recomputation.
 #' @param grid_lines Draw cell boundaries. Worth turning on when the cells
 #'   carry no shading, so the grid still reads as a grid
 #' @param note Optional line of text under the element labels
@@ -59,6 +62,7 @@ draw_grid_heatmap <- function(mat, elements, left_poles, right_poles,
                               value_col = function(v) "black",
                               elem_col = "black", pole_col = "black",
                               element_hclust = NULL, construct_hclust = NULL,
+                              show_match_pct = FALSE,
                               grid_lines = FALSE,
                               note = NULL, legend_title = NULL,
                               legend_at = NULL, legend_labels = legend_at) {
@@ -94,12 +98,22 @@ draw_grid_heatmap <- function(mat, elements, left_poles, right_poles,
     max(strwidth(right_lab, units = "inches", cex = pole_cex), na.rm = TRUE)
   } else 0
 
+  # The construct tree's join labels are left-aligned and run outwards past it,
+  # so the margin has to hold them or the outermost one falls off the device.
+  pct_cex <- 0.62 * text_size
+  pct_w <- if (show_match_pct && show_dendro_c) {
+    strwidth("100%", units = "inches", cex = pct_cex) * 1.3
+  } else 0
+
   bottom_mar <- label_margin_lines(elements, elem_cex) + if (is.null(note)) 0.5 else 2
   left_mar <- label_margin_lines(left_lab, pole_cex)
-  right_mar <- label_margin_lines(right_lab, pole_cex) + dend_right_in / csi
+  right_mar <- label_margin_lines(right_lab, pole_cex) + dend_right_in / csi +
+    pct_w / csi
   top_mar <- if (is.null(title)) 1.5 else 3.5
   if (!is.null(subtitle)) top_mar <- top_mar + 1.4
   top_mar <- top_mar + dend_top_in / csi
+  # a little headroom so the topmost join's label is not clipped
+  if (show_match_pct && show_dendro_e) top_mar <- top_mar + 0.9
   par(mar = c(bottom_mar, left_mar, top_mar, right_mar), family = "sans")
 
   # image() puts z[i, k] at (x = i, y = k); reverse the construct columns
@@ -189,6 +203,11 @@ draw_grid_heatmap <- function(mat, elements, left_poles, right_poles,
         to_y <- function(h) base_y + (h / max_h) * span
         segments(lay$segs[, 1], to_y(lay$segs[, 2]),
                  lay$segs[, 3], to_y(lay$segs[, 4]), col = "#555555", lwd = 1)
+        if (show_match_pct && nrow(lay$nodes) > 0) {
+          text(lay$nodes[, 1], to_y(lay$nodes[, 2]) + span * 0.07,
+               sprintf("%.0f%%", 100 - lay$nodes[, 2]),
+               cex = pct_cex, col = "#333333")
+        }
       }
     }
 
@@ -205,6 +224,12 @@ draw_grid_heatmap <- function(mat, elements, left_poles, right_poles,
         to_x <- function(h) base_x + (h / max_h) * span
         segments(to_x(lay$segs[, 2]), lay$segs[, 1],
                  to_x(lay$segs[, 4]), lay$segs[, 3], col = "#555555", lwd = 1)
+        if (show_match_pct && nrow(lay$nodes) > 0) {
+          # Left-aligned, so the label starts clear of its own join line.
+          text(to_x(lay$nodes[, 2]) + span * 0.07, lay$nodes[, 1],
+               sprintf("%.0f%%", 100 - lay$nodes[, 2]),
+               cex = pct_cex, col = "#333333", adj = c(0, 0.5))
+        }
       }
     }
     par(xpd = old_xpd)
