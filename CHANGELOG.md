@@ -2,6 +2,24 @@
 
 All notable changes to WebGrid.Online are documented in this file.
 
+## [2.14.0] - 2026-10-23
+
+### Added
+- **The Mode Grid can be sorted by FOCUS match.** It was drawn in source order
+  - the first grid's elements, and constructs in whatever order the grids were
+  read - with no clustering anywhere in the Mode Grid path, so a consensus grid
+  gave away none of its structure. "Sort by FOCUS match" runs Shaw's sort over
+  the merged grid and puts elements and constructs that are rated alike
+  together. Off by default, so the existing layout is unchanged until asked
+  for; the caption under the plot says which order it is in, so a downloaded
+  copy is not ambiguous.
+
+### Fixed
+- **A grid now keeps its colour whether the Mode Grid is sorted or not.**
+  Source colours were handed out in the order constructs happened to appear, so
+  turning the sort on reshuffled which colour stood for which grid and the key
+  changed meaning. They follow the order the grids were selected in.
+
 ## [2.13.0] - 2026-10-23
 
 ### Added

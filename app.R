@@ -5,7 +5,7 @@ library(uuid)
 library(jsonlite)
 library(igraph)
 
-APP_VERSION <- "2.13.0"
+APP_VERSION <- "2.14.0"
 
 # Security: explicit upload size limit (10MB) and grid limits
 options(shiny.maxRequestSize = 10 * 1024^2)
@@ -1823,6 +1823,8 @@ ui <- fluidPage(
                           checkboxInput("mode_color_by_grid",
                                         "Colour construct labels by source grid",
                                         value = TRUE),
+                          checkboxInput("mode_focus_sort",
+                                        "Sort by FOCUS match", value = FALSE),
                           sliderInput("mode_text_size", "Text Size",
                                       min = 0.8, max = 2.0, value = 1.2, step = 0.1),
                           actionButton("generate_mode_grid", "Generate Mode Grid", class = "btn-primary"),
@@ -6226,8 +6228,17 @@ server <- function(input, output, session) {
   mode_source_colors <- function(g) {
     src <- g$construct_source
     if (is.null(src)) return(NULL)
-    grids <- setdiff(unique(src), "Shared")
-    if (length(grids) == 0) return(NULL)
+    present <- setdiff(unique(src), "Shared")
+    if (length(present) == 0) return(NULL)
+    # Assign colours in the order the grids were selected, not the order their
+    # constructs happen to appear. Going by appearance meant that turning the
+    # FOCUS sort on reshuffled which colour stood for which grid, so the key
+    # changed meaning under the reader.
+    grids <- if (!is.null(g$grid_names)) {
+      c(intersect(g$grid_names, present), setdiff(present, g$grid_names))
+    } else {
+      present
+    }
     pal <- get_palette_colors(input$mode_palette)
     # Start from the palette's own hues, then fall back to a colour-blind-safe
     # sequence for however many grids are left.
@@ -6239,7 +6250,35 @@ server <- function(input, output, session) {
          key = key, has_shared = any(src == "Shared"))
   }
 
+  # Reorder a mode grid by Shaw's FOCUS sort, so elements and constructs that
+  # are rated alike sit together. Without it the grid is in source order: the
+  # first grid's elements, and constructs in the order the grids were read.
+  #
+  # Everything held per element or per construct has to move with the sort.
+  # construct_source especially - leave it behind and the source colours stay
+  # in the old positions, quietly labelling constructs with the wrong grid.
+  mode_focus_sorted <- function(g) {
+    if (nrow(g$scores_mat) < 2 || ncol(g$scores_mat) < 2) return(g)
+    labels <- paste(g$constructs$left, "-", g$constructs$right)
+    fr <- try(focus_cluster(g$scores_mat, g$elements, labels, scale = g$scale),
+              silent = TRUE)
+    if (inherits(fr, "try-error")) {
+      showNotification("Could not FOCUS-sort this mode grid; showing it in source order.",
+                       type = "warning")
+      return(g)
+    }
+    eo <- fr$element_order
+    co <- fr$construct_order
+    g$scores_mat <- g$scores_mat[eo, co, drop = FALSE]
+    g$elements <- g$elements[eo]
+    g$constructs <- g$constructs[co, , drop = FALSE]
+    if (!is.null(g$construct_source)) g$construct_source <- g$construct_source[co]
+    g$focus_sorted <- TRUE
+    g
+  }
+
   draw_mode_heatmap <- function(g) {
+    if (isTRUE(input$mode_focus_sort)) g <- mode_focus_sorted(g)
     text_size <- if (!is.null(input$mode_text_size)) input$mode_text_size else 1.2
     show_values <- if (!is.null(input$mode_show_values)) input$mode_show_values else TRUE
     scale_min <- g$scale[1]
@@ -6252,6 +6291,9 @@ server <- function(input, output, session) {
 
     note <- paste0("Blue = low (", scale_min, ", left pole)    White = mid    Orange = high (",
                    scale_max, ", right pole)")
+    # Say which order it is in, so a downloaded copy is not ambiguous.
+    note <- paste0(note, "    |    ",
+                   if (isTRUE(g$focus_sorted)) "FOCUS sorted" else "source order")
 
     draw_grid_heatmap(
       g$scores_mat, elements = g$elements,
