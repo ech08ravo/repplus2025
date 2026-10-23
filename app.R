@@ -5,7 +5,7 @@ library(uuid)
 library(jsonlite)
 library(igraph)
 
-APP_VERSION <- "2.9.0"
+APP_VERSION <- "2.9.1"
 
 # Security: explicit upload size limit (10MB) and grid limits
 options(shiny.maxRequestSize = 10 * 1024^2)
@@ -110,10 +110,54 @@ source("R/grid_heatmap.R")
 source("R/accessibility.R")
 source("R/color_input.R")
 
+# A collapsible sidebar section heading.
+#
+# It stays an <h4> rather than becoming a <button>: the show/hide code here,
+# and in the openAnalysis and click_analyze message handlers, finds the panel
+# with $(this).next('.sidebar-content'), which needs the heading to be the
+# panel's immediate previous sibling. An h4 is neither focusable nor operable
+# by keyboard on its own, so it carries the disclosure pattern explicitly -
+# a role, a tab stop, and the expanded state for a screen reader to announce.
+# Enter and Space are wired up in the script below, since only a real button
+# gets those for free.
+sidebar_section_header <- function(label, content_id, collapsed = TRUE) {
+  tags$h4(
+    class = if (collapsed) "sidebar-toggle collapsed" else "sidebar-toggle",
+    role = "button", tabindex = "0",
+    `aria-expanded` = if (collapsed) "false" else "true",
+    `aria-controls` = content_id,
+    paste0(label, " "),
+    tags$span(class = "toggle-arrow", `aria-hidden` = "true", "\u25BC")
+  )
+}
+
 ui <- fluidPage(
   lang = "en",
   tags$head(
         tags$title("WebGrid.Online — Repertory Grid Analysis"),
+        tags$script(HTML(r"(
+      // The sidebar section headings are h4s with role="button", so Enter and
+      // Space have to be wired up by hand; a real button would get them for
+      // free, but the show/hide code relies on the heading being the panel's
+      // previous sibling. Delegated, so it also covers headings Shiny
+      // re-renders. aria-expanded is updated in step with the class, which is
+      // what a screen reader announces.
+      function toggleSidebarSection($h) {
+        var opening = $h.hasClass('collapsed');
+        $h.next('.sidebar-content').slideToggle(200);
+        $h.toggleClass('collapsed', !opening);
+        $h.attr('aria-expanded', opening ? 'true' : 'false');
+      }
+      $(document).on('click', '.sidebar-toggle', function () {
+        toggleSidebarSection($(this));
+      });
+      $(document).on('keydown', '.sidebar-toggle', function (e) {
+        if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+          e.preventDefault();   // Space would otherwise scroll the page
+          toggleSidebarSection($(this));
+        }
+      });
+    )")),
         tags$script(HTML("
       Shiny.addCustomMessageHandler('openAnalysis', function(msg) {
         // Open Analysis sidebar section if collapsed
@@ -121,6 +165,7 @@ ui <- fluidPage(
           if ($(this).text().indexOf('Analysis') >= 0) {
             $(this).next('.sidebar-content').show();
             $(this).removeClass('collapsed');
+            $(this).attr('aria-expanded', 'true');
           }
         });
       });
@@ -144,6 +189,7 @@ ui <- fluidPage(
             if (h.textContent.indexOf('Analysis') >= 0) {
               $(h).next('.sidebar-content').show();
               h.classList.remove('collapsed');
+              h.setAttribute('aria-expanded', 'true');
             }
           });
           var btn = document.getElementById('analyze');
@@ -442,6 +488,7 @@ ui <- fluidPage(
       .sidebar-section { border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 8px; }
       .sidebar-toggle { cursor: pointer; user-select: none; margin: 0; padding: 6px 0; font-size: 14px; font-weight: 600; color: #333; }
       .sidebar-toggle:hover { color: #0072B2; }
+      .sidebar-toggle:focus-visible { outline: 3px solid #E69F00; outline-offset: 2px; }
       .sidebar-toggle .toggle-arrow { font-size: 10px; transition: transform 0.2s; display: inline-block; }
       .sidebar-toggle.collapsed .toggle-arrow { transform: rotate(-90deg); }
       .sidebar-content { padding-top: 4px; }
@@ -739,9 +786,8 @@ ui <- fluidPage(
                    style = "margin-bottom: 16px; width: 100%;"),
       # --- File Operations (collapsible, collapsed by default) ---
       tags$div(class = "sidebar-section",
-        tags$h4(class = "sidebar-toggle collapsed", onclick = "$(this).next('.sidebar-content').slideToggle(200); $(this).toggleClass('collapsed');",
-          "File Operations ", tags$span(class = "toggle-arrow", "\u25BC")),
-        tags$div(class = "sidebar-content", style = "display: none;",
+        sidebar_section_header("File Operations", "sidebar_file_ops", collapsed = TRUE),
+        tags$div(class = "sidebar-content", id = "sidebar_file_ops", style = "display: none;",
           fileInput("import_file", "Select Grid File", accept = c(".rgrid", ".json")),
           uiOutput("load_grid_prompt"),
           div(style = "margin-top: -20px;",
@@ -788,9 +834,8 @@ ui <- fluidPage(
       ),
       # --- Analysis (collapsible, open by default) ---
       tags$div(class = "sidebar-section",
-        tags$h4(class = "sidebar-toggle", onclick = "$(this).next('.sidebar-content').slideToggle(200); $(this).toggleClass('collapsed');",
-          "Analysis ", tags$span(class = "toggle-arrow", "\u25BC")),
-        tags$div(class = "sidebar-content",
+        sidebar_section_header("Analysis", "sidebar_analysis", collapsed = FALSE),
+        tags$div(class = "sidebar-content", id = "sidebar_analysis",
           uiOutput("analyse_button_ui"),
           div(style = "display: flex; align-items: center; gap: 6px; margin-top: 8px;",
             tags$small(class = "text-muted", "Unrated cells stay blank"),
@@ -815,9 +860,8 @@ ui <- fluidPage(
       ),
       # --- Display Options (collapsible, collapsed by default) ---
       tags$div(class = "sidebar-section",
-        tags$h4(class = "sidebar-toggle collapsed", onclick = "$(this).next('.sidebar-content').slideToggle(200); $(this).toggleClass('collapsed');",
-          "Display Options ", tags$span(class = "toggle-arrow", "\u25BC")),
-        tags$div(class = "sidebar-content", style = "display: none;",
+        sidebar_section_header("Display Options", "sidebar_display", collapsed = TRUE),
+        tags$div(class = "sidebar-content", id = "sidebar_display", style = "display: none;",
           p("Each visualization has its own colour palette selector.", style = "font-size: 11px; color: #666;"),
           sliderInput("text_size", "Text Size", min = 0.8, max = 1.6, value = 1.2, step = 0.1),
           sliderInput("grid_cell_size", "Heatmap/Focus Cell Size", min = 0.8, max = 2.0, value = 1.2, step = 0.1),
@@ -826,9 +870,8 @@ ui <- fluidPage(
       ),
       # --- Export (collapsible, collapsed by default) ---
       tags$div(class = "sidebar-section",
-        tags$h4(class = "sidebar-toggle collapsed", onclick = "$(this).next('.sidebar-content').slideToggle(200); $(this).toggleClass('collapsed');",
-          "Export ", tags$span(class = "toggle-arrow", "\u25BC")),
-        tags$div(class = "sidebar-content", style = "display: none;",
+        sidebar_section_header("Export", "sidebar_export", collapsed = TRUE),
+        tags$div(class = "sidebar-content", id = "sidebar_export", style = "display: none;",
           downloadButton("download_grid", "Download Grid as CSV"),
           downloadButton("download_rgrid", "Download Grid as .rgrid")
         )

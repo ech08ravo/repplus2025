@@ -2,6 +2,19 @@
 
 All notable changes to WebGrid.Online are documented in this file.
 
+## [2.9.1] - 2026-10-23
+
+### Fixed
+- **The sidebar sections can be opened from the keyboard.** File Operations,
+  Analysis, Display Options and Export were headings with a click handler and
+  nothing else - no tab stop, no role, no key handling - so everything inside
+  them was unreachable without a mouse, and a screen reader was given no hint
+  that they open and close. Each now takes focus, announces itself as a button
+  with its open or closed state, responds to Enter and Space, and shows a focus
+  ring. Space no longer scrolls the page when used on one. The decorative arrow
+  is hidden from screen readers, and the state stays correct when the app opens
+  the Analysis section by itself.
+
 ## [2.9.0] - 2026-10-23
 
 ### Added
