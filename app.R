@@ -5,7 +5,7 @@ library(uuid)
 library(jsonlite)
 library(igraph)
 
-APP_VERSION <- "2.10.0"
+APP_VERSION <- "2.11.0"
 
 # Security: explicit upload size limit (10MB) and grid limits
 options(shiny.maxRequestSize = 10 * 1024^2)
@@ -536,6 +536,14 @@ ui <- fluidPage(
       .wizard-buttons { margin-top: 24px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
       .triad-instruction { background: #fff3cd; padding: 10px 14px; border-radius: 6px; border: 1px solid #ffc107; font-size: 13px; margin-bottom: 16px; }
       .triad-wizard .instruction-text { background: #fff3cd; padding: 10px 14px; border-radius: 6px; border: 1px solid #ffc107; font-size: 13px; margin-bottom: 16px; }
+      /* The similarity matrices are far wider than the half-width column they
+         sit in, and construct labels make the rows longer still. Scroll in
+         both directions rather than letting the text spill out of the box;
+         white-space: pre (not pre-wrap) keeps the matrix columns aligned. */
+      .match-box pre { max-height: 320px; overflow: auto; white-space: pre;
+        font-size: 12px; line-height: 1.35; }
+      .match-tools { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 4px; }
+      .match-tools .btn { font-size: 12px; padding: 3px 8px; }
       .skip-to-main { position: absolute; top: -40px; left: 0; background: #000; color: #fff; padding: 8px 12px; text-decoration: none; z-index: 100; }
       .skip-to-main:focus { top: 0; }
       *:focus { outline: 2px solid #0072B2; outline-offset: 2px; }
@@ -575,6 +583,34 @@ ui <- fluidPage(
           showFeedback("Copied! Now paste into Claude.ai");
         }
       });
+      // Copies a match box as shown. Done in the browser rather than through
+      // the server so the text copied is exactly what is on screen.
+      function copyMatchBox(preId, btn) {
+        var el = document.getElementById(preId);
+        if (!el) return;
+        var text = el.textContent || "";
+        function done() {
+          var old = btn.getAttribute("data-label") || btn.textContent;
+          btn.setAttribute("data-label", old);
+          btn.textContent = "Copied";
+          setTimeout(function () { btn.textContent = old; }, 2000);
+        }
+        function fallback() {
+          var ta = document.createElement("textarea");
+          ta.value = text;
+          ta.style.cssText = "position:fixed;left:-9999px;";
+          document.body.appendChild(ta);
+          ta.select();
+          try { document.execCommand("copy"); } catch (e) {}
+          document.body.removeChild(ta);
+          done();
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(done, fallback);
+        } else {
+          fallback();
+        }
+      }
       Shiny.addCustomMessageHandler("clearTextarea", function(id) {
         var el = document.getElementById(id);
         if (el) el.value = "";
@@ -1465,11 +1501,31 @@ ui <- fluidPage(
                  fluidRow(
                    column(6,
                           h5("Element Matches"),
-                          verbatimTextOutput("focus_element_matches")
+                          tags$div(class = "match-tools",
+                            tags$button(type = "button", class = "btn btn-outline-secondary btn-sm",
+                                        onclick = "copyMatchBox('focus_element_matches', this)",
+                                        `aria-label` = "Copy the element match data", "Copy"),
+                            downloadButton("download_element_matrix", "Matrix CSV",
+                                           class = "btn-outline-secondary btn-sm"),
+                            downloadButton("download_element_pairs", "Matches CSV",
+                                           class = "btn-outline-secondary btn-sm")
+                          ),
+                          tags$div(class = "match-box",
+                                   verbatimTextOutput("focus_element_matches"))
                    ),
                    column(6,
                           h5("Construct Matches"),
-                          verbatimTextOutput("focus_construct_matches")
+                          tags$div(class = "match-tools",
+                            tags$button(type = "button", class = "btn btn-outline-secondary btn-sm",
+                                        onclick = "copyMatchBox('focus_construct_matches', this)",
+                                        `aria-label` = "Copy the construct match data", "Copy"),
+                            downloadButton("download_construct_matrix", "Matrix CSV",
+                                           class = "btn-outline-secondary btn-sm"),
+                            downloadButton("download_construct_pairs", "Matches CSV",
+                                           class = "btn-outline-secondary btn-sm")
+                          ),
+                          tags$div(class = "match-box",
+                                   verbatimTextOutput("focus_construct_matches"))
                    )
                  ),
                  tags$hr(),
@@ -5194,68 +5250,106 @@ server <- function(input, output, session) {
     draw_focus_plot()
   })
 
+  # Every unordered pair once, strongest first.
+  #
+  # which(sim >= cutoff, arr.ind = TRUE) returns both (i,j) and (j,i), in column
+  # order. The previous listing took the first ten of those rows and then kept
+  # only the ones with r < c, so it discarded most of what it had found and
+  # never sorted by similarity at all - on the sample grids that dropped the
+  # strongest matches entirely while calling what remained the "top" ones.
+  top_match_pairs <- function(sim, labels, cutoff, n = NULL) {
+    empty <- data.frame(item_a = character(0), item_b = character(0),
+                        match_pct = numeric(0), stringsAsFactors = FALSE)
+    if (is.null(sim) || !is.matrix(sim) || nrow(sim) < 2) return(empty)
+    keep <- upper.tri(sim) & !is.na(sim) & sim >= cutoff
+    if (!any(keep)) return(empty)
+    idx <- which(keep, arr.ind = TRUE)
+    # which(keep) and sim[keep] walk the matrix in the same column order, so
+    # the indices and the values line up row for row.
+    df <- data.frame(
+      item_a = labels[idx[, 1]],
+      item_b = labels[idx[, 2]],
+      match_pct = round(sim[keep], 1),
+      stringsAsFactors = FALSE
+    )
+    df <- df[order(-df$match_pct, df$item_a, df$item_b), , drop = FALSE]
+    rownames(df) <- NULL
+    if (!is.null(n)) df <- utils::head(df, n)
+    df
+  }
+
+  print_top_matches <- function(sim, labels, cutoff, what) {
+    cat(sprintf("\n\nTop %s Matches (excluding self):\n", what))
+    pairs <- top_match_pairs(sim, labels, cutoff, n = 10)
+    if (nrow(pairs) == 0) {
+      cat("  No matches above cutoff threshold\n")
+      return(invisible(NULL))
+    }
+    for (i in seq_len(nrow(pairs))) {
+      cat(sprintf("  %s - %s: %.1f%%\n",
+                  pairs$item_a[i], pairs$item_b[i], pairs$match_pct[i]))
+    }
+    total <- nrow(top_match_pairs(sim, labels, cutoff))
+    if (total > nrow(pairs)) {
+      cat(sprintf("  ... and %d more above the cutoff (Matches CSV has them all)\n",
+                  total - nrow(pairs)))
+    }
+  }
+
+  element_sim_named <- reactive({
+    req(focus_result())
+    sim <- focus_result()$element_similarities
+    rownames(sim) <- colnames(sim) <- rv$elements
+    sim
+  })
+
+  construct_sim_named <- reactive({
+    req(focus_result())
+    sim <- focus_result()$construct_similarities
+    labs <- paste(rv$constructs$left, "-", rv$constructs$right)
+    rownames(sim) <- colnames(sim) <- labs
+    sim
+  })
+
+  output$download_element_matrix <- downloadHandler(
+    filename = function() paste0("element-similarity-matrix-", Sys.Date(), ".csv"),
+    content = function(file) write.csv(element_sim_named(), file)
+  )
+  output$download_construct_matrix <- downloadHandler(
+    filename = function() paste0("construct-similarity-matrix-", Sys.Date(), ".csv"),
+    content = function(file) write.csv(construct_sim_named(), file)
+  )
+  output$download_element_pairs <- downloadHandler(
+    filename = function() paste0("element-matches-", Sys.Date(), ".csv"),
+    content = function(file) {
+      sim <- element_sim_named()
+      write.csv(top_match_pairs(sim, rownames(sim), input$focus_cutoff),
+                file, row.names = FALSE)
+    }
+  )
+  output$download_construct_pairs <- downloadHandler(
+    filename = function() paste0("construct-matches-", Sys.Date(), ".csv"),
+    content = function(file) {
+      sim <- construct_sim_named()
+      write.csv(top_match_pairs(sim, rownames(sim), input$focus_cutoff),
+                file, row.names = FALSE)
+    }
+  )
+
   output$focus_element_matches <- renderPrint({
     req(focus_result())
-    result <- focus_result()
-    elem_sim <- result$element_similarities
-
+    elem_sim <- element_sim_named()
     cat("Element Similarity Matrix (%):\n\n")
-    rownames(elem_sim) <- rv$elements
-    colnames(elem_sim) <- rv$elements
     print(round(elem_sim, 1))
-
-    cat("\n\nTop Element Matches (excluding self):\n")
-    elem_sim_no_diag <- elem_sim
-    diag(elem_sim_no_diag) <- 0
-
-    matches <- which(elem_sim_no_diag >= input$focus_cutoff, arr.ind = TRUE)
-    if (nrow(matches) > 0) {
-      for (i in seq_len(min(10, nrow(matches)))) {
-        r <- matches[i, 1]
-        c <- matches[i, 2]
-        if (r < c) {
-          cat(sprintf("  %s - %s: %.1f%%\n",
-                     rv$elements[r],
-                     rv$elements[c],
-                     elem_sim[r, c]))
-        }
-      }
-    } else {
-      cat("  No matches above cutoff threshold\n")
-    }
+    print_top_matches(elem_sim, rownames(elem_sim), input$focus_cutoff, "Element")
   })
 
   output$focus_construct_matches <- renderPrint({
     req(focus_result())
-    result <- focus_result()
-    const_sim <- result$construct_similarities
-
-    construct_labels <- paste(rv$constructs$left, "-", rv$constructs$right)
-
+    const_sim <- construct_sim_named()
     cat("Construct Similarity Matrix (%):\n\n")
-    rownames(const_sim) <- construct_labels
-    colnames(const_sim) <- construct_labels
     print(round(const_sim, 1))
-
-    cat("\n\nTop Construct Matches (excluding self):\n")
-    const_sim_no_diag <- const_sim
-    diag(const_sim_no_diag) <- 0
-
-    matches <- which(const_sim_no_diag >= input$focus_cutoff, arr.ind = TRUE)
-    if (nrow(matches) > 0) {
-      for (i in seq_len(min(10, nrow(matches)))) {
-        r <- matches[i, 1]
-        c <- matches[i, 2]
-        if (r < c) {
-          cat(sprintf("  %s - %s: %.1f%%\n",
-                     construct_labels[r],
-                     construct_labels[c],
-                     const_sim[r, c]))
-        }
-      }
-    } else {
-      cat("  No matches above cutoff threshold\n")
-    }
+    print_top_matches(const_sim, rownames(const_sim), input$focus_cutoff, "Construct")
   })
 
   output$download_focus <- downloadHandler(

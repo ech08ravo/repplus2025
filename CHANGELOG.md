@@ -2,6 +2,31 @@
 
 All notable changes to WebGrid.Online are documented in this file.
 
+## [2.11.0] - 2026-10-23
+
+### Added
+- **The match boxes can be copied and exported.** Each of the Element and
+  Construct match boxes on the Focus tab now carries Copy, Matrix CSV and
+  Matches CSV. Copy takes the box exactly as shown, client side. Matrix CSV is
+  the full similarity matrix with its labels; Matches CSV is every pair above
+  the cutoff, strongest first, as a tidy three-column table rather than the top
+  ten the box has room to print.
+
+### Fixed
+- **The match boxes scroll instead of overflowing.** The similarity matrices
+  are far wider than the half-width column holding them, and construct labels
+  make each row longer still, so the text ran out of its box. Both boxes now
+  scroll in either direction within a fixed height, and keep `white-space: pre`
+  so the matrix columns stay aligned rather than wrapping into a jumble.
+- **"Top Matches" now lists the strongest matches.** It listed neither the top
+  matches nor all of them: `which(sim >= cutoff, arr.ind = TRUE)` returns each
+  pair twice, in column order, and the code took the first ten of those rows
+  and then kept only the ones with `r < c` - so it discarded most of what it
+  found and never sorted by similarity. On the yurungi sample it showed 2 of
+  the 10 qualifying pairs and left out both 100% matches. Pairs are now
+  deduplicated, sorted strongest first, and the box says how many more sit
+  above the cutoff.
+
 ## [2.10.0] - 2026-10-23
 
 ### Added
