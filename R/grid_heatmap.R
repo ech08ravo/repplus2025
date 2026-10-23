@@ -35,6 +35,8 @@ palette_index <- function(v, zlim, n) {
 #' @param value_cex Text size of the cell values
 #' @param value_fmt Function turning a cell value into its label
 #' @param value_col Function giving the label colour for a cell value
+#' @param elem_col,pole_col Colours for the element labels along the bottom
+#'   and the construct pole labels down each side
 #' @param grid_lines Draw cell boundaries. Worth turning on when the cells
 #'   carry no shading, so the grid still reads as a grid
 #' @param note Optional line of text under the element labels
@@ -45,6 +47,7 @@ draw_grid_heatmap <- function(mat, elements, left_poles, right_poles,
                               show_values = TRUE, value_cex = 0.8 * text_size,
                               value_fmt = function(v) sprintf("%.0f", v),
                               value_col = function(v) "black",
+                              elem_col = "black", pole_col = "black",
                               grid_lines = FALSE,
                               note = NULL, legend_title = NULL,
                               legend_at = NULL, legend_labels = legend_at) {
@@ -88,9 +91,12 @@ draw_grid_heatmap <- function(mat, elements, left_poles, right_poles,
     }
   }
 
-  axis(1, at = 1:n_e, labels = elements, las = 2, cex.axis = elem_cex)
-  axis(2, at = n_c:1, labels = left_lab, las = 1, cex.axis = pole_cex)
-  axis(4, at = n_c:1, labels = right_lab, las = 1, cex.axis = pole_cex)
+  axis(1, at = 1:n_e, labels = elements, las = 2, cex.axis = elem_cex,
+       col.axis = elem_col)
+  axis(2, at = n_c:1, labels = left_lab, las = 1, cex.axis = pole_cex,
+       col.axis = pole_col)
+  axis(4, at = n_c:1, labels = right_lab, las = 1, cex.axis = pole_cex,
+       col.axis = pole_col)
   box()
 
   if (!is.null(note)) {

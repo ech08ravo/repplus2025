@@ -2,6 +2,37 @@
 
 All notable changes to WebGrid.Online are documented in this file.
 
+## [2.8.0] - 2026-10-23
+
+### Added
+- **A display options panel for visitors.** A control at the bottom left of
+  every page offers larger text, high contrast, underlined links, a plainer
+  typeface and reduced motion, remembered in that browser. It is a preferences
+  panel, not an accessibility overlay: it changes only what the visitor asks it
+  to change and never tries to detect or auto-repair the page. Everything is
+  client side - no preference reaches the server. Because every font size in
+  the app is set in px, text scaling works by zoom; the text drawn inside the
+  plots is separate and stays with the sidebar's Text Size slider.
+- **Separate colours for the three parts of the heatmap.** The Heatmap tab now
+  takes a colour for the construct pole labels, one for the element labels and
+  one for the rating values, alongside the existing cell shading palette, which
+  is now labelled "Cell Shading Palette" to tell the two apart. Rating values
+  keep following their cell by default; unticking "Rating colour follows the
+  cell" hands that choice over. Uses the browser's own colour picker, so no new
+  package is needed.
+
+### Fixed
+- **The sidebar toggle button works.** Its click handler and the media query
+  that hides the control panel on a narrow screen both looked for
+  `.col-sm-2.sidebar`, which needs one element carrying both classes.
+  `sidebarPanel()` puts the column class on a wrapper div and `sidebar` on the
+  form inside it, so the selector matched nothing: `querySelector` returned
+  null and the handler threw before it could do anything, which is why the
+  button appeared dead, and the panel never hid on a narrow screen either.
+  The wrapper is now tagged on load and both work from that. The button also
+  reports its state with `aria-expanded` and moves focus into the panel it
+  opens, and back to itself on close.
+
 ## [2.7.0] - 2026-10-23
 
 ### Added

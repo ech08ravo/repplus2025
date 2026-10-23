@@ -5,7 +5,7 @@ library(uuid)
 library(jsonlite)
 library(igraph)
 
-APP_VERSION <- "2.7.0"
+APP_VERSION <- "2.8.0"
 
 # Security: explicit upload size limit (10MB) and grid limits
 options(shiny.maxRequestSize = 10 * 1024^2)
@@ -107,6 +107,8 @@ source("R/focus_analysis.r")
 source("R/claude_api.R")
 source("R/multigrid_analysis.r")
 source("R/grid_heatmap.R")
+source("R/accessibility.R")
+source("R/color_input.R")
 
 ui <- fluidPage(
   lang = "en",
@@ -427,10 +429,10 @@ ui <- fluidPage(
         .nav-tabs#main_tabs > li:not(.tab-row-break):not(.mg-legend) { flex-shrink: 0; }
       }
       @media (max-width: 992px) {
-        .col-sm-2.sidebar { display: none; }
+        .sidebar-col { display: none; }
         .col-sm-10 { width: 100%; }
         .sidebar-toggle-btn { display: block !important; }
-        .col-sm-2.sidebar.d-block { display: block !important; position: fixed; top: 0; left: 0; width: 280px; height: 100vh; overflow-y: auto; z-index: 999; background: #fff; box-shadow: 2px 0 10px rgba(0,0,0,0.2); padding: 16px; }
+        .sidebar-col.sidebar-open { display: block !important; position: fixed; top: 0; left: 0; width: 280px; height: 100vh; overflow-y: auto; z-index: 999; background: #fff; box-shadow: 2px 0 10px rgba(0,0,0,0.2); padding: 16px; }
       }
       @media (min-width: 993px) {
         .sidebar-toggle-btn { display: none !important; }
@@ -681,7 +683,42 @@ ui <- fluidPage(
   # Main app - shown after results
   conditionalPanel(
     condition = "output.landing_step == 'done'",
-  tags$button(id = "sidebar_toggle", class = "btn btn-primary sidebar-toggle-btn", onclick = "document.querySelector('.col-sm-2.sidebar').classList.toggle('d-block'); this.classList.toggle('active');", `aria-label` = "Toggle sidebar visibility", "\u2630"),
+  colorInputDeps(),
+  accessibility_widget(),
+  tags$button(id = "sidebar_toggle", class = "btn btn-primary sidebar-toggle-btn",
+              `aria-label` = "Show or hide the control panel",
+              `aria-expanded` = "false", `aria-controls` = "sidebar_panel",
+              "\u2630"),
+  # sidebarPanel() puts the Bootstrap column class on a wrapper div and the
+  # "sidebar" class on the <form> inside it, so ".col-sm-2.sidebar" matched
+  # nothing - that selector needs both classes on one element. querySelector
+  # returned null and the inline handler threw before it could do anything,
+  # which is why the button appeared dead. The same selector was in the
+  # media query, so the panel never hid on a narrow screen either. Tag the
+  # wrapper once on load and let both the CSS and the button work from that.
+  tags$script(HTML("
+    document.addEventListener('DOMContentLoaded', function () {
+      var form = document.querySelector('form.sidebar');
+      var btn  = document.getElementById('sidebar_toggle');
+      if (!form || !form.parentElement || !btn) return;
+      var col = form.parentElement;
+      col.classList.add('sidebar-col');
+      if (!col.id) col.id = 'sidebar_panel';
+      btn.addEventListener('click', function () {
+        var open = col.classList.toggle('sidebar-open');
+        btn.classList.toggle('active', open);
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        // Send focus into the panel when it opens, so a keyboard or screen
+        // reader user lands on the controls they just asked for.
+        if (open) {
+          var first = col.querySelector('button, a, input, select, textarea, [tabindex]');
+          if (first) first.focus();
+        } else {
+          btn.focus();
+        }
+      });
+    });
+  ")),
   conditionalPanel(
     condition = "!output.welcome_dismissed",
     div(style = "background: #e3f2fd; border: 1px solid #90caf9; border-radius: 8px; padding: 16px 20px; margin-bottom: 16px; position: relative;",
@@ -1110,7 +1147,7 @@ ui <- fluidPage(
                      checkboxInput("heatmap_use_color", "Use color shading", value = TRUE)
                    ),
                    column(4,
-                     selectInput("heatmap_palette", "Color Palette",
+                     selectInput("heatmap_palette", "Cell Shading Palette",
                                  choices = c(
                                    "Accessible (Wong)" = "wong",
                                    "Classic (Blue/Red)" = "classic",
@@ -1119,7 +1156,16 @@ ui <- fluidPage(
                                    "Greyscale" = "greyscale"
                                  ),
                                  selected = "wong")
+                   ),
+                   column(4,
+                     checkboxInput("heatmap_auto_rating_col",
+                                   "Rating colour follows the cell", value = TRUE)
                    )
+                 ),
+                 fluidRow(
+                   column(4, colorInput("heatmap_construct_col", "Construct label colour", "#000000")),
+                   column(4, colorInput("heatmap_element_col",   "Element label colour",   "#000000")),
+                   column(4, colorInput("heatmap_rating_col",    "Rating value colour",    "#000000"))
                  ),
                  uiOutput("heatmap_plot_ui"),
                  div(class = "plot-toolbar",
@@ -4267,18 +4313,25 @@ server <- function(input, output, session) {
   draw_single_heatmap <- function(sm, pal, txt_size, cell_size) {
     shaded <- isTRUE(input$heatmap_show_shading)
     zlim <- range(sm, na.rm = TRUE)
+    auto_rating <- isTRUE(input$heatmap_auto_rating_col)
+    rating_col <- input$heatmap_rating_col %||% "#000000"
     draw_grid_heatmap(
       sm, elements = rv$elements,
       left_poles = rv$constructs$left, right_poles = rv$constructs$right,
       colors = pal, zlim = zlim, text_size = txt_size,
       value_cex = cell_size * 1.2,
-      # Read the label colour off the cell it sits on, so it stays legible on a
-      # dark cell, a pale one, and on no shading at all. The old fixed "> 4"
-      # threshold assumed a 1-7 scale and turned white on an unshaded cell.
       value_col = function(v) {
+        # Left to itself, the label reads its colour off the cell it sits on,
+        # so it stays legible on a dark cell, a pale one, and on no shading at
+        # all. (The old fixed "> 4" threshold assumed a 1-7 scale and turned
+        # white on an unshaded cell.) A chosen colour overrides that, which is
+        # the visitor's call to make - and to check.
+        if (!auto_rating) return(rating_col)
         if (!shaded) return("black")
         contrast_text_col(pal[palette_index(v, zlim, length(pal))])
       },
+      elem_col = input$heatmap_element_col %||% "black",
+      pole_col = input$heatmap_construct_col %||% "black",
       grid_lines = !shaded
     )
   }
