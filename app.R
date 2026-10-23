@@ -5,7 +5,7 @@ library(uuid)
 library(jsonlite)
 library(igraph)
 
-APP_VERSION <- "2.16.0"
+APP_VERSION <- "2.17.0"
 
 # Security: explicit upload size limit (10MB) and grid limits
 options(shiny.maxRequestSize = 10 * 1024^2)
@@ -1433,6 +1433,15 @@ ui <- fluidPage(
                           checkboxInput("focus_use_color", "Use color shading", value = TRUE),
                           checkboxInput("focus_show_match_pct",
                                         "Show match % on dendrograms", value = FALSE),
+                          actionButton("align_poles", "Align construct poles\u2026",
+                                       class = "btn-outline-primary btn-sm",
+                                       style = "width:100%; margin-bottom:6px;"),
+                          conditionalPanel(
+                            condition = "output.has_reversed_poles",
+                            actionButton("reset_poles", "Undo pole reversals",
+                                         class = "btn-outline-secondary btn-sm",
+                                         style = "width:100%; margin-bottom:6px;")
+                          ),
                           downloadButton("download_focus", "Download Focus Plot")
                    ),
                    column(6,
@@ -2396,6 +2405,11 @@ server <- function(input, output, session) {
     # Multi-grid analysis results
     match_matrix = NULL,             # Grid-to-grid match percentages
     socionet_data = NULL,            # Network data for visualization
+    # Constructs the viewer has chosen to see reversed, held by label so the
+    # choice survives re-sorting, and is simply dropped if the grid changes
+    # under it. Display only: rv$ratings and every export keep the ratings as
+    # they were given.
+    reversed_poles = character(0),
     mode_grid = NULL,                # Generated Mode (consensus) grid
     composite_grid = NULL,           # Generated Composite grid
 
@@ -5215,6 +5229,141 @@ server <- function(input, output, session) {
 
   # Shared renderer for the Focus tab - used by the on-screen plot and by both
   # download buttons so all three stay in step.
+  # --- pole reversal, for display only -------------------------------------
+  #
+  # Nothing here touches rv$ratings, the stored grid or any export. Flipping a
+  # construct is also neutral for the analysis: both similarity matrices are
+  # unchanged by it, because |(2m-a) - (2m-b)| is just |a - b|. So this only
+  # ever changes how the grid reads, never what it says.
+  # Plain ASCII on purpose: the plot device has no glyph for the nicer arrows,
+  # and an unrenderable marker comes out as an empty box, which reads as a
+  # mistake rather than a flag.
+  REV_MARK <- "* "
+
+  construct_labels_now <- function() {
+    paste(rv$constructs$left, "-", rv$constructs$right)
+  }
+
+  # Which constructs are currently shown reversed, as a logical in the grid's
+  # own order. Labels that no longer exist simply fall out.
+  reversed_flags <- function() {
+    construct_labels_now() %in% rv$reversed_poles
+  }
+
+  output$has_reversed_poles <- reactive(length(rv$reversed_poles) > 0)
+  outputOptions(output, "has_reversed_poles", suspendWhenHidden = FALSE)
+
+  # Poles as they should be drawn: swapped round where reversed, and marked,
+  # because a reversed construct that is silently rewritten is worse than one
+  # that is not reversed at all.
+  display_poles <- function() {
+    l <- rv$constructs$left
+    r <- rv$constructs$right
+    flip <- reversed_flags()
+    if (any(flip)) {
+      tmp <- l[flip]
+      l[flip] <- paste0(REV_MARK, r[flip])
+      r[flip] <- tmp
+    }
+    list(left = l, right = r)
+  }
+
+  # Say on the plot what the asterisks mean, so a downloaded copy explains
+  # itself to someone who never saw the dialog.
+  reversal_note <- function(title) {
+    if (!any(reversed_flags())) return(title)
+    paste0(title, "   [", trimws(REV_MARK), " = pole reversed for display]")
+  }
+
+  display_matrix <- function(m) {
+    flip <- reversed_flags()
+    if (any(flip) && !is.null(m) && ncol(m) == length(flip)) {
+      for (j in which(flip)) m[, j] <- flip_ratings(m[, j], rv$scale)
+    }
+    m
+  }
+
+  # The focus result drawn with those reversals applied. sorted_matrix is in
+  # display order, so each column maps back through construct_order.
+  display_focus_result <- function(fr) {
+    flip <- reversed_flags()
+    if (!any(flip)) return(fr)
+    ord <- fr$construct_order
+    for (k in seq_along(ord)) {
+      if (isTRUE(flip[ord[k]])) {
+        fr$sorted_matrix[, k] <- flip_ratings(fr$sorted_matrix[, k], rv$scale)
+      }
+    }
+    fr
+  }
+
+  observeEvent(input$align_poles, {
+    fr <- focus_result()
+    if (is.null(fr)) {
+      showNotification("Run the Focus analysis first, then poles can be aligned to it.",
+                       type = "warning")
+      return()
+    }
+    labels <- construct_labels_now()
+    proposed <- focus_pole_alignment(rv$scores_mat_last, fr$construct_order, rv$scale)
+    # Already-reversed constructs are shown flipped, so the proposal has to be
+    # read against what is on screen, not against the stored grid.
+    current <- reversed_flags()
+    changing <- which(xor(proposed, current))
+
+    if (length(changing) == 0) {
+      showNotification("Every construct already reads the same way round as its neighbours.",
+                       type = "message")
+      return()
+    }
+
+    rows <- lapply(changing, function(i) {
+      to_reverse <- !current[i]
+      tags$li(
+        tags$strong(paste(rv$constructs$left[i], "-", rv$constructs$right[i])),
+        if (to_reverse) {
+          tags$span(" \u2192 ", tags$em(paste(rv$constructs$right[i], "-",
+                                              rv$constructs$left[i])))
+        } else {
+          tags$span(" \u2192 ", tags$em("back as written"))
+        }
+      )
+    })
+
+    showModal(modalDialog(
+      title = "Reverse these construct poles?",
+      p(sprintf("%d of %d constructs read the other way round from their neighbours in the Focus sort. Reversing them makes the grid read as bands instead of mirror images.",
+                length(changing), length(labels))),
+      tags$ul(rows),
+      p(tags$small(
+        "This changes the display only. Your ratings, the saved grid and every ",
+        "export stay exactly as they are, and the analysis is unaffected \u2014 ",
+        "reversing a construct cannot change either similarity matrix. ",
+        "Reversed constructs are marked ", tags$strong(REV_MARK), "on the plot."
+      )),
+      footer = tagList(
+        modalButton("Cancel"),
+        actionButton("confirm_align_poles", "Reverse them", class = "btn-primary")
+      ),
+      easyClose = TRUE
+    ))
+  })
+
+  observeEvent(input$confirm_align_poles, {
+    removeModal()
+    fr <- focus_result()
+    req(fr)
+    proposed <- focus_pole_alignment(rv$scores_mat_last, fr$construct_order, rv$scale)
+    rv$reversed_poles <- construct_labels_now()[proposed]
+    showNotification(sprintf("%d construct(s) reversed for display.", sum(proposed)),
+                     type = "message")
+  })
+
+  observeEvent(input$reset_poles, {
+    rv$reversed_poles <- character(0)
+    showNotification("Poles back as written.", type = "message")
+  })
+
   draw_focus_plot <- function() {
     colors <- get_palette_colors(input$focus_palette)
     style <- if (is.null(input$focus_style)) "focus" else input$focus_style
@@ -5232,25 +5381,27 @@ server <- function(input, output, session) {
 
     if (identical(style, "display")) {
       req(rv$scores_mat_last)
+      poles <- display_poles()
       do.call(plot_display_grid, c(
         list(
-          scores_matrix = rv$scores_mat_last,
+          scores_matrix = display_matrix(rv$scores_mat_last),
           element_names = rv$elements,
-          construct_left = rv$constructs$left,
-          construct_right = rv$constructs$right,
-          title = with_grid_name(paste0("Display ", rv$pseudonym))
+          construct_left = poles$left,
+          construct_right = poles$right,
+          title = reversal_note(with_grid_name(paste0("Display ", rv$pseudonym)))
         ),
         common
       ))
     } else {
       req(focus_result())
       spaced <- identical(style, "spaced")
+      poles <- display_poles()
       do.call(if (spaced) plot_focus_spaced else plot_focus_cluster, c(
         list(
-          focus_result = focus_result(),
-          title = with_grid_name(if (spaced) "SPACED: Focus Cluster Analysis" else "Focus Cluster Analysis"),
-          construct_left = rv$constructs$left,
-          construct_right = rv$constructs$right
+          focus_result = display_focus_result(focus_result()),
+          title = reversal_note(with_grid_name(if (spaced) "SPACED: Focus Cluster Analysis" else "Focus Cluster Analysis")),
+          construct_left = poles$left,
+          construct_right = poles$right
         ),
         common
       ))

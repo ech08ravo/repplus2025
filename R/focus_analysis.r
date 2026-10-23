@@ -302,6 +302,55 @@ dendro_layout <- function(hc, leaf_pos) {
   list(segs = segs, nodes = cbind(node_pos, hc$height))
 }
 
+#' Flip a construct's ratings about the centre of the scale
+#'
+#' The mirror image of "warm 1 2 4 cold" on a 1-5 scale is "cold 5 4 2 warm":
+#' same distinction, stated the other way round. Integer ratings stay integers,
+#' and flipping twice returns the original, so this is lossless.
+flip_ratings <- function(v, scale) {
+  2 * (sum(scale) / 2) - v
+}
+
+#' Which constructs should be shown reversed, to read with their neighbours
+#'
+#' Construct similarity already scores each pair in whichever orientation fits
+#' better, so FOCUS can place two constructs together on the strength of a
+#' match that only holds when one of them is flipped - and then draw them as
+#' written, as mirror images of each other. In Bezzi's expert grid
+#' "extrusive - intrusive" and "crystalline - glassy" score 100% flipped and
+#' 0% as written: the sort calls them identical and the picture shows them
+#' opposite.
+#'
+#' This walks the constructs in sorted order and orients each one to agree with
+#' the one before it, which is what makes the bands read coherently. The first
+#' construct is the anchor and is never flipped, so the result is stable and
+#' explainable rather than depending on a global optimisation.
+#'
+#' @param scores_matrix Elements (rows) x constructs (cols)
+#' @param construct_order Display order, as focus_cluster returns it
+#' @return Logical vector indexed by ORIGINAL construct position
+focus_pole_alignment <- function(scores_matrix, construct_order, scale) {
+  n <- ncol(scores_matrix)
+  rev_flags <- logical(n)
+  if (n < 2 || length(construct_order) < 2) return(rev_flags)
+
+  running <- scores_matrix[, construct_order[1]]
+  for (k in seq.int(2, length(construct_order))) {
+    idx <- construct_order[k]
+    v <- scores_matrix[, idx]
+    shared <- !is.na(running) & !is.na(v)
+    if (any(shared)) {
+      flipped <- flip_ratings(v, scale)
+      as_written <- sum(abs(running[shared] - v[shared]))
+      as_flipped <- sum(abs(running[shared] - flipped[shared]))
+      rev_flags[idx] <- as_flipped < as_written
+    }
+    # Compare the next construct against this one as it will be shown.
+    running <- if (rev_flags[idx]) flip_ratings(v, scale) else v
+  }
+  rev_flags
+}
+
 #' Pick a readable text colour for a given cell background
 contrast_text_col <- function(bg) {
   rgb_vals <- col2rgb(bg) / 255

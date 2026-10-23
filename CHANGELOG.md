@@ -2,6 +2,31 @@
 
 All notable changes to WebGrid.Online are documented in this file.
 
+## [2.17.0] - 2026-10-23
+
+### Added
+- **On-demand construct pole reversal, for display.** Construct similarity has
+  always scored each pair in whichever orientation fits better, then drawn the
+  construct as written - so FOCUS could place two constructs together on a
+  match that only holds reversed, and render them as mirror images. In Bezzi's
+  expert grid "extrusive - intrusive" and "crystalline - glassy" score 100%
+  reversed and 0% as written: the sort calls them identical, the picture shows
+  them opposite. On that grid, aligning the poles lifts agreement between
+  neighbouring constructs from 52.9% to 88.3%.
+- "Align construct poles..." on the Focus tab works out which constructs read
+  the other way round from their neighbours and **asks before changing
+  anything**, listing each one and what it would become. Reversed constructs
+  have their poles swapped and are marked with an asterisk, with a key in the
+  plot title so a downloaded copy explains itself. "Undo pole reversals" puts
+  them back.
+- **Nothing but the display changes.** Ratings, the stored grid and every
+  export keep the values as given, and the analysis cannot be affected either:
+  mirroring a construct maps a to 2m-a, so |a-b| is unchanged and neither
+  similarity matrix can move. The release check asserts exactly that, along
+  with the alignment improving neighbour agreement and flipping being lossless.
+  The choice is held by construct label, so it survives re-sorting and is
+  dropped if the grid changes underneath it.
+
 ## [2.16.0] - 2026-10-23
 
 ### Added

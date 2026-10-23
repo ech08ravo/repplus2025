@@ -295,6 +295,57 @@ check("reimported grid keeps its ratings",
 unlink(tmp)
 
 # ===========================================================================
+section("Pole reversal is presentation, not analysis")
+# ===========================================================================
+# Reversing a construct swaps its poles and mirrors its ratings. It must not
+# be able to change any number the app reports, or "display only" is a lie.
+bz <- parse_rgrid("dataExamples/bezzi1996_nick.rgrid")
+bm <- bz$scores_mat
+
+check("flipping twice returns the original exactly",
+      identical(flip_ratings(flip_ratings(bm, bz$scale), bz$scale), bm))
+check("1..5 mirrors to 5..1 on a 1-5 scale",
+      identical(flip_ratings(c(1, 2, 3, 4, 5), c(1, 5)), c(5, 4, 3, 2, 1)))
+check("unrated cells stay unrated when flipped",
+      is.na(flip_ratings(c(NA, 2), c(1, 5))[1]))
+
+bfr <- focus_cluster(bm, bz$elements, paste(bz$left, "-", bz$right), scale = bz$scale)
+bflags <- focus_pole_alignment(bm, bfr$construct_order, bz$scale)
+bdisp <- bm
+for (j in which(bflags)) bdisp[, j] <- flip_ratings(bm[, j], bz$scale)
+
+check("the sample grid does need some constructs reversed",
+      sum(bflags) > 0, paste(sum(bflags), "of", ncol(bm)))
+# |(2m-a) - (2m-b)| is |a - b|, so neither matrix can move. If either does,
+# reversal has stopped being presentational.
+check("construct similarities unchanged by reversal",
+      near(compute_construct_similarities(bm, scale = bz$scale),
+           compute_construct_similarities(bdisp, scale = bz$scale), 1e-9))
+check("element similarities unchanged by reversal",
+      near(compute_element_similarities(bm, scale = bz$scale),
+           compute_element_similarities(bdisp, scale = bz$scale), 1e-9))
+
+# The point of aligning: neighbours in the sort should read the same way round.
+neighbour_fit <- function(mat) {
+  ord <- bfr$construct_order
+  out <- numeric(0)
+  for (k in seq.int(2, length(ord))) {
+    a <- mat[, ord[k - 1]]; b <- mat[, ord[k]]
+    sh <- !is.na(a) & !is.na(b)
+    if (any(sh)) out <- c(out, 100 * (1 - sum(abs(a[sh] - b[sh])) /
+                                        (sum(sh) * diff(bz$scale))))
+  }
+  mean(out)
+}
+check("aligning poles makes neighbouring constructs agree more",
+      neighbour_fit(bdisp) > neighbour_fit(bm),
+      sprintf("%.1f%% -> %.1f%%", neighbour_fit(bm), neighbour_fit(bdisp)))
+check("a grid needing no reversal is left alone",
+      !any(focus_pole_alignment(bdisp,
+             focus_cluster(bdisp, bz$elements, paste(bz$left, "-", bz$right),
+                           scale = bz$scale)$construct_order, bz$scale)))
+
+# ===========================================================================
 section("Version and changelog agree")
 # ===========================================================================
 # APP_VERSION is what the title bar shows and what deploy.sh compares the live
