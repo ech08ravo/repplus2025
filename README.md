@@ -85,6 +85,34 @@ Outputs are interoperable with **RepPlus** (`.rgrid` format).
 
 ---
 
+
+## Testing
+
+Before releasing, run every check from the project root:
+
+```bash
+./tests/run_all.sh
+```
+
+It exits non-zero if anything fails.
+
+- `tests/test_grid_integrity.R` - the path from a `.rgrid` file to the objects
+  the app analyses, plus a round trip for every sample grid.
+- `tests/test_release_check.R` - the arithmetic: element and construct match
+  percentages, missing-cell handling, scale handling, construct reversal, the
+  FOCUS sort and its dendrogram heights.
+
+The release check is built so it can catch wrong answers, not just changed
+ones. Its expectations come from `tests/fixtures/*.rgrid`, two small synthetic
+grids whose answers follow by construction - identical elements must match
+100%, elements at opposite ends of every construct must match 0% - and from a
+second, deliberately naive implementation of the match formula that the whole
+similarity matrix is compared against. A snapshot of current output would have
+frozen two real bugs instead of catching them.
+
+The fixtures are not real data and are kept out of `dataExamples/`, though they
+can be opened in the app like any other grid.
+
 ## 🛠️ Setup
 
 ### Prerequisites

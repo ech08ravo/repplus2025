@@ -2,6 +2,33 @@
 
 All notable changes to WebGrid.Online are documented in this file.
 
+## [2.11.1] - 2026-10-23
+
+### Added
+- **A release check suite.** `./tests/run_all.sh` runs every automated check and
+  exits non-zero if any fails. The new `tests/test_release_check.R` covers the
+  arithmetic: element and construct match percentages, unrated-cell handling,
+  the declared scale, construct reversal, the FOCUS sort and its dendrogram
+  heights, and a round trip through the file format.
+- **Two calibration grids**, `tests/fixtures/calibration_elements.rgrid` and
+  `tests/fixtures/calibration_constructs.rgrid`, built so the right answer
+  follows by construction: identical elements must match 100%, elements at
+  opposite ends of every construct 0%, a mirrored construct 100%. The check
+  also compares whole similarity matrices against a second, deliberately naive
+  implementation of the formula, so it tests for correct answers rather than
+  merely unchanged ones - a snapshot would have frozen the two bugs found
+  earlier this month instead of catching them.
+
+### Fixed
+- **A grid exported from the app and loaded back came back named after a row
+  count.** The grid name was read from header field 5, which holds the number
+  of ratings; the name is field 6. Real `.rgrid` files were unaffected because
+  they carry a `_Name` line, which is read first - but the app's own export
+  wrote no `_Name`, so a reimported grid was titled "6" on every plot. The
+  field is corrected, a bare number is no longer accepted as a name, and the
+  exporter now writes the grid's real name into both the header and a `_Name`
+  line, with `_Context` alongside it when the grid has one.
+
 ## [2.11.0] - 2026-10-23
 
 ### Added

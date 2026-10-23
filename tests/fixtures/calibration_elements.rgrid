@@ -1,0 +1,18 @@
+	Grid	8	6	48	calibration-elements		1	23-Oct-2026	10:00	local	Rep IV 2.00	RepGrid
+C0	R	100	0	1	1	5	left1	right1	
+C1	R	100	0	1	1	5	left2	right2	
+C2	R	100	0	1	1	5	left3	right3	
+C3	R	100	0	1	1	5	left4	right4	
+C4	R	100	0	1	1	5	left5	right5	
+C5	R	100	0	1	1	5	left6	right6	
+E0	100	0	1	1	4	1	1	1	1	1	1	All ones
+E1	100	0	1	1	4	1	1	1	1	1	1	All ones twin
+E2	100	0	1	1	4	5	5	5	5	5	5	All fives
+E3	100	0	1	1	4	3	3	3	3	3	3	All threes
+E4	100	0	1	1	4	2	2	2	2	2	2	All twos
+E5	100	0	1	1	4	1	5	1	5	1	5	Alternating
+E6	100	0	1	1	4	1	1	1	?	?	?	Half rated low
+E7	100	0	1	1	4	5	5	5	?	?	?	Half rated high
+_Date	23-Oct-2026
+_Name	calibration-elements
+_Context	Synthetic grid calibrating element match percentages; not real data

@@ -168,11 +168,14 @@ parse_rgrid <- function(file_path, zero_is_na = FALSE) {
   colnames(scores_mat) <- paste(left, "-", right)
 
   meta <- extract_rgrid_meta(txt)
-  # Field 5 of the header carries the name too; _Name is the better source, so
-  # it is only the fallback.
+  # Field 6 of the header carries the name too (1:"" 2:"Grid" 3:cols 4:rows
+  # 5:ratings 6:name), so it is the fallback when there is no _Name line -
+  # which is the case for grids this app exports. A count is not a name, so a
+  # bare number is rejected rather than ending up as a plot title.
   grid_name <- meta$Name
-  if (is.null(grid_name) && length(header) >= 5 && nzchar(header[5])) {
-    grid_name <- trimws(header[5])
+  if (is.null(grid_name) && length(header) >= 6) {
+    h6 <- trimws(header[6])
+    if (nzchar(h6) && !grepl("^[0-9]+$", h6)) grid_name <- h6
   }
 
   list(

@@ -5,7 +5,7 @@ library(uuid)
 library(jsonlite)
 library(igraph)
 
-APP_VERSION <- "2.11.0"
+APP_VERSION <- "2.11.1"
 
 # Security: explicit upload size limit (10MB) and grid limits
 options(shiny.maxRequestSize = 10 * 1024^2)
@@ -5379,8 +5379,17 @@ server <- function(input, output, session) {
       nC <- nrow(rv$constructs)
       nR <- nrow(rv$ratings)
       now <- Sys.time()
+      # Field 6 is the grid's name. Writing a placeholder here meant a grid
+      # exported and reimported came back named after the placeholder, so carry
+      # the real name through - and repeat it as _Name below, which is where
+      # the importer looks first.
+      out_name <- rv$grid_name
+      if (is.null(out_name) || !nzchar(out_name)) out_name <- rv$pseudonym
+      if (is.null(out_name) || !nzchar(out_name)) out_name <- "WebGrid"
+      out_name <- gsub("[\t\r\n]", " ", out_name)
+
       hdr <- paste(
-        "", "Grid", nE, nC, nR, "YourTitle", "", "1",
+        "", "Grid", nE, nC, nR, out_name, "", "1",
         format(Sys.Date(), "%d-%b-%Y"), format(now, "%H:%M"),
         "local", "Rep IV 2.00", "RepGrid",
         sep = "\t"
@@ -5417,6 +5426,11 @@ server <- function(input, output, session) {
       writeLines(paste("_UID", uuid::UUIDgenerate(), sep = "\t"), con)
       writeLines(paste("_Date", format(Sys.Date(), "%d-%b-%Y"), sep = "\t"), con)
       writeLines(paste("_Time", format(now, "%H:%M"), sep = "\t"), con)
+      writeLines(paste("_Name", out_name, sep = "\t"), con)
+      if (!is.null(rv$grid_context) && nzchar(rv$grid_context)) {
+        writeLines(paste("_Context",
+                         gsub("[\t\r\n]", " ", rv$grid_context), sep = "\t"), con)
+      }
     }
   )
 
