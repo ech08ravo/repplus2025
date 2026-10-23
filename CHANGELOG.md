@@ -2,6 +2,18 @@
 
 All notable changes to WebGrid.Online are documented in this file.
 
+## [2.10.0] - 2026-10-23
+
+### Added
+- **Match percentages can be shown on the FOCUS dendrograms.** "Show match % on
+  dendrograms" on the Focus tab labels every join on both the element and the
+  construct tree with the percentage at which those two clusters merged. FOCUS
+  already stores each join's height as 100 - match, so the figure is the one
+  the sort itself used, not a recomputation. Off by default, since on a large
+  grid the labels crowd. The element labels sit clear above each join; the
+  construct ones are left-aligned beyond their join, with room reserved in the
+  right margin so the outermost label is not clipped.
+
 ## [2.9.1] - 2026-10-23
 
 ### Fixed

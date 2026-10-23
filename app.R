@@ -5,7 +5,7 @@ library(uuid)
 library(jsonlite)
 library(igraph)
 
-APP_VERSION <- "2.9.1"
+APP_VERSION <- "2.10.0"
 
 # Security: explicit upload size limit (10MB) and grid limits
 options(shiny.maxRequestSize = 10 * 1024^2)
@@ -1395,6 +1395,8 @@ ui <- fluidPage(
                           checkboxInput("focus_show_values", "Show Rating Values", value = TRUE),
                           checkboxInput("focus_show_shading", "Show Shading", value = TRUE),
                           checkboxInput("focus_use_color", "Use color shading", value = TRUE),
+                          checkboxInput("focus_show_match_pct",
+                                        "Show match % on dendrograms", value = FALSE),
                           downloadButton("download_focus", "Download Focus Plot")
                    ),
                    column(6,
@@ -5154,6 +5156,7 @@ server <- function(input, output, session) {
       show_values = isTRUE(input$focus_show_values),
       show_shading = isTRUE(input$focus_show_shading),
       use_color = isTRUE(input$focus_use_color),
+      show_match_pct = isTRUE(input$focus_show_match_pct),
       text_size = input$text_size,
       cell_size = input$grid_cell_size,
       heat_low = colors$heat_low,

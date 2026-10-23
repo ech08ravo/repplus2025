@@ -258,8 +258,19 @@ split_pole_labels <- function(labels) {
 #' `leaf_pos` is indexed by display position; it is mapped back onto the
 #' original observation indices via hc$order.
 dendro_segments <- function(hc, leaf_pos) {
+  dendro_layout(hc, leaf_pos)$segs
+}
+
+#' Dendrogram segments *and* the join nodes, which carry the match percentage
+#'
+#' Each merge joins two clusters at `hc$height[k]`, and FOCUS stores that
+#' height as 100 - match, so a join's match percentage is 100 - height.
+#' `nodes` is a two-column matrix of that join's position and height, in the
+#' same order as hc$merge.
+dendro_layout <- function(hc, leaf_pos) {
   n <- length(hc$order)
-  if (n < 2) return(matrix(numeric(0), ncol = 4))
+  if (n < 2) return(list(segs = matrix(numeric(0), ncol = 4),
+                         nodes = matrix(numeric(0), ncol = 2)))
 
   pos_by_obs <- numeric(n)
   pos_by_obs[hc$order] <- leaf_pos
@@ -288,7 +299,7 @@ dendro_segments <- function(hc, leaf_pos) {
     segs[row, ] <- c(child_pos[2], child_h[2], child_pos[2], h); row <- row + 1
     segs[row, ] <- c(child_pos[1], h, child_pos[2], h); row <- row + 1
   }
-  segs
+  list(segs = segs, nodes = cbind(node_pos, hc$height))
 }
 
 #' Pick a readable text colour for a given cell background
@@ -312,6 +323,7 @@ render_grid_display <- function(scores, left_poles, right_poles, element_labels,
                                 element_hclust = NULL, construct_hclust = NULL,
                                 show_values = TRUE, show_shading = TRUE,
                                 use_color = FALSE, text_size = 1.0, cell_size = 1.0,
+                                show_match_pct = FALSE,
                                 heat_low = "#0072B2", heat_high = "#D55E00",
                                 element_col = "#C0392B", construct_col = "#1F5FA9") {
 
@@ -331,6 +343,11 @@ render_grid_display <- function(scores, left_poles, right_poles, element_labels,
   label_cex <- 0.95 * text_size
   value_cex <- 0.95 * cell_size * text_size
   title_cex <- 1.25 * text_size
+  pct_cex <- 0.62 * text_size
+  # The construct dendrogram's match labels are left-aligned, so they run
+  # outwards past the dendrogram and need room reserved, or the outermost
+  # join's label falls off the edge of the device.
+  pct_w <- if (show_match_pct) strwidth("100%", units = "inches", cex = pct_cex) * 1.3 else 0
 
   din <- par("din")
   pad <- 0.08
@@ -378,7 +395,7 @@ render_grid_display <- function(scores, left_poles, right_poles, element_labels,
     # Distance from each column's centre to the right edge of the box
     to_right_edge <- (max(col_pos) + 0.5 - col_pos) * cell_w
     overflow <- max(elem_lab_w + pad * 2 - to_right_edge, 0)
-    mar_right <- max(pad + right_lab_w + pad + dendro_right_w, overflow + pad)
+    mar_right <- max(pad + right_lab_w + pad + dendro_right_w + pct_w, overflow + pad)
   }
 
   avail_h <- din[2] - mar_top - mar_bottom
@@ -468,18 +485,28 @@ render_grid_display <- function(scores, left_poles, right_poles, element_labels,
 
   # --- dendrograms -----------------------------------------------------------
   if (dendro_top_h > 0) {
-    segs <- dendro_segments(element_hclust, col_pos)
+    lay <- dendro_layout(element_hclust, col_pos)
+    segs <- lay$segs
     if (nrow(segs) > 0) {
       max_h <- max(element_hclust$height)
       if (max_h <= 0) max_h <- 1
       to_y <- function(h) y_lim[2] - dy(pad + (h / max_h) * (dendro_top_h - pad))
       segments(segs[, 1], to_y(segs[, 2]), segs[, 3], to_y(segs[, 4]),
                col = "#555555", lwd = 1)
+      if (show_match_pct && nrow(lay$nodes) > 0) {
+        # Offset along whichever direction growing height runs in, so the
+        # label sits just outside its own join rather than on top of it.
+        off <- (to_y(max_h) - to_y(0)) * 0.07
+        text(lay$nodes[, 1], to_y(lay$nodes[, 2]) + off,
+             sprintf("%.0f%%", 100 - lay$nodes[, 2]),
+             cex = pct_cex, col = "#333333")
+      }
     }
   }
 
   if (dendro_right_w > 0) {
-    segs <- dendro_segments(construct_hclust, row_pos)
+    lay <- dendro_layout(construct_hclust, row_pos)
+    segs <- lay$segs
     if (nrow(segs) > 0) {
       max_h <- max(construct_hclust$height)
       if (max_h <= 0) max_h <- 1
@@ -487,6 +514,14 @@ render_grid_display <- function(scores, left_poles, right_poles, element_labels,
       to_x <- function(h) x_lim[2] + dx(base_in + (h / max_h) * (dendro_right_w - pad))
       segments(to_x(segs[, 2]), segs[, 1], to_x(segs[, 4]), segs[, 3],
                col = "#555555", lwd = 1)
+      if (show_match_pct && nrow(lay$nodes) > 0) {
+        off <- (to_x(max_h) - to_x(0)) * 0.07
+        # Left-aligned, so the label starts clear of the join's own vertical
+        # line instead of straddling it.
+        text(to_x(lay$nodes[, 2]) + off, lay$nodes[, 1],
+             sprintf("%.0f%%", 100 - lay$nodes[, 2]),
+             cex = pct_cex, col = "#333333", adj = c(0, 0.5))
+      }
     }
   }
 
@@ -551,6 +586,7 @@ plot_display_grid <- function(scores_matrix, element_names,
                               title = "Display Grid", subtitle = NULL,
                               show_values = TRUE, show_shading = TRUE,
                               use_color = FALSE, text_size = 1.0, cell_size = 1.0,
+                              show_match_pct = FALSE,
                               heat_low = "#0072B2", heat_high = "#D55E00") {
   render_grid_display(
     scores = t(scores_matrix),
@@ -560,6 +596,9 @@ plot_display_grid <- function(scores_matrix, element_names,
     title = title, subtitle = subtitle,
     show_values = show_values, show_shading = show_shading, use_color = use_color,
     text_size = text_size, cell_size = cell_size,
+    # Accepted so the Focus tab can pass one argument list to every style.
+    # The display layout draws no dendrograms, so there is nothing to label.
+    show_match_pct = show_match_pct,
     heat_low = heat_low, heat_high = heat_high
   )
 }
@@ -567,7 +606,7 @@ plot_display_grid <- function(scores_matrix, element_names,
 #' Plot Focus cluster analysis with dendrograms, in the display layout
 plot_focus_cluster <- function(focus_result, title = "Focus Cluster Analysis",
                                show_values = TRUE, show_shading = TRUE, use_color = FALSE,
-                               text_size = 1.0, cell_size = 1.0,
+                               text_size = 1.0, cell_size = 1.0, show_match_pct = FALSE,
                                heat_low = "#0072B2", heat_high = "#D55E00",
                                construct_left = NULL, construct_right = NULL) {
   poles <- focus_poles(focus_result, construct_left, construct_right)
@@ -581,6 +620,7 @@ plot_focus_cluster <- function(focus_result, title = "Focus Cluster Analysis",
     subtitle = focus_match_subtitle(focus_result),
     element_hclust = focus_result$element_hclust,
     construct_hclust = focus_result$construct_hclust,
+    show_match_pct = show_match_pct,
     show_values = show_values, show_shading = show_shading, use_color = use_color,
     text_size = text_size, cell_size = cell_size,
     heat_low = heat_low, heat_high = heat_high
@@ -608,7 +648,7 @@ spaced_positions <- function(hc, item_order) {
 #' Plot Focus cluster with SPACED proportional spacing, in the display layout
 plot_focus_spaced <- function(focus_result, title = "SPACED: Focus Cluster Analysis",
                               show_values = TRUE, show_shading = TRUE, use_color = FALSE,
-                              text_size = 1.0, cell_size = 1.0,
+                              text_size = 1.0, cell_size = 1.0, show_match_pct = FALSE,
                               heat_low = "#0072B2", heat_high = "#D55E00",
                               construct_left = NULL, construct_right = NULL) {
   poles <- focus_poles(focus_result, construct_left, construct_right)
@@ -628,6 +668,7 @@ plot_focus_spaced <- function(focus_result, title = "SPACED: Focus Cluster Analy
     col_pos = spaced_positions(focus_result$element_hclust, focus_result$element_order),
     element_hclust = focus_result$element_hclust,
     construct_hclust = focus_result$construct_hclust,
+    show_match_pct = show_match_pct,
     show_values = show_values, show_shading = show_shading, use_color = use_color,
     text_size = text_size, cell_size = cell_size,
     heat_low = heat_low, heat_high = heat_high
