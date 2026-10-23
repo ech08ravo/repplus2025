@@ -35,6 +35,8 @@ palette_index <- function(v, zlim, n) {
 #' @param value_cex Text size of the cell values
 #' @param value_fmt Function turning a cell value into its label
 #' @param value_col Function giving the label colour for a cell value
+#' @param subtitle Smaller line under the title - the grid's elicitation
+#'   context, where the file carries one
 #' @param elem_col,pole_col Colours for the element labels along the bottom
 #'   and the construct pole labels down each side
 #' @param grid_lines Draw cell boundaries. Worth turning on when the cells
@@ -43,7 +45,8 @@ palette_index <- function(v, zlim, n) {
 #' @param legend_title If not NULL, draw a colour bar to the right with
 #'   ticks at legend_at labelled legend_labels
 draw_grid_heatmap <- function(mat, elements, left_poles, right_poles,
-                              colors, zlim, title = NULL, text_size = 1,
+                              colors, zlim, title = NULL, subtitle = NULL,
+                              text_size = 1,
                               show_values = TRUE, value_cex = 0.8 * text_size,
                               value_fmt = function(v) sprintf("%.0f", v),
                               value_col = function(v) "black",
@@ -66,6 +69,7 @@ draw_grid_heatmap <- function(mat, elements, left_poles, right_poles,
   left_mar <- label_margin_lines(left_lab, pole_cex)
   right_mar <- label_margin_lines(right_lab, pole_cex)
   top_mar <- if (is.null(title)) 1.5 else 3.5
+  if (!is.null(subtitle)) top_mar <- top_mar + 1.4
   par(mar = c(bottom_mar, left_mar, top_mar, right_mar), family = "sans")
 
   # image() puts z[i, k] at (x = i, y = k); reverse the construct columns
@@ -73,6 +77,10 @@ draw_grid_heatmap <- function(mat, elements, left_poles, right_poles,
   image(1:n_e, 1:n_c, mat[, n_c:1, drop = FALSE],
         col = colors, zlim = zlim, axes = FALSE, xlab = "", ylab = "",
         main = title, cex.main = text_size * 1.1)
+
+  if (!is.null(subtitle)) {
+    mtext(subtitle, side = 3, line = 0.6, cex = 0.72 * text_size, col = "#555555")
+  }
 
   if (grid_lines) {
     abline(v = seq(0.5, n_e + 0.5, by = 1), col = "#CCCCCC", lwd = 0.5)

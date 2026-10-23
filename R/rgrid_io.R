@@ -14,6 +14,27 @@
 #
 # Fields 6 and 7 are the rating scale (min, max).
 
+#' Trailing "_Key<TAB>value" metadata lines, as a named list
+#'
+#' Rep Plus writes these after the element lines: _Name is what the grid is
+#' called ("yurungi"), _Context the question the constructs were elicited
+#' against, which is the nearest thing the format has to a title. Keys repeat
+#' in some files; the first wins, since later ones are usually blank.
+extract_rgrid_meta <- function(txt) {
+  lines <- grep("^_", txt, value = TRUE)
+  out <- list()
+  for (l in lines) {
+    toks <- strsplit(l, "\t")[[1]]
+    if (length(toks) < 2) next
+    key <- sub("^_", "", toks[1])
+    val <- trimws(paste(toks[-1], collapse = " "))
+    # Strip any stray control characters a CR-delimited file leaves behind
+    val <- gsub("[\r\n\x01-\x08\x0b\x0c\x0e-\x1f]", "", val)
+    if (nzchar(key) && nzchar(val) && is.null(out[[key]])) out[[key]] <- val
+  }
+  out
+}
+
 #' Is this token a bare rating number rather than a pole label?
 is_rating_token <- function(x) {
   !is.na(x) & grepl("^[0-9]+\\*?$", x)
@@ -146,6 +167,14 @@ parse_rgrid <- function(file_path, zero_is_na = FALSE) {
   rownames(scores_mat) <- elements
   colnames(scores_mat) <- paste(left, "-", right)
 
+  meta <- extract_rgrid_meta(txt)
+  # Field 5 of the header carries the name too; _Name is the better source, so
+  # it is only the fallback.
+  grid_name <- meta$Name
+  if (is.null(grid_name) && length(header) >= 5 && nzchar(header[5])) {
+    grid_name <- trimws(header[5])
+  }
+
   list(
     elements = elements,
     left = left,
@@ -153,6 +182,10 @@ parse_rgrid <- function(file_path, zero_is_na = FALSE) {
     scores_mat = scores_mat,
     scale = scale,
     source = source_tag,
+    meta = meta,
+    grid_name = grid_name,
+    grid_context = meta$Context,
+    grid_date = meta$Date,
     offset_applied = offset,
     zero_is_na = zero_is_na,
     n_zero_as_na = zeros,

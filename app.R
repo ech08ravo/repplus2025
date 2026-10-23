@@ -5,7 +5,7 @@ library(uuid)
 library(jsonlite)
 library(igraph)
 
-APP_VERSION <- "2.8.0"
+APP_VERSION <- "2.9.0"
 
 # Security: explicit upload size limit (10MB) and grid limits
 options(shiny.maxRequestSize = 10 * 1024^2)
@@ -820,7 +820,8 @@ ui <- fluidPage(
         tags$div(class = "sidebar-content", style = "display: none;",
           p("Each visualization has its own colour palette selector.", style = "font-size: 11px; color: #666;"),
           sliderInput("text_size", "Text Size", min = 0.8, max = 1.6, value = 1.2, step = 0.1),
-          sliderInput("grid_cell_size", "Heatmap/Focus Cell Size", min = 0.8, max = 2.0, value = 1.2, step = 0.1)
+          sliderInput("grid_cell_size", "Heatmap/Focus Cell Size", min = 0.8, max = 2.0, value = 1.2, step = 0.1),
+          checkboxInput("show_grid_caption", "Name the grid on plots", value = TRUE)
         )
       ),
       # --- Export (collapsible, collapsed by default) ---
@@ -4042,6 +4043,9 @@ server <- function(input, output, session) {
         )
         warn_duplicate_constructs(g$left, g$right)
         rv$scale <- g$scale
+        rv$grid_name <- g$grid_name
+        rv$grid_context <- g$grid_context
+        rv$grid_date <- g$grid_date
         labels <- paste(g$left, "-", g$right)
         rv$ratings <- data.frame(
           element   = rep(g$elements, times = n_c),
@@ -4310,6 +4314,29 @@ server <- function(input, output, session) {
   })
 
   # sm is elements (rows) x constructs (cols); shared by the plot and its PNG
+  # What the loaded file calls this grid, and the question its constructs were
+  # elicited against. Both are absent from a grid built in the app or imported
+  # from JSON, in which case the plot is left untitled as before.
+  grid_caption_title <- function() {
+    if (!isTRUE(input$show_grid_caption)) return(NULL)
+    nm <- rv$grid_name
+    if (is.null(nm) || !nzchar(nm)) return(NULL)
+    if (!is.null(rv$grid_date) && nzchar(rv$grid_date)) paste0(nm, "  (", rv$grid_date, ")") else nm
+  }
+  grid_caption_sub <- function(width = 90) {
+    if (!isTRUE(input$show_grid_caption)) return(NULL)
+    ctx <- rv$grid_context
+    if (is.null(ctx) || !nzchar(ctx)) return(NULL)
+    if (nchar(ctx) > width) paste0(substr(ctx, 1, width - 1), "\u2026") else ctx
+  }
+
+  # The Focus plots keep their match summary in the subtitle, so the grid's
+  # name goes on the end of the title instead.
+  with_grid_name <- function(base) {
+    nm <- if (isTRUE(input$show_grid_caption)) rv$grid_name else NULL
+    if (is.null(nm) || !nzchar(nm)) base else paste0(base, " \u2014 ", nm)
+  }
+
   draw_single_heatmap <- function(sm, pal, txt_size, cell_size) {
     shaded <- isTRUE(input$heatmap_show_shading)
     zlim <- range(sm, na.rm = TRUE)
@@ -4319,6 +4346,7 @@ server <- function(input, output, session) {
       sm, elements = rv$elements,
       left_poles = rv$constructs$left, right_poles = rv$constructs$right,
       colors = pal, zlim = zlim, text_size = txt_size,
+      title = grid_caption_title(), subtitle = grid_caption_sub(),
       value_cex = cell_size * 1.2,
       value_col = function(v) {
         # Left to itself, the label reads its colour off the cell it sits on,
@@ -5097,7 +5125,7 @@ server <- function(input, output, session) {
           element_names = rv$elements,
           construct_left = rv$constructs$left,
           construct_right = rv$constructs$right,
-          title = paste0("Display ", rv$pseudonym)
+          title = with_grid_name(paste0("Display ", rv$pseudonym))
         ),
         common
       ))
@@ -5107,7 +5135,7 @@ server <- function(input, output, session) {
       do.call(if (spaced) plot_focus_spaced else plot_focus_cluster, c(
         list(
           focus_result = focus_result(),
-          title = if (spaced) "SPACED: Focus Cluster Analysis" else "Focus Cluster Analysis",
+          title = with_grid_name(if (spaced) "SPACED: Focus Cluster Analysis" else "Focus Cluster Analysis"),
           construct_left = rv$constructs$left,
           construct_right = rv$constructs$right
         ),

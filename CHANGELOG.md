@@ -2,6 +2,20 @@
 
 All notable changes to WebGrid.Online are documented in this file.
 
+## [2.9.0] - 2026-10-23
+
+### Added
+- **Plots name the grid they are drawn from.** A `.rgrid` file carries the
+  grid's name and the question its constructs were elicited against in its
+  trailing `_Name` and `_Context` lines, but the importer was discarding both.
+  They are read now, and the heatmap carries the name and date as its title
+  with the elicitation context beneath - so `yurungi` prints as
+  "yurungi (2019-04-02)" over "Your perception of collaboration platforms...".
+  The Focus and Display plots append the name to their own titles, which keep
+  their match summaries in the subtitle. "Name the grid on plots" under Display
+  Options turns it off. A grid built in the app or imported from JSON carries
+  no such metadata and is left untitled, as before.
+
 ## [2.8.0] - 2026-10-23
 
 ### Added
