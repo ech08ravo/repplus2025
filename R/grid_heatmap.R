@@ -40,6 +40,12 @@ palette_index <- function(v, zlim, n) {
 #' @param elem_col,pole_col Colours for the element labels along the bottom
 #'   and the construct pole labels down each side. pole_col may be one colour
 #'   per construct, to show which grid each one came from.
+#' @param element_hclust,construct_hclust Optional hclust objects. When given,
+#'   a dendrogram is drawn above the elements and to the right of the
+#'   constructs. The matrix must already be in the order those trees imply -
+#'   leaf k across is element k, leaf k down is construct k - which is what
+#'   reordering by hc$order gives you. A colour bar cannot be shown at the same
+#'   time: it splits the device, and the construct tree needs that same strip.
 #' @param grid_lines Draw cell boundaries. Worth turning on when the cells
 #'   carry no shading, so the grid still reads as a grid
 #' @param note Optional line of text under the element labels
@@ -52,6 +58,7 @@ draw_grid_heatmap <- function(mat, elements, left_poles, right_poles,
                               value_fmt = function(v) sprintf("%.0f", v),
                               value_col = function(v) "black",
                               elem_col = "black", pole_col = "black",
+                              element_hclust = NULL, construct_hclust = NULL,
                               grid_lines = FALSE,
                               note = NULL, legend_title = NULL,
                               legend_at = NULL, legend_labels = legend_at) {
@@ -64,22 +71,56 @@ draw_grid_heatmap <- function(mat, elements, left_poles, right_poles,
   left_lab <- wrap_pole(left_poles)
   right_lab <- wrap_pole(right_poles)
 
+  # A colour bar splits the device in two, and the construct dendrogram wants
+  # the strip the bar would occupy. Asking for both is a mistake worth naming
+  # rather than drawing something overlapping.
+  show_dendro_e <- !is.null(element_hclust) && n_e > 1
+  show_dendro_c <- !is.null(construct_hclust) && n_c > 1
+  if (!is.null(legend_title) && (show_dendro_e || show_dendro_c)) {
+    stop("draw_grid_heatmap(): a legend and dendrograms cannot share the plot; ",
+         "drop legend_title to show the trees.")
+  }
+
   if (!is.null(legend_title)) layout(matrix(c(1, 2), nrow = 1), widths = c(6, 1))
+
+  din <- par("din")
+  csi <- par("csi")                      # height of one margin line, in inches
+  # Tree depth, in inches. Capped so a tall window does not hand most of the
+  # plot to the dendrograms, and floored so a short one still shows them.
+  dend_top_in <- if (show_dendro_e) min(1.1, max(0.4, din[2] * 0.14)) else 0
+  dend_right_in <- if (show_dendro_c) min(1.1, max(0.4, din[1] * 0.11)) else 0
+
+  right_lab_in <- if (length(right_lab)) {
+    max(strwidth(right_lab, units = "inches", cex = pole_cex), na.rm = TRUE)
+  } else 0
 
   bottom_mar <- label_margin_lines(elements, elem_cex) + if (is.null(note)) 0.5 else 2
   left_mar <- label_margin_lines(left_lab, pole_cex)
-  right_mar <- label_margin_lines(right_lab, pole_cex)
+  right_mar <- label_margin_lines(right_lab, pole_cex) + dend_right_in / csi
   top_mar <- if (is.null(title)) 1.5 else 3.5
   if (!is.null(subtitle)) top_mar <- top_mar + 1.4
+  top_mar <- top_mar + dend_top_in / csi
   par(mar = c(bottom_mar, left_mar, top_mar, right_mar), family = "sans")
 
   # image() puts z[i, k] at (x = i, y = k); reverse the construct columns
   # so construct 1 lands on the top row
+  # With a dendrogram above, the top margin is no longer just the title's -
+  # image() would place main() relative to the plot edge, underneath the tree.
+  # In that case the title and subtitle are placed by hand, above it.
+  has_dendro <- show_dendro_e || show_dendro_c
+
   image(1:n_e, 1:n_c, mat[, n_c:1, drop = FALSE],
         col = colors, zlim = zlim, axes = FALSE, xlab = "", ylab = "",
-        main = title, cex.main = text_size * 1.1)
+        main = if (has_dendro) NULL else title, cex.main = text_size * 1.1)
 
-  if (!is.null(subtitle)) {
+  if (has_dendro && !is.null(title)) {
+    title_line <- top_mar - 1.6
+    mtext(title, side = 3, line = title_line, cex = text_size * 1.1, font = 2)
+    if (!is.null(subtitle)) {
+      mtext(subtitle, side = 3, line = title_line - 1.2,
+            cex = 0.72 * text_size, col = "#555555")
+    }
+  } else if (!is.null(subtitle)) {
     mtext(subtitle, side = 3, line = 0.6, cex = 0.72 * text_size, col = "#555555")
   }
 
@@ -128,6 +169,46 @@ draw_grid_heatmap <- function(mat, elements, left_poles, right_poles,
     par(xpd = old_xpd)
   }
   box()
+
+  # --- dendrograms ---------------------------------------------------------
+  # image() uses xaxs/yaxs = "i", so the user window is exactly the cell
+  # extent: x spans 0.5 .. n_e + 0.5 and y 0.5 .. n_c + 0.5. That makes the
+  # conversion from inches to user units a straight ratio against par("pin").
+  if (show_dendro_e || show_dendro_c) {
+    ux <- n_e / par("pin")[1]            # user units per inch, across
+    uy <- n_c / par("pin")[2]            # user units per inch, down
+    old_xpd <- par("xpd"); par(xpd = NA)
+
+    if (show_dendro_e) {
+      lay <- dendro_layout(element_hclust, seq_len(n_e))
+      if (nrow(lay$segs) > 0) {
+        max_h <- max(element_hclust$height)
+        if (!is.finite(max_h) || max_h <= 0) max_h <- 1
+        base_y <- n_c + 0.5 + 0.10 * uy          # small gap above the box
+        span <- max(0, dend_top_in - 0.14) * uy
+        to_y <- function(h) base_y + (h / max_h) * span
+        segments(lay$segs[, 1], to_y(lay$segs[, 2]),
+                 lay$segs[, 3], to_y(lay$segs[, 4]), col = "#555555", lwd = 1)
+      }
+    }
+
+    if (show_dendro_c) {
+      # Construct j is drawn at y = n_c - j + 1, so leaf k down the display is
+      # at n_c - k + 1; dendro_layout wants those positions in display order.
+      lay <- dendro_layout(construct_hclust, n_c:1)
+      if (nrow(lay$segs) > 0) {
+        max_h <- max(construct_hclust$height)
+        if (!is.finite(max_h) || max_h <= 0) max_h <- 1
+        # Start clear of the right pole labels, which sit in the same margin.
+        base_x <- n_e + 0.5 + (right_lab_in + 0.12) * ux
+        span <- max(0, dend_right_in - 0.14) * ux
+        to_x <- function(h) base_x + (h / max_h) * span
+        segments(to_x(lay$segs[, 2]), lay$segs[, 1],
+                 to_x(lay$segs[, 4]), lay$segs[, 3], col = "#555555", lwd = 1)
+      }
+    }
+    par(xpd = old_xpd)
+  }
 
   if (!is.null(note)) {
     mtext(note, side = 1, line = bottom_mar - 1.2, cex = 0.7 * text_size)

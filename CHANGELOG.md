@@ -2,6 +2,26 @@
 
 All notable changes to WebGrid.Online are documented in this file.
 
+## [2.15.0] - 2026-10-23
+
+### Added
+- **Dendrograms on the FOCUS-sorted Mode Grid.** With "Sort by FOCUS match" on,
+  the element tree is drawn above the grid and the construct tree to its right,
+  so the clustering is shown rather than left to be inferred from the ordering.
+  `draw_grid_heatmap()` gained the two tree arguments; they default to NULL, so
+  the single-grid heatmap, MINUS and CORE are unaffected.
+- The Mode Grid plot height now follows the construct count and whether a tree
+  is being drawn. At the old fixed 600px a dendrogram would have paid for
+  itself by thinning the cells.
+
+### Changed
+- **The Mode Grid's rating colour bar is gone.** It took an eighth of the plot
+  width to say a third time what the caption says in words and the cell values
+  say in numbers, and it split the device in two - the half the construct
+  dendrogram needs. MINUS keeps its "Diff" bar, where the scale is signed and
+  less self-evident. Asking `draw_grid_heatmap()` for a colour bar and a
+  dendrogram together is now an error rather than an overlap.
+
 ## [2.14.0] - 2026-10-23
 
 ### Added

@@ -5,7 +5,7 @@ library(uuid)
 library(jsonlite)
 library(igraph)
 
-APP_VERSION <- "2.14.0"
+APP_VERSION <- "2.15.0"
 
 # Security: explicit upload size limit (10MB) and grid limits
 options(shiny.maxRequestSize = 10 * 1024^2)
@@ -1803,7 +1803,7 @@ ui <- fluidPage(
                  p("Generate a consensus grid representing commonality across multiple participants."),
                  fluidRow(
                    column(8,
-                          plotOutput("mode_grid_heatmap", height = "600px")
+                          uiOutput("mode_grid_heatmap_ui")
                    ),
                    column(4,
                           selectInput("mode_method", "Consensus Method:",
@@ -6273,6 +6273,10 @@ server <- function(input, output, session) {
     g$elements <- g$elements[eo]
     g$constructs <- g$constructs[co, , drop = FALSE]
     if (!is.null(g$construct_source)) g$construct_source <- g$construct_source[co]
+    # The matrix is now in the order these trees imply, which is what
+    # draw_grid_heatmap() needs before it will draw them.
+    g$element_hclust <- fr$element_hclust
+    g$construct_hclust <- fr$construct_hclust
     g$focus_sorted <- TRUE
     g
   }
@@ -6307,10 +6311,13 @@ server <- function(input, output, session) {
         if (pct > 0.75 || pct < 0.15) "white" else "black"
       },
       pole_col = pole_col,
+      # The caption already says which colour is which end of the scale, and
+      # the cells carry their values, so the colour bar was saying a third
+      # time what is said twice - at an eighth of the width, which the grid
+      # and the construct dendrogram both want.
       note = note,
-      legend_title = "Rating",
-      legend_at = c(scale_min, (scale_min + scale_max) / 2, scale_max),
-      legend_labels = c(scale_min, round((scale_min + scale_max) / 2, 1), scale_max)
+      element_hclust = g$element_hclust,
+      construct_hclust = g$construct_hclust
     )
 
     # Which colour means which grid. Drawn after the heatmap so it sits over
@@ -6327,6 +6334,17 @@ server <- function(input, output, session) {
       par(xpd = old_xpd)
     }
   }
+
+  # A dendrogram takes its space out of the plot, so a fixed height would pay
+  # for the tree by thinning the cells. The height follows the construct count
+  # and whether a tree is being drawn.
+  output$mode_grid_heatmap_ui <- renderUI({
+    g <- rv$mode_grid
+    n_const <- if (is.null(g)) 0 else nrow(g$constructs)
+    txt <- input$mode_text_size %||% 1.2
+    h <- 260 + n_const * 30 * txt + (if (isTRUE(input$mode_focus_sort)) 110 else 0)
+    plotOutput("mode_grid_heatmap", height = max(420, min(2400, round(h))))
+  })
 
   output$mode_grid_heatmap <- renderPlot({
     req(rv$mode_grid)
