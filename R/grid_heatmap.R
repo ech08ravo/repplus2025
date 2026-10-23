@@ -38,7 +38,8 @@ palette_index <- function(v, zlim, n) {
 #' @param subtitle Smaller line under the title - the grid's elicitation
 #'   context, where the file carries one
 #' @param elem_col,pole_col Colours for the element labels along the bottom
-#'   and the construct pole labels down each side
+#'   and the construct pole labels down each side. pole_col may be one colour
+#'   per construct, to show which grid each one came from.
 #' @param grid_lines Draw cell boundaries. Worth turning on when the cells
 #'   carry no shading, so the grid still reads as a grid
 #' @param note Optional line of text under the element labels
@@ -101,10 +102,31 @@ draw_grid_heatmap <- function(mat, elements, left_poles, right_poles,
 
   axis(1, at = 1:n_e, labels = elements, las = 2, cex.axis = elem_cex,
        col.axis = elem_col)
-  axis(2, at = n_c:1, labels = left_lab, las = 1, cex.axis = pole_cex,
-       col.axis = pole_col)
-  axis(4, at = n_c:1, labels = right_lab, las = 1, cex.axis = pole_cex,
-       col.axis = pole_col)
+
+  if (length(pole_col) <= 1) {
+    axis(2, at = n_c:1, labels = left_lab, las = 1, cex.axis = pole_cex,
+         col.axis = pole_col)
+    axis(4, at = n_c:1, labels = right_lab, las = 1, cex.axis = pole_cex,
+         col.axis = pole_col)
+  } else {
+    # col.axis is one graphical parameter for the whole axis - axis() will not
+    # take a colour per label - so the ticks are drawn bare and each label is
+    # placed by hand. text() rather than mtext() because a wrapped pole label
+    # carries newlines, which mtext does not lay out.
+    pc <- rep_len(pole_col, n_c)
+    axis(2, at = n_c:1, labels = FALSE, cex.axis = pole_cex)
+    axis(4, at = n_c:1, labels = FALSE, cex.axis = pole_cex)
+    old_xpd <- par("xpd"); par(xpd = NA)
+    gap <- strwidth("m", cex = pole_cex)
+    for (j in seq_len(n_c)) {
+      y <- n_c - j + 1
+      text(0.5 - gap, y, left_lab[j], adj = c(1, 0.5),
+           cex = pole_cex, col = pc[j])
+      text(n_e + 0.5 + gap, y, right_lab[j], adj = c(0, 0.5),
+           cex = pole_cex, col = pc[j])
+    }
+    par(xpd = old_xpd)
+  }
   box()
 
   if (!is.null(note)) {

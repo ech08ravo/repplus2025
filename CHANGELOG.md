@@ -2,6 +2,23 @@
 
 All notable changes to WebGrid.Online are documented in this file.
 
+## [2.13.0] - 2026-10-23
+
+### Added
+- **Mode Grid construct labels can be coloured by the grid they came from.**
+  With several grids merged into one picture there was no way to see whose
+  construct was whose. `generate_mode_grid()` already worked out the source of
+  each construct when collecting, then discarded it on the way out; it is kept
+  now, and recorded when folding too. A construct that folding merged across
+  grids is marked "Shared" and drawn in grey rather than credited to whichever
+  grid happened to be read first. A key along the bottom says which colour is
+  which. "Colour construct labels by source grid" on the Mode Grid tab turns it
+  off.
+- `draw_grid_heatmap()` accepts one pole colour per construct. `axis()` takes a
+  single `col.axis` for a whole axis, so in that case the tick labels are drawn
+  individually - with `text()` rather than `mtext()`, since a wrapped pole label
+  contains newlines that `mtext()` does not lay out.
+
 ## [2.12.0] - 2026-10-23
 
 ### Added

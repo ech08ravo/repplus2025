@@ -5,7 +5,7 @@ library(uuid)
 library(jsonlite)
 library(igraph)
 
-APP_VERSION <- "2.12.0"
+APP_VERSION <- "2.13.0"
 
 # Security: explicit upload size limit (10MB) and grid limits
 options(shiny.maxRequestSize = 10 * 1024^2)
@@ -1820,6 +1820,9 @@ ui <- fluidPage(
                                       ),
                                       selected = "wong"),
                           checkboxInput("mode_show_values", "Show Rating Values", value = TRUE),
+                          checkboxInput("mode_color_by_grid",
+                                        "Colour construct labels by source grid",
+                                        value = TRUE),
                           sliderInput("mode_text_size", "Text Size",
                                       min = 0.8, max = 2.0, value = 1.2, step = 0.1),
                           actionButton("generate_mode_grid", "Generate Mode Grid", class = "btn-primary"),
@@ -6216,6 +6219,26 @@ server <- function(input, output, session) {
 
   # Mode grid heatmap
   # Shared by the Mode Grid plot and its PNG download
+  # A colour per source grid, plus a fixed one for constructs that folding
+  # merged across grids - those belong to no single grid, so giving them any
+  # grid's colour would misreport where they came from.
+  MODE_SHARED_COL <- "#555555"
+  mode_source_colors <- function(g) {
+    src <- g$construct_source
+    if (is.null(src)) return(NULL)
+    grids <- setdiff(unique(src), "Shared")
+    if (length(grids) == 0) return(NULL)
+    pal <- get_palette_colors(input$mode_palette)
+    # Start from the palette's own hues, then fall back to a colour-blind-safe
+    # sequence for however many grids are left.
+    base <- unique(c(pal$element, pal$construct, pal$highlight, pal$accent,
+                     "#0072B2", "#D55E00", "#009E73", "#CC79A7",
+                     "#56B4E9", "#E69F00", "#8B4513", "#4B0082"))
+    key <- setNames(rep_len(base, length(grids)), grids)
+    list(per_construct = ifelse(src == "Shared", MODE_SHARED_COL, key[src]),
+         key = key, has_shared = any(src == "Shared"))
+  }
+
   draw_mode_heatmap <- function(g) {
     text_size <- if (!is.null(input$mode_text_size)) input$mode_text_size else 1.2
     show_values <- if (!is.null(input$mode_show_values)) input$mode_show_values else TRUE
@@ -6223,6 +6246,13 @@ server <- function(input, output, session) {
     scale_max <- g$scale[2]
     mode_colors <- get_palette_colors(input$mode_palette)
     colors <- colorRampPalette(c(mode_colors$heat_low, "#FFFFFF", mode_colors$heat_high))(100)
+
+    sc <- if (isTRUE(input$mode_color_by_grid)) mode_source_colors(g) else NULL
+    pole_col <- if (is.null(sc)) "black" else unname(sc$per_construct)
+
+    note <- paste0("Blue = low (", scale_min, ", left pole)    White = mid    Orange = high (",
+                   scale_max, ", right pole)")
+
     draw_grid_heatmap(
       g$scores_mat, elements = g$elements,
       left_poles = g$constructs$left, right_poles = g$constructs$right,
@@ -6234,12 +6264,26 @@ server <- function(input, output, session) {
         pct <- (v - scale_min) / (scale_max - scale_min)
         if (pct > 0.75 || pct < 0.15) "white" else "black"
       },
-      note = paste0("Blue = low (", scale_min, ", left pole)    White = mid    Orange = high (",
-                    scale_max, ", right pole)"),
+      pole_col = pole_col,
+      note = note,
       legend_title = "Rating",
       legend_at = c(scale_min, (scale_min + scale_max) / 2, scale_max),
       legend_labels = c(scale_min, round((scale_min + scale_max) / 2, 1), scale_max)
     )
+
+    # Which colour means which grid. Drawn after the heatmap so it sits over
+    # the figure margin rather than stealing width from the grid itself.
+    if (!is.null(sc)) {
+      labs <- names(sc$key); cols <- unname(sc$key)
+      if (isTRUE(sc$has_shared)) {
+        labs <- c(labs, "Shared"); cols <- c(cols, MODE_SHARED_COL)
+      }
+      old_xpd <- par("xpd"); par(xpd = NA)
+      legend(grconvertX(0.01, "ndc", "user"), grconvertY(0.015, "ndc", "user"),
+             legend = labs, text.col = cols, col = cols, pch = 15,
+             bty = "n", cex = 0.7 * text_size, horiz = TRUE, xjust = 0, yjust = 0)
+      par(xpd = old_xpd)
+    }
   }
 
   output$mode_grid_heatmap <- renderPlot({

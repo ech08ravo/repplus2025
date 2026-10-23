@@ -287,9 +287,16 @@ generate_mode_grid <- function(grids, common_elements = NULL, method = "average"
     )
   })
 
+  grid_names <- names(grids)
+  if (is.null(grid_names) || !all(nzchar(grid_names))) {
+    grid_names <- paste0("Grid", seq_along(grids))
+  }
+
   if (construct_handling == "fold") {
     # Find identical constructs (by label) and average their ratings
     all_labels <- unique(unlist(lapply(normalized_grids, function(g) g$labels)))
+    # Which grids each folded construct came from, so the plot can say so.
+    construct_source <- character(0)
 
     result_mat <- matrix(NA_real_, nrow = length(common_elements), ncol = length(all_labels))
     result_constructs <- data.frame(left = character(), right = character(),
@@ -299,10 +306,13 @@ generate_mode_grid <- function(grids, common_elements = NULL, method = "average"
       label <- all_labels[k]
       # Find this construct in each grid
       ratings_list <- list()
-      for (g in normalized_grids) {
+      contributors <- character(0)
+      for (gi in seq_along(normalized_grids)) {
+        g <- normalized_grids[[gi]]
         idx <- which(g$labels == label)
         if (length(idx) > 0) {
           ratings_list[[length(ratings_list) + 1]] <- g$mat[, idx[1]]
+          contributors <- c(contributors, grid_names[gi])
         }
       }
 
@@ -322,6 +332,11 @@ generate_mode_grid <- function(grids, common_elements = NULL, method = "average"
           right = if (length(parts) > 1) parts[2] else "",
           stringsAsFactors = FALSE
         ))
+        # A folded construct that more than one grid used is no longer any one
+        # grid's, so it is labelled as shared rather than attributed to the
+        # first grid that happened to carry it.
+        construct_source <- c(construct_source,
+                              if (length(contributors) > 1) "Shared" else contributors[1])
       }
     }
 
@@ -333,9 +348,6 @@ generate_mode_grid <- function(grids, common_elements = NULL, method = "average"
     all_constructs <- data.frame(left = character(), right = character(),
                                  source = character(), stringsAsFactors = FALSE)
 
-    grid_names <- names(grids)
-    if (is.null(grid_names)) grid_names <- paste0("Grid", seq_along(grids))
-
     for (i in seq_along(normalized_grids)) {
       g <- normalized_grids[[i]]
       all_mats[[i]] <- g$mat
@@ -346,6 +358,7 @@ generate_mode_grid <- function(grids, common_elements = NULL, method = "average"
 
     result_mat <- do.call(cbind, all_mats)
     result_constructs <- all_constructs
+    construct_source <- all_constructs$source
   }
 
   rownames(result_mat) <- common_elements
@@ -375,6 +388,11 @@ generate_mode_grid <- function(grids, common_elements = NULL, method = "average"
     name = paste("Mode Grid (", method, ")", sep = ""),
     elements = common_elements,
     constructs = result_constructs[, c("left", "right")],
+    # Which grid each construct came from ("Shared" when folding merged
+    # several). Kept separate from `constructs` so nothing that reads that
+    # data frame sees an unexpected column.
+    construct_source = construct_source,
+    grid_names = grid_names,
     ratings = ratings_df,
     scores_mat = result_mat,
     scale = target_scale,
