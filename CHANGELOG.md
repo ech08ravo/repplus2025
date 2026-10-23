@@ -2,6 +2,33 @@
 
 All notable changes to WebGrid.Online are documented in this file.
 
+## [2.7.0] - 2026-10-23
+
+### Added
+- **The heatmap can be drawn with no shading at all.** A "Show Shading" checkbox
+  turns the colour off entirely, leaving white cells carrying only their rating
+  values, with cell boundaries drawn so the grid still reads as a grid. The
+  existing "Use color shading" checkbox only ever swapped colour for a grey
+  ramp - still shading, and already available as the Greyscale palette - so
+  there was no way to read the grid as a plain table of numbers. The Heatmap tab
+  now offers the same shading controls as the Focus tab.
+
+### Fixed
+- **The Heatmap/Focus cell size slider now changes the heatmap's cells.** It was
+  wired only to the size of the digits; the plot itself was pinned at 500px
+  whether the grid had three constructs or forty, and `image()` stretches its
+  cells to fill whatever device it is given, so the cells themselves never
+  moved. The plot height now follows both the slider and the number of
+  constructs. The PNG download shared the same fixed height, so tall grids
+  downloaded squashed; it follows the same rule now.
+- **Rating values stay legible on every cell.** The label colour was chosen by a
+  fixed `value > 4` test, which assumed a 1-7 scale: it put white digits on the
+  pale middle of a diverging palette, black digits on dark greys, and would have
+  rendered white on white once shading could be turned off. Each label now takes
+  its colour from the cell it actually sits on.
+- Corrected a test fixture path left stale by the `bezzi1996_expert` to
+  `bezzi1996_nick` rename, which had been failing the grid integrity suite.
+
 ## [2.6.0] - 2026-09-14
 
 ### Changed

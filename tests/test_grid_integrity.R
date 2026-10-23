@@ -69,7 +69,7 @@ pub <- matrix(c(
   4,1,2,2,2,3,5,3,1,      1,5,5,5,1,3,5,5,5,
   5,1,1,5,5,3,1,1,1,      1,1,1,1,1,1,3,2,5), nrow = 16, byrow = TRUE)
 
-bz <- parse_rgrid("dataExamples/bezzi1996_expert.rgrid")
+bz <- parse_rgrid("dataExamples/bezzi1996_nick.rgrid")
 check("Bezzi: N/A cells match the published figure",
       identical(is.na(pub), unname(is.na(t(bz$scores_mat)))))
 check("Bezzi: all 144 cells match the published figure",

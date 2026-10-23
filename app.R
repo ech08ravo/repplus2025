@@ -5,7 +5,7 @@ library(uuid)
 library(jsonlite)
 library(igraph)
 
-APP_VERSION <- "2.6.0"
+APP_VERSION <- "2.7.0"
 
 # Security: explicit upload size limit (10MB) and grid limits
 options(shiny.maxRequestSize = 10 * 1024^2)
@@ -1106,6 +1106,7 @@ ui <- fluidPage(
         tabPanel(title = tagList(tags$span(class = "sg-dot"), "Heatmap"), value = "Heatmap",
                  fluidRow(
                    column(4,
+                     checkboxInput("heatmap_show_shading", "Show Shading", value = TRUE),
                      checkboxInput("heatmap_use_color", "Use color shading", value = TRUE)
                    ),
                    column(4,
@@ -1120,7 +1121,7 @@ ui <- fluidPage(
                                  selected = "wong")
                    )
                  ),
-                 plotOutput("heatmap_plot", height = 500),
+                 uiOutput("heatmap_plot_ui"),
                  div(class = "plot-toolbar",
                    tags$button(type = "button", class = "btn btn-outline-info btn-sm",
                                onclick = "popoutPlot('heatmap_plot', 'Heatmap')",
@@ -4222,34 +4223,63 @@ server <- function(input, output, session) {
     }
   })
 
+  # One source of truth for the heatmap palette, shared by the on-screen plot
+  # and the PNG download so the two cannot drift apart.
+  heatmap_colors <- function() {
+    if (!isTRUE(input$heatmap_show_shading)) {
+      # No shading at all: every cell stays white and the values carry the
+      # data. Cell boundaries are drawn instead, so it still reads as a grid.
+      return(rep("#FFFFFF", 100))
+    }
+    colors <- get_palette_colors(input$heatmap_palette)
+    if (isTRUE(input$heatmap_use_color)) {
+      colorRampPalette(c(colors$heat_low, "#FFFFFF", colors$heat_high))(100)
+    } else {
+      # 5-step greyscale: 90%, 70%, 50%, 30%, 10% grey
+      colorRampPalette(c("#E6E6E6", "#B3B3B3", "#808080", "#4D4D4D", "#1A1A1A"))(100)
+    }
+  }
+
+  # image() stretches its cells to fill whatever device it is given, so with a
+  # fixed plot height the cell size slider could only ever change the digits.
+  # Growing the plot with the slider is what makes the cells themselves change.
+  # The constant is the fixed furniture (title, and the rotated element labels
+  # along the bottom); only the rows scale. Tuned so the default slider setting
+  # leaves a typical grid at about the 500px it used to be pinned to.
+  heatmap_plot_height <- function(n_const, cell_size, txt_size) {
+    max(360, min(3000, round(260 + n_const * 33 * cell_size * txt_size)))
+  }
+
+  output$heatmap_plot_ui <- renderUI({
+    sm <- rv$scores_mat_last
+    n_const <- if (is.null(sm)) 0 else ncol(sm)
+    plotOutput("heatmap_plot", height = heatmap_plot_height(
+      n_const, input$grid_cell_size %||% 1.2, input$text_size %||% 1.2))
+  })
+
   output$heatmap_plot <- renderPlot({
     sm <- rv$scores_mat_last
     if (is.null(sm)) return()
-
-    # Get colors from heatmap-specific palette
-    colors <- get_palette_colors(input$heatmap_palette)
-    txt_size <- input$text_size
-    cell_size <- input$grid_cell_size
-
-    # Build palette - use selected color palette
-    if (isTRUE(input$heatmap_use_color)) {
-      # Use palette colors for diverging heatmap
-      pal <- colorRampPalette(c(colors$heat_low, "#FFFFFF", colors$heat_high))(100)
-    } else {
-      # 5-step greyscale: 90%, 70%, 50%, 30%, 10% grey
-      pal <- colorRampPalette(c("#E6E6E6", "#B3B3B3", "#808080", "#4D4D4D", "#1A1A1A"))(100)
-    }
-    draw_single_heatmap(sm, pal, txt_size, cell_size)
+    draw_single_heatmap(sm, heatmap_colors(), input$text_size, input$grid_cell_size)
   })
 
   # sm is elements (rows) x constructs (cols); shared by the plot and its PNG
   draw_single_heatmap <- function(sm, pal, txt_size, cell_size) {
+    shaded <- isTRUE(input$heatmap_show_shading)
+    zlim <- range(sm, na.rm = TRUE)
     draw_grid_heatmap(
       sm, elements = rv$elements,
       left_poles = rv$constructs$left, right_poles = rv$constructs$right,
-      colors = pal, zlim = range(sm, na.rm = TRUE), text_size = txt_size,
+      colors = pal, zlim = zlim, text_size = txt_size,
       value_cex = cell_size * 1.2,
-      value_col = function(v) if (v > 4) "white" else "black"
+      # Read the label colour off the cell it sits on, so it stays legible on a
+      # dark cell, a pale one, and on no shading at all. The old fixed "> 4"
+      # threshold assumed a 1-7 scale and turned white on an unshaded cell.
+      value_col = function(v) {
+        if (!shaded) return("black")
+        contrast_text_col(pal[palette_index(v, zlim, length(pal))])
+      },
+      grid_lines = !shaded
     )
   }
 
@@ -4418,17 +4448,14 @@ server <- function(input, output, session) {
     content = function(file) {
       req(rv$scores_mat_last)
       sm <- rv$scores_mat_last
-      colors <- get_palette_colors(input$heatmap_palette)
       txt_size <- input$text_size
       cell_size <- input$grid_cell_size
-      if (isTRUE(input$heatmap_use_color)) {
-        pal <- colorRampPalette(c(colors$heat_low, "#FFFFFF", colors$heat_high))(100)
-      } else {
-        # 5-step greyscale: 90%, 70%, 50%, 30%, 10% grey
-        pal <- colorRampPalette(c("#E6E6E6", "#B3B3B3", "#808080", "#4D4D4D", "#1A1A1A"))(100)
-      }
-      png(file, width = 1200, height = 900, res = 120)
-      draw_single_heatmap(sm, pal, txt_size, cell_size)
+      # Same sizing rule as the screen plot (at PNG resolution), so a tall grid
+      # downloads tall instead of being squashed into a fixed 900px.
+      png_h <- max(900, min(4800, round(2 * heatmap_plot_height(
+        ncol(sm), cell_size %||% 1.2, txt_size %||% 1.2))))
+      png(file, width = 1200, height = png_h, res = 120)
+      draw_single_heatmap(sm, heatmap_colors(), txt_size, cell_size)
       dev.off()
     }
   )

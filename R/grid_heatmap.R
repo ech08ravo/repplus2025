@@ -17,6 +17,16 @@ label_margin_lines <- function(labels, cex) {
   w / par("csi") + 1.5
 }
 
+# Which palette entry a value lands on - the same mapping image() applies
+# across zlim. Used to pick a label colour that contrasts with its own cell.
+palette_index <- function(v, zlim, n) {
+  if (!is.finite(v)) return(1L)
+  span <- diff(zlim)
+  frac <- if (!is.finite(span) || span == 0) 0.5 else (v - zlim[1]) / span
+  idx <- as.integer(round(frac * (n - 1))) + 1L
+  max(1L, min(as.integer(n), idx))
+}
+
 #' Draw a grid heatmap
 #' @param mat Matrix, elements (rows) x constructs (cols), as scores_mat
 #' @param elements,left_poles,right_poles Labels, in the same order as mat
@@ -25,6 +35,8 @@ label_margin_lines <- function(labels, cex) {
 #' @param value_cex Text size of the cell values
 #' @param value_fmt Function turning a cell value into its label
 #' @param value_col Function giving the label colour for a cell value
+#' @param grid_lines Draw cell boundaries. Worth turning on when the cells
+#'   carry no shading, so the grid still reads as a grid
 #' @param note Optional line of text under the element labels
 #' @param legend_title If not NULL, draw a colour bar to the right with
 #'   ticks at legend_at labelled legend_labels
@@ -33,6 +45,7 @@ draw_grid_heatmap <- function(mat, elements, left_poles, right_poles,
                               show_values = TRUE, value_cex = 0.8 * text_size,
                               value_fmt = function(v) sprintf("%.0f", v),
                               value_col = function(v) "black",
+                              grid_lines = FALSE,
                               note = NULL, legend_title = NULL,
                               legend_at = NULL, legend_labels = legend_at) {
   n_e <- nrow(mat)
@@ -57,6 +70,11 @@ draw_grid_heatmap <- function(mat, elements, left_poles, right_poles,
   image(1:n_e, 1:n_c, mat[, n_c:1, drop = FALSE],
         col = colors, zlim = zlim, axes = FALSE, xlab = "", ylab = "",
         main = title, cex.main = text_size * 1.1)
+
+  if (grid_lines) {
+    abline(v = seq(0.5, n_e + 0.5, by = 1), col = "#CCCCCC", lwd = 0.5)
+    abline(h = seq(0.5, n_c + 0.5, by = 1), col = "#CCCCCC", lwd = 0.5)
+  }
 
   if (show_values) {
     for (i in seq_len(n_e)) {
